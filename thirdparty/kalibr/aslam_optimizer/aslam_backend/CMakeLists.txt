@@ -1,19 +1,12 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(aslam_backend)
 
-find_package(catkin_simple REQUIRED)
-catkin_simple()
-
 find_package(Boost REQUIRED COMPONENTS system thread)
 
-include_directories(${Eigen_INCLUDE_DIRS})
+find_package(Eigen3 REQUIRED)
+include_directories(SYSTEM ${EIGEN3_INCLUDE_DIR})
 
-#add_definitions( -fPIC -msse2 -mssse3 -march=nocona -Wextra -Winit-self -Woverloaded-virtual -Wnon-virtual-dtor -Wsign-promo -Wno-long-long -std=c++0x -O3)
-
-#target_link_libraries(${PROJECT_NAME} ${CHOLMOD_LIBRARIES} ${EXTRA_LIBS}  ${CSPARSE_LIBRARY})
-#rosbuild_link_boost(${PROJECT_NAME} thread system)
-
-cs_add_library(${PROJECT_NAME}
+add_library(${PROJECT_NAME}
   src/MEstimatorPolicies.cpp
   src/JacobianContainer.cpp
   src/DesignVariable.cpp
@@ -46,29 +39,18 @@ cs_add_library(${PROJECT_NAME}
   src/Optimizer2.cpp
 )
 
-target_link_libraries(${PROJECT_NAME} ${Boost_LIBRARIES} ${TBB_LIBRARIES})
+target_link_libraries(${PROJECT_NAME}
+        ${Boost_LIBRARIES}
+        ${TBB_LIBRARIES}
+        sparse_block_matrix
+        sm_boost
+        sm_eigen
+        sm_random
+        sm_timing
+        sm_logging
+        sm_property_tree
+        suitesparse
+        )
 
-if(CATKIN_ENABLE_TESTING)
-
-  # Avoid clash with tr1::tuple: https://code.google.com/p/googletest/source/browse/trunk/README?r=589#257
-  add_definitions(-DGTEST_USE_OWN_TR1_TUPLE=0)
-  catkin_add_gtest(${PROJECT_NAME}_test
-    test/test_main.cpp
-    test/JacobianContainer.cpp
-    test/test_sparse_matrix_functions.cpp
-    test/TestOptimizer.cpp
-    test/TestOptimizationProblem.cpp
-    test/CompressedColumnMatrixTest.cpp
-    test/MatrixTestHarness.cpp
-    test/DenseMatrixTest.cpp
-    test/SparseMatrixTest.cpp
-    test/LinearSolverTests.cpp
-    test/ErrorTermTests.cpp
-    )
-  target_link_libraries(${PROJECT_NAME}_test ${PROJECT_NAME})
-
-endif()
-
-cs_install()
-cs_export()
-
+target_include_directories(${PROJECT_NAME} PUBLIC
+        include)

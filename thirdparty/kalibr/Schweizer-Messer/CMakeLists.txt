@@ -1,0 +1,7 @@
+add_subdirectory(sm_boost)
+add_subdirectory(sm_common)
+add_subdirectory(sm_eigen)
+add_subdirectory(sm_random)
+add_subdirectory(sm_logging)
+add_subdirectory(sm_property_tree)
+add_subdirectory(sm_timing)
