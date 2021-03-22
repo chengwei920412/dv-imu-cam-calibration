@@ -5,8 +5,7 @@ find_package(Boost REQUIRED COMPONENTS system serialization)
 find_package(Eigen3 REQUIRED)
 include_directories(SYSTEM ${EIGEN3_INCLUDE_DIR})
 
-include_directories(include
-        ${Boost_INCLUDE_DIRS})
+include_directories(${Boost_INCLUDE_DIRS})
 
 ##############
 ## Building ##
@@ -20,6 +19,9 @@ target_link_libraries(${PROJECT_NAME}
                       ${Boost_LIBRARIES}
                       sm_common
                       sm_random)
+
+target_include_directories(${PROJECT_NAME} PUBLIC
+        include)
 
 ##################
 ## Installation ##

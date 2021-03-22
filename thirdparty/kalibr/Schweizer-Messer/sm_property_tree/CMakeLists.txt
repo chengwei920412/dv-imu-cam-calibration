@@ -6,7 +6,7 @@ find_package(Boost REQUIRED COMPONENTS system filesystem)
 add_definitions(-D__STRICT_ANSI__)
 remove_definitions(-std=c++0x -std-c++11)
 
-include_directories(include ${Boost_INCLUDE_DIRS})
+include_directories(${Boost_INCLUDE_DIRS})
 
 ##############
 ## Building ##
@@ -24,3 +24,6 @@ target_link_libraries(${PROJECT_NAME}
                       ${Boost_LIBRARIES}
                       pthread
                       sm_common)
+
+target_include_directories(${PROJECT_NAME} PUBLIC
+        include)

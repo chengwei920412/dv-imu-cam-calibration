@@ -3,7 +3,7 @@ project(sm_logging)
 
 find_package(Boost REQUIRED COMPONENTS system thread regex)
 
-include_directories(include ${Boost_INCLUDE_DIRS})
+include_directories(${Boost_INCLUDE_DIRS})
 
 add_definitions(-std=c++0x)
 
@@ -22,6 +22,9 @@ add_library(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME} 
                       ${Boost_LIBRARIES})
+
+target_include_directories(${PROJECT_NAME} PUBLIC
+        include)
 
 ##################
 ## Installation ##

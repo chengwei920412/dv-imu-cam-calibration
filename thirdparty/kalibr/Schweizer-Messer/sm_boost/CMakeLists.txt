@@ -3,7 +3,7 @@ project(sm_boost)
 
 find_package(Boost REQUIRED COMPONENTS system serialization thread)
 
-include_directories(include ${Boost_INCLUDE_DIRS})
+include_directories(${Boost_INCLUDE_DIRS})
 
 ##############
 ## Building ##
@@ -18,6 +18,9 @@ add_library(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME}
                       ${Boost_LIBRARIES}
                       sm_common)
+
+target_include_directories(${PROJECT_NAME} PUBLIC
+        include)
 
 ##################
 ## Installation ##
