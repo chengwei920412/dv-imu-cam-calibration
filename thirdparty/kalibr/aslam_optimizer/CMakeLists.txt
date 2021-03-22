@@ -1,4 +1,2 @@
 
-include_directories(sparse_block_matrix/include)
 add_subdirectory(sparse_block_matrix)
-add_dependencies(sparse_block_matrix sm_common sm_eigen suitesparse)

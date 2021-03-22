@@ -17,10 +17,9 @@ add_library(${PROJECT_NAME}
 )
 
 target_link_libraries(${PROJECT_NAME} 
-                      ${Boost_LIBRARIES})
-
-add_dependencies(${PROJECT_NAME}
-        sm_random)
+                      ${Boost_LIBRARIES}
+                      sm_common
+                      sm_random)
 
 ##################
 ## Installation ##

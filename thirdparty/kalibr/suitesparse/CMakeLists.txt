@@ -47,6 +47,9 @@ target_link_libraries(${PROJECT_NAME}
   ${PROJECT_BINARY_DIR}/lib/librbio.a
   ${PROJECT_BINARY_DIR}/lib/libsuitesparseconfig.a)
 add_dependencies(${PROJECT_NAME} suitesparse_src)
+target_include_directories(${PROJECT_NAME} PUBLIC
+        include
+        ${PROJECT_BINARY_DIR}/include/suitesparse/)
 
 install(DIRECTORY include
   DESTINATION include

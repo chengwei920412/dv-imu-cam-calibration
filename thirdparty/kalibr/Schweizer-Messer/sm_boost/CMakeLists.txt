@@ -16,7 +16,8 @@ add_library(${PROJECT_NAME}
 )
 
 target_link_libraries(${PROJECT_NAME}
-                      ${Boost_LIBRARIES})
+                      ${Boost_LIBRARIES}
+                      sm_common)
 
 ##################
 ## Installation ##

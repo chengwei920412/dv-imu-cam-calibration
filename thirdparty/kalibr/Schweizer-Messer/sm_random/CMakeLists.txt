@@ -10,6 +10,8 @@ include_directories(include)
 add_library(${PROJECT_NAME}
   src/random.cpp
 )
+target_include_directories(${PROJECT_NAME} PUBLIC
+        include)
 
 ##################
 ## Installation ##

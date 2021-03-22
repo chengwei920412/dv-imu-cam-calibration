@@ -17,4 +17,6 @@ add_library(${PROJECT_NAME}
   src/NsecTimeUtilities.cpp
 )
 target_link_libraries(${PROJECT_NAME} 
-                      ${Boost_LIBRARIES})
+                      ${Boost_LIBRARIES}
+                      sm_common
+                      sm_random)

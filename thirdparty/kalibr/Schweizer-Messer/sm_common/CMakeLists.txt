@@ -12,7 +12,8 @@ add_library(${PROJECT_NAME}
 )
 target_link_libraries(${PROJECT_NAME} 
                       ${Boost_LIBRARIES})
-
+target_include_directories(${PROJECT_NAME} PUBLIC
+        include)
 
 ##################
 ## Installation ##
