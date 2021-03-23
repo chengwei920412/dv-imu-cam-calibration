@@ -1,9 +1,5 @@
-cmake_minimum_required(VERSION 2.8.9)
-project (hello)
+cmake_minimum_required(VERSION 3.10.0)
+project(dv-imu-cam-calibration)
 
+add_subdirectory(src)
 add_subdirectory(thirdparty)
-
-add_library(hi SHARED hi.hpp hi.cpp)
-
-add_executable(hello helloworld.cpp)
-target_link_libraries(hello hi)
