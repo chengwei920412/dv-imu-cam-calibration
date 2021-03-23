@@ -1,2 +1,0 @@
-add_subdirectory(aslam_cameras)
-add_subdirectory(aslam_time)
