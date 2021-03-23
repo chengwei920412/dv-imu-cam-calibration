@@ -1,7 +1,10 @@
 #include <dv-sdk/module.hpp>
 
+#include <utilities/calibrator.hpp>
+
 class ImuCamCalibration : public dv::ModuleBase {
 private:
+  Calibrator calibrator;
 
 public:
   static void initInputs(dv::InputDefinitionList &in) {
@@ -29,6 +32,7 @@ public:
 
 	auto frame = inputs.getFrameInput("frames").frame();
 	cv::Mat img = *frame.getMatPointer();
+	img = calibrator.process(img);
 	outputs.getFrameOutput("frames") << frame.timestamp() << img << dv::commit;
 
   }

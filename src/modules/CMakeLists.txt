@@ -44,13 +44,16 @@ DV_MODULE_SETUP()
 SET(CMAKE_INSTALL_RPATH ${DV_MODULES_DIR})
 
 # Compile this module (standard C++ file, no additional dependencies)
-ADD_LIBRARY(imu-cam-calibration SHARED ImuCamCalibration.cpp)
+ADD_LIBRARY(imu-cam-calibration SHARED
+        ImuCamCalibration.cpp)
 
 SET_TARGET_PROPERTIES(imu-cam-calibration
         PROPERTIES
         PREFIX "user_"
         )
 
-TARGET_LINK_LIBRARIES(imu-cam-calibration PRIVATE ${DV_LIBRARIES})
+TARGET_LINK_LIBRARIES(imu-cam-calibration PRIVATE
+        ${DV_LIBRARIES}
+        calibrator)
 
 INSTALL(TARGETS imu-cam-calibration DESTINATION ${DV_MODULES_DIR})
