@@ -1,4 +1,5 @@
 
+add_subdirectory(aslam_cv)
 add_subdirectory(aslam_optimizer)
 add_subdirectory(Schweizer-Messer)
 add_subdirectory(suitesparse)
