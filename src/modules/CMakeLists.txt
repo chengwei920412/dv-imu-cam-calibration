@@ -16,6 +16,8 @@ IF (NOT CMAKE_INSTALL_PREFIX)
     ENDIF()
 ENDIF()
 
+add_definitions(-fPIC)
+
 # Project name and version
 PROJECT(dv-imu-cam-calibration-cpp
         VERSION 1.0.0
