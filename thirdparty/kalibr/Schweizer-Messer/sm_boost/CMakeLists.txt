@@ -5,6 +5,8 @@ find_package(Boost REQUIRED COMPONENTS system serialization thread)
 
 include_directories(${Boost_INCLUDE_DIRS})
 
+add_definitions(-fPIC)
+
 ##############
 ## Building ##
 ##############
