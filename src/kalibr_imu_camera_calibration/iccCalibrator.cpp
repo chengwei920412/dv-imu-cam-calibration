@@ -6,6 +6,7 @@
 
 #include <aslam/calibration/core/IncrementalEstimator.h>
 
+
 iccCalibrator::iccCalibrator() {
 
 }
@@ -17,6 +18,18 @@ void iccCalibrator::recoverCovariance() {
   aslam::calibration::IncrementalEstimator estimator(calibrationGroupId);
   //auto rval = estimator.addBatch(problem, true);
   // TODO(radam): finish
+
+
+}
+
+void iccCalibrator::initDesignVariables(bool problem,
+										const bsplines::BSplinePose& poseSpline,
+										bool noTimeCalibration,
+										bool noChainExtrinsics,
+										bool estimateGravityLength,
+										const Eigen::Vector3d &initialGravityEstimate) {
+  poseDv = std::make_unique<aslam::splines::BSplinePoseDesignVariable>(poseSpline);
+
 
 
 }
