@@ -22,8 +22,3 @@ PinholeEquidistantCamera::PinholeEquidistantCamera(const std::vector<double> &in
 
 
 }
-
-
-ParametersBase::ParametersBase() {
-
-}
