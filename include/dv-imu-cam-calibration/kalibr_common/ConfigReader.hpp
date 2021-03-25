@@ -4,9 +4,11 @@
 
 #pragma once
 
-#include <cstddef>
+#include <opencv2/opencv.hpp>
 
-class AslamCamera {
+#include <vector>
+
+class PinholeCamera {
 
 public:
 
@@ -15,7 +17,7 @@ protected:
 
 public:
 
-  AslamCamera();
+  PinholeCamera(const std::vector<double>& intrinsics,const std::vector<double>& dist_coeff,const cv::Size& resolution);
 
 
 
