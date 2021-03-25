@@ -1,5 +1,6 @@
 add_subdirectory(aslam_cv)
 add_subdirectory(aslam_incremental_calibration)
+add_subdirectory(aslam_nonparametric_estimation)
 add_subdirectory(aslam_optimizer)
 add_subdirectory(Schweizer-Messer)
 add_subdirectory(suitesparse)

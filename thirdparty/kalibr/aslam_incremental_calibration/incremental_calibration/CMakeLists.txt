@@ -44,6 +44,7 @@ find_package(Boost REQUIRED COMPONENTS system thread)
 target_link_libraries(${PROJECT_NAME}
         ${Boost_LIBRARIES}
         ${TBB_LIBRARIES}
-        aslam_backend)
+        aslam_backend
+        aslam_backend_expressions)
 target_include_directories(${PROJECT_NAME} PUBLIC
         include)
