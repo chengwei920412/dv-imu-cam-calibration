@@ -45,9 +45,9 @@ public:
 struct ImuMeasurement {
   Eigen::Vector3d omega, alpha;
   Eigen::Matrix3d omegaR, omegaInvR, alphaR, alphaInvR;
-  int64_t stamp;
+  double stamp;
 
-  ImuMeasurement(const int64_t _stamp,
+  explicit ImuMeasurement(const double _stamp,
 				 const Eigen::Vector3d& _omega,
 				 const Eigen::Vector3d& _alpha,
 				 const Eigen::Matrix3d& _Rgyro,

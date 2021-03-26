@@ -1,6 +1,9 @@
 # Init CMake (require at least version 3.10.0)
 CMAKE_MINIMUM_REQUIRED(VERSION 3.10.0)
 
+find_package(Eigen3 REQUIRED)
+include_directories(SYSTEM ${EIGEN3_INCLUDE_DIR})
+
 # General build settings
 IF (NOT CMAKE_BUILD_TYPE)
     SET(CMAKE_BUILD_TYPE "Release" CACHE STRING "Possible build types: None Debug Release RelWithDebInfo MinSizeRel")

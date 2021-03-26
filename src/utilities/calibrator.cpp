@@ -2,9 +2,12 @@
 // Created by radam on 2021-03-23.
 //
 
+
 #include <utilities/calibrator.hpp>
 
 #include <sm/boost/JobQueue.hpp>
+
+#include <Eigen/Eigen>
 
 Calibrator::StampedImage previewImageWithText(const std::string &text, const int64_t timestamp = 0LL, const cv::Size &size = cv::Size(640, 480)) {
   cv::Mat img = cv::Mat::zeros(size, CV_8UC3);
@@ -27,9 +30,28 @@ Calibrator::Calibrator() {
   calibrationPattern = CalibrationPattern::ASYMMETRIC_CIRCLES_GRID;; // TODO(radam): param
 }
 
-void Calibrator::addImu() {
-  // TODO(radam): implement
+void Calibrator::addImu(const int64_t timestamp,
+						const double gyroX,
+						const double gyroY,
+						const double gyroZ,
+						const double accelX,
+						const double accelY,
+						const double accelZ) {
+
+  const double tsS = static_cast<double>(timestamp) / 1e6;
+  // const auto Rgyro = Eigen::Matrix3d::Identity() * ;
+
+  //ImuMeasurement imuMeas(tsS);
+
+  //imuData.push_back(imuMeas);
 }
+
+//void Calibrator::addImu() {
+//
+//
+//
+//  // TODO(radam): implement
+//}
 
 
 void Calibrator::addImage(const StampedImage& stampedImage) {

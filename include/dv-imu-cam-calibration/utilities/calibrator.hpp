@@ -4,6 +4,9 @@
 
 #pragma once
 
+#include <kalibr_imu_camera_calibration/iccCalibrator.hpp>
+#include <kalibr_imu_camera_calibration/iccSensors.hpp>
+
 #include <opencv2/opencv.hpp>
 
 #include <sm/boost/JobQueue.hpp>
@@ -58,6 +61,8 @@ protected:
   cv::Mat previewImage;
   int64_t previewTimestamp = 0LL;
 
+  // IccCalibrator
+  IccCalibrator iccCalibrator;
 
 public:
   /**
@@ -68,7 +73,14 @@ public:
   /**
    * Add IMU measurement to the calibration buffer.
    */
-  void addImu();
+  void addImu(int64_t timestamp,
+			  double gyroX,
+			  double gyroY,
+			  double gyroZ,
+			  double accelX,
+			  double accelY,
+			  double accelZ
+			  );
 
 
   /**

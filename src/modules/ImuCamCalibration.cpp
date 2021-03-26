@@ -34,7 +34,7 @@ public:
 	auto imuInput = inputs.getIMUInput("imu");
 	if (auto imuData = imuInput.data()) {
 	  for (const auto &singleImu : imuData) {
-		calibrator.addImu();
+		calibrator.addImu(singleImu.timestamp, singleImu.gyroscopeX, singleImu.gyroscopeY, singleImu.gyroscopeZ, singleImu.accelerometerX, singleImu.accelerometerY, singleImu.accelerometerZ);
 	  }
 	}
 
