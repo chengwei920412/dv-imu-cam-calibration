@@ -30,15 +30,6 @@ iccCalibrator::iccCalibrator() {
 }
 
 
-void iccCalibrator::recoverCovariance() {
-  std::cout << "Recovering covariance..." << std::endl;
-
-  aslam::calibration::IncrementalEstimator estimator(calibrationGroupId);
-  //auto rval = estimator.addBatch(problem, true);
-  // TODO(radam): finish
-
-
-}
 
 void iccCalibrator::initDesignVariables(std::unique_ptr<aslam::calibration::OptimizationProblem>& problem,
 										const bsplines::BSplinePose& poseSpline,
@@ -67,4 +58,19 @@ void iccCalibrator::initDesignVariables(std::unique_ptr<aslam::calibration::Opti
 
   // TODO(radam): add design variables to camera chain
 
+}
+
+
+void iccCalibrator::recoverCovariance() {
+  std::cout << "Recovering covariance..." << std::endl;
+
+  aslam::calibration::IncrementalEstimator estimator(calibrationGroupId);
+  auto rval = estimator.addBatch(problem, true);
+  auto est_stds = estimator.getSigma2Theta().diagonal().cwiseSqrt();
+
+  // TODO(radam): finish once knowing what the dimensions are
+
+  // # split and store the variance
+  // self.std_trafo_ic = np.array(est_stds[0:6])
+  // self.std_times = np.array(est_stds[6:])
 }
