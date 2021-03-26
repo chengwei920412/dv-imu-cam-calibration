@@ -102,7 +102,10 @@ public:
 
 	bool optimizationFailed = false;
 	try {
-
+	  const auto retval = optimizer.optimize();
+	  if (retval.linearSolverFailure) {
+	    optimizationFailed = true;
+	  }
 	} catch(...) {
 	  optimizationFailed = true;
 	}
