@@ -6,10 +6,15 @@
 
 #include <sm/kinematics/Transformation.hpp>
 #include <kalibr_common/ConfigReader.hpp>
+#include <kalibr_errorterms/EuclideanError.hpp>
 
 #include <aslam/calibration/core/OptimizationProblem.h>
 #include <aslam/splines/EuclideanBSplineDesignVariable.hpp>
+#include <aslam/splines/BSplinePoseDesignVariable.hpp>
 #include <aslam/backend/BSplineMotionError.hpp>
+#include <aslam/backend/MEstimatorPolicies.hpp>
+#include <aslam/backend/RotationQuaternion.hpp>
+#include <aslam/backend/EuclideanPoint.hpp>
 
 #include <Eigen/Eigen>
 
@@ -28,6 +33,7 @@ protected:
       cv::Size(640, 480)}; // TODO(radam): pass these in constructor
   bool targetObservations; // TODO(radam): type
   Eigen::Vector3d gravity_w;
+  double timeOffset = 0.0;
 
 
 
@@ -86,10 +92,13 @@ protected:
   size_t gyroBiasPriorCount = 0;
 
   Eigen::Vector4d q_i_b_prior;
+  boost::shared_ptr<aslam::backend::RotationQuaternion> q_i_b_Dv = nullptr;
+  boost::shared_ptr<aslam::backend::EuclideanPoint> r_b_Dv = nullptr;
+
   double timeOffset = 0.0;
 
-  std::unique_ptr<aslam::splines::EuclideanBSplineDesignVariable> gyroBiasDv = nullptr;
-  std::unique_ptr<aslam::splines::EuclideanBSplineDesignVariable> accelBiasDv = nullptr;
+  boost::shared_ptr<aslam::splines::EuclideanBSplineDesignVariable> gyroBiasDv = nullptr;
+  boost::shared_ptr<aslam::splines::EuclideanBSplineDesignVariable> accelBiasDv = nullptr;
 
 public:
 
@@ -121,7 +130,7 @@ public:
 
   } // TODO(radam): move to cpp
 
-  void addDesignVariables(std::unique_ptr<aslam::calibration::OptimizationProblem>& problem) {
+  void addDesignVariables(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem) {
     //gyroBiasDv = aslam::splines::EuclideanBSplineDesignVariable(gyroBias); // TODO(radam): fix
     //accelBiasDv = aslam::splines::EuclideanBSplineDesignVariable(accelBias); // TODO(radam): fix
 
@@ -130,12 +139,54 @@ public:
 
   } // TODO(radam): move to cpp
 
-  void addAccelerometerErrorTerms(std::unique_ptr<aslam::calibration::OptimizationProblem>& problem /* finish */, double mSigma=0.0, double accelNoiseScale=1.0) {
+  void addAccelerometerErrorTerms(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,
+								  boost::shared_ptr<aslam::splines::BSplinePoseDesignVariable> poseSplineDv,
+								  const Eigen::Vector3d& g_w,
+								  double mSigma=0.0,
+								  double accelNoiseScale=1.0) {
 
+     const double weight = 1.0 / accelNoiseScale;
+     std::vector<double> accelErrors;
+     size_t num_skipped = 0;
+
+     std::unique_ptr<aslam::backend::MEstimator> mest;
+     if (mSigma > 0.0) {
+       mest =  std::make_unique<aslam::backend::HuberMEstimator>(mSigma);
+     } else {
+       mest = std::make_unique<aslam::backend::NoMEstimator>();
+     }
+
+     std::vector<ImuMeasurement> imuData; // TODO(radam): this has to be passed somehow
+     for (const auto& im : imuData) {
+       const auto tk = im.stamp + timeOffset;
+       if (tk > poseSplineDv->spline().t_min() && tk < poseSplineDv->spline().t_max()) {
+		 const auto C_b_w = poseSplineDv->orientation(tk).inverse();
+		 const auto a_w = poseSplineDv->linearAcceleration(tk);
+		 const auto b_i = accelBiasDv->toEuclideanExpression(tk,0);
+		 const auto w_b = poseSplineDv->angularVelocityBodyFrame(tk);
+		 const auto w_dot_b = poseSplineDv->angularAccelerationBodyFrame(tk);
+		 const auto C_i_b = q_i_b_Dv->toExpression();
+		 const auto r_b = r_b_Dv->toExpression();
+		 const auto a = C_i_b * (C_b_w * (a_w - g_w) + \
+                             w_dot_b.cross(r_b) + w_b.cross(w_b.cross(r_b))); finish here
+//		 const auto aerr = aslam::backend ket.EuclideanError(im.alpha, im.alphaInvR * weight, a + b_i)
+//		 aerr.setMEstimatorPolicy(mest)
+//		 accelErrors.append(aerr)
+//		 problem.addErrorTerm(aerr)
+       } else {
+         ++num_skipped;
+       }
+
+     }
+
+
+
+
+     // here would be a good next task
     // TODO(radam): finish
   } // TODO(radam): move to cpp
 
-  void addGyroscopeErrorTerms(std::unique_ptr<aslam::calibration::OptimizationProblem>& problem /* finish */, double mSigma=0.0, double gyroNoiseScale=1.0 /* finish*/) {
+  void addGyroscopeErrorTerms(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem /* finish */, double mSigma=0.0, double gyroNoiseScale=1.0 /* finish*/) {
 
 	// TODO(radam): finish
   } // TODO(radam): move to cpp
@@ -145,7 +196,7 @@ public:
 	// TODO(radam): finish
   } // TODO(radam): move to cpp
 
-  void addBiasMotionTerms(std::unique_ptr<aslam::calibration::OptimizationProblem>& problem) {
+  void addBiasMotionTerms(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem) {
     const auto Wgyro = Eigen::Matrix3d::Identity() / (gyroRandomWalk * gyroRandomWalk);
     const auto Waccel = Eigen::Matrix3d::Identity() / (accelRandomWalk * accelRandomWalk);
     const auto gyroBiasMotionErr = aslam::backend::BSplineMotionError<aslam::splines::EuclideanBSplineDesignVariable>(gyroBiasDv.get(), Wgyro,1);

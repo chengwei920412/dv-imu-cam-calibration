@@ -11,8 +11,8 @@
 
 static constexpr size_t HELPER_GROUP_ID = 1;
 
-void addSplineDesignVariables(std::unique_ptr<aslam::calibration::OptimizationProblem>& problem,
-							  std::unique_ptr<aslam::splines::BSplinePoseDesignVariable>& dvc,
+void addSplineDesignVariables(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,
+							  boost::shared_ptr<aslam::splines::BSplinePoseDesignVariable> dvc,
 							  bool setActive=true,
 							  size_t groupId = HELPER_GROUP_ID) {
   for (size_t i = 0 ; i < dvc->numDesignVariables() ; ++i) {
@@ -29,19 +29,21 @@ IccCalibrator::IccCalibrator() {
 
 
 
-void IccCalibrator::initDesignVariables(std::unique_ptr<aslam::calibration::OptimizationProblem>& problem,
+// TODO(radam): use boost shared pointer
+void IccCalibrator::initDesignVariables(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,
 										const bsplines::BSplinePose& poseSpline,
 										bool noTimeCalibration,
 										bool noChainExtrinsics,
 										bool estimateGravityLength,
 										const Eigen::Vector3d &initialGravityEstimate) {
   // Initialize the system pose spline (always attached to imu0)
-  poseDv = std::make_unique<aslam::splines::BSplinePoseDesignVariable>(poseSpline);
+  poseDv = boost::make_shared<aslam::splines::BSplinePoseDesignVariable>(poseSpline);
   addSplineDesignVariables(problem, poseDv);
 
   // Add the calibration target orientation design variable. (expressed as gravity vector in target frame)
   if (estimateGravityLength) {
     auto gravityDv = aslam::backend::EuclideanPoint(initialGravityEstimate); // TODO(radam): not local
+    gravityDv.toExpression();
   } else {
     auto gravityDv = aslam::backend::EuclideanDirection(initialGravityEstimate); // TODO(radam): not local
   }

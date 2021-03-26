@@ -43,8 +43,6 @@ void Calibrator::addImu(const int64_t timestamp,
   const auto Raccel = Eigen::Matrix3d::Identity() * iccImu.getAccelUncertaintyDiscrete();
   const Eigen::Vector3d omega(gyroX, gyroY, gyroZ);
   const Eigen::Vector3d alpha(accelY, accelY, accelZ);
-
-
   ImuMeasurement imuMeas(tsS, omega, alpha, Rgyro, Raccel);
   imuData.push_back(imuMeas);
 } // TODO(radam): move to cpp

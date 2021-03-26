@@ -17,6 +17,7 @@ target_link_libraries(kalibr_imu_camera_calibration
         bsplines
         incremental_calibration
         sm_kinematics
+        kalibr_errorterms
         )
 target_include_directories(kalibr_imu_camera_calibration PUBLIC
         ../../include/dv-imu-cam-calibration)
