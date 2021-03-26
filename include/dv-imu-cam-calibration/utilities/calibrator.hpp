@@ -61,8 +61,13 @@ protected:
   cv::Mat previewImage;
   int64_t previewTimestamp = 0LL;
 
+  // IMU data
+  std::vector<ImuMeasurement> imuData;
+  ImuParameters imuParameters; // TODO(radam): take them as input
+
   // IccCalibrator
   IccCalibrator iccCalibrator;
+  IccImu iccImu;
 
 public:
   /**

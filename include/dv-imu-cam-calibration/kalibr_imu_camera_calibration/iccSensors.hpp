@@ -50,14 +50,14 @@ struct ImuMeasurement {
   explicit ImuMeasurement(const double _stamp,
 				 const Eigen::Vector3d& _omega,
 				 const Eigen::Vector3d& _alpha,
-				 const Eigen::Matrix3d& _Rgyro,
-				 const Eigen::Matrix3d& _Raccel) {
+				 const Eigen::Matrix3d& Rgyro,
+				 const Eigen::Matrix3d& Raccel) {
     omega = _omega;
     alpha = _alpha;
-    omegaR = _Rgyro;
-    omegaInvR = _Rgyro.inverse();
-    alphaR = _Raccel;
-    alphaInvR = _Raccel.inverse();
+    omegaR = Rgyro;
+    omegaInvR = Rgyro.inverse();
+    alphaR = Raccel;
+    alphaInvR = Raccel.inverse();
     stamp = _stamp;
   }
 };
@@ -93,7 +93,13 @@ protected:
 
 public:
 
+   double getAccelUncertaintyDiscrete() {
+     return accelUncertaintyDiscrete;
+   } // TODO(radam): to cpp
 
+  double getGyroUncertaintyDiscrete() {
+	return gyroUncertaintyDiscrete;
+  } // TODO(radam): to cpp
 
 
   IccImu(const ImuParameters& imuParams) :imuParameters(imuParams) {

@@ -23,7 +23,7 @@ Calibrator::StampedImage previewImageWithText(const std::string &text, const int
   return Calibrator::StampedImage(img, timestamp);
 }
 
-Calibrator::Calibrator() {
+Calibrator::Calibrator() : iccImu(imuParameters){
   setPreviewImage(previewImageWithText("No image arrived so far", previewTimestamp));
   detectionsQueue.start(5);
   boardSize  = cv::Size(4, 11); // TODO(radam): param
@@ -39,19 +39,17 @@ void Calibrator::addImu(const int64_t timestamp,
 						const double accelZ) {
 
   const double tsS = static_cast<double>(timestamp) / 1e6;
-  // const auto Rgyro = Eigen::Matrix3d::Identity() * ;
+  const auto Rgyro = Eigen::Matrix3d::Identity() * iccImu.getGyroUncertaintyDiscrete();
+  const auto Raccel = Eigen::Matrix3d::Identity() * iccImu.getAccelUncertaintyDiscrete();
+  const Eigen::Vector3d omega(gyroX, gyroY, gyroZ);
+  const Eigen::Vector3d alpha(accelY, accelY, accelZ);
 
-  //ImuMeasurement imuMeas(tsS);
 
-  //imuData.push_back(imuMeas);
-}
+  ImuMeasurement imuMeas(tsS, omega, alpha, Rgyro, Raccel);
+  imuData.push_back(imuMeas);
+} // TODO(radam): move to cpp
 
-//void Calibrator::addImu() {
-//
-//
-//
-//  // TODO(radam): implement
-//}
+
 
 
 void Calibrator::addImage(const StampedImage& stampedImage) {

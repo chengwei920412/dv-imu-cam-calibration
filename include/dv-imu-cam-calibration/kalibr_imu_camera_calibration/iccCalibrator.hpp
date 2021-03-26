@@ -51,6 +51,10 @@ public:
 
   void addPoseMotionTerms(){} // TODO(radam):
 
+
+
+
+
   void registerCamChain() {} // TODO(radam):
 
   void registerImu() {} // TODO(radam):

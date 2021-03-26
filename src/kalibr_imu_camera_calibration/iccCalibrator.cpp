@@ -4,8 +4,6 @@
 
 #include <kalibr_imu_camera_calibration/iccCalibrator.hpp>
 
-
-
 #include <aslam/calibration/core/IncrementalEstimator.h>
 #include <aslam/backend/EuclideanDirection.hpp>
 #include <aslam/backend/EuclideanPoint.hpp>
