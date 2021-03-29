@@ -87,43 +87,9 @@ public:
   } // TODO(radam): move to cpp
 
 
-  void optimize(const bool opts, // TODO(radam): check if options are passed
+  void optimize(boost::shared_ptr<aslam::backend::Optimizer2Options> options = nullptr,
 				const size_t maxIterations = 30,
-				const bool recoverCov = false) {
-    aslam::backend::Optimizer2Options options;
-    options.verbose = true;
-	// options.doLevenbergMarquardt = True // TODO(radam): ??
-	const double levenbergMarquardtLambdaInit = 10.0;
-	options.nThreads = std::max(1u, std::thread::hardware_concurrency()-1);
-	options.convergenceDeltaX = 1e-5;
-	options.convergenceDeltaJ = 1e-2;
-	options.maxIterations = maxIterations;
-	options.trustRegionPolicy = boost::make_shared<aslam::backend::LevenbergMarquardtTrustRegionPolicy>(levenbergMarquardtLambdaInit);
-	options.linearSystemSolver = boost::make_shared<aslam::backend::BlockCholeskyLinearSystemSolver>();
-
-	auto optimizer = aslam::backend::Optimizer2(options);
-	optimizer.setProblem(problem);
-
-	bool optimizationFailed = false;
-	try {
-	  const auto retval = optimizer.optimize();
-	  if (retval.linearSolverFailure) {
-	    optimizationFailed = true;
-	  }
-	} catch(...) {
-	  optimizationFailed = true;
-	}
-
-	if (optimizationFailed) {
-	  throw std::runtime_error("Optimization failed");
-	}
-
-	if (recoverCov) {
-	  recoverCovariance();
-	}
-
-
-  } // TODO(radam): move to cpp
+				const bool recoverCov = false) ;
 
   void recoverCovariance();
 
