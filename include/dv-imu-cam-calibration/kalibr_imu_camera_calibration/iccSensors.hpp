@@ -19,6 +19,8 @@
 #include <aslam/backend/EuclideanPoint.hpp>
 #include <aslam/backend/OptimizationProblem.hpp>
 
+#include <boost/make_shared.hpp>
+
 #include <Eigen/Eigen>
 
 double toSec(const int64_t time);
@@ -57,28 +59,7 @@ public:
 
   // void setupCalibrationTarget // TODO(radam): make sure it is not needed
 
-  void findOrientationPriorCameraToImu(IccImu* iccImu) {
-    std::cout << std::endl << "Estimating imu-camera rotation prior" << std::endl;
-
-    // Build the problem
-    auto problem = aslam::backend::OptimizationProblem();
-
-    // Add the rotation as design variable
-	auto q_i_c_Dv = boost::make_shared<aslam::backend::RotationQuaternion>(T_extrinsic.q());
-	q_i_c_Dv->setActive(true);
-	problem.addDesignVariable(q_i_c_Dv);
-
-	// Add the gyro bias as design variable
-	auto gyroBiasDv = boost::make_shared<aslam::backend::EuclideanPoint>(Eigen::Vector3d(0.0, 0.0, 0.0));
-	gyroBiasDv->setActive(true);
-	problem.addDesignVariable(gyroBiasDv);
-
-	// Initialize a pose spline using the camera poses
-	auto poseSpline = initPoseSplineFromCamera(6, 100, 0.0);
-
-
-
-  }
+  void findOrientationPriorCameraToImu(IccImu* iccImu);
 
   // TODO(radam): missing methods here
 
@@ -119,6 +100,11 @@ public:
 
   // TODO(radam): update imu config
 
+  std::vector<ImuMeasurement> imuData; // TODO(radam): this probably should not be public
+
+  Eigen::Vector3d gyroBiasPrior;
+  size_t gyroBiasPriorCount = 0;
+
 protected:
 
   ImuParameters imuParameters;
@@ -129,8 +115,7 @@ protected:
   double gyroRandomWalk;
   double gyroUncertainty;
 
-  Eigen::Vector3d gyroBiasPrior;
-  size_t gyroBiasPriorCount = 0;
+
 
   Eigen::Vector4d q_i_b_prior;
   boost::shared_ptr<aslam::backend::RotationQuaternion> q_i_b_Dv = nullptr;

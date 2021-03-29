@@ -2,7 +2,14 @@
 // Created by radam on 2021-03-25.
 //
 
+#include <aslam/backend/Optimizer2Options.hpp>
+#include <aslam/backend/Optimizer2.hpp>
+#include <aslam/backend/BlockCholeskyLinearSystemSolver.hpp>
+
 #include <kalibr_imu_camera_calibration/iccSensors.hpp>
+#include <kalibr_errorterms/GyroscopeError.hpp>
+
+#include <sm/kinematics/transformations.hpp>
 
 double toSec(const int64_t time ) {
   return static_cast<double>(time) / 1e6;
@@ -16,6 +23,98 @@ IccCamera::IccCamera(const double reprojectionSigma,
   // targetObservations = false; // TODO(radam): They need to be passed somehow?
   gravity_w = Eigen::Vector3d(9.80655, 0., 0.);
 
+}
+
+void IccCamera::findOrientationPriorCameraToImu(IccImu *iccImu) {
+  std::cout << std::endl << "Estimating imu-camera rotation prior" << std::endl;
+
+  // Build the problem
+  auto problem = boost::shared_ptr<aslam::backend::OptimizationProblem>();
+
+  // Add the rotation as design variable
+  auto q_i_c_Dv = boost::make_shared<aslam::backend::RotationQuaternion>(T_extrinsic.q());
+  q_i_c_Dv->setActive(true);
+  problem->addDesignVariable(q_i_c_Dv);
+
+  // Add the gyro bias as design variable
+  auto gyroBiasDv = boost::make_shared<aslam::backend::EuclideanPoint>(Eigen::Vector3d(0.0, 0.0, 0.0));
+  gyroBiasDv->setActive(true);
+  problem->addDesignVariable(gyroBiasDv);
+
+  // Initialize a pose spline using the camera poses
+  auto poseSpline = initPoseSplineFromCamera(6, 100, 0.0);
+
+  for (const auto im : iccImu->imuData) {
+    const auto tk = im.stamp;
+    if (tk > poseSpline->t_min() && tk < poseSpline->t_max()) {
+      // DV expressions
+	  const auto R_i_c = q_i_c_Dv->toExpression();
+	  const auto bias = gyroBiasDv->toExpression();
+
+      // get the vision predicted omega and measured omega (IMU)
+	  const auto omega_predicted = R_i_c * aslam::backend::EuclideanExpression(poseSpline->angularVelocityBodyFrame(tk).transpose());
+	  const auto omega_measured = im.omega;
+
+      // error term
+      auto gerr = boost::make_shared<kalibr_errorterms::GyroscopeError>(omega_measured, im.omegaInvR, omega_predicted, bias);
+	  problem->addErrorTerm(gerr);
+    }
+  }
+
+  if (problem->numErrorTerms() == 0) {
+    throw std::runtime_error("Failed to obtain orientation prior."
+							 "Please make sure that your sensors are synchronized correctly.");
+  }
+
+  // Define the optimization
+  aslam::backend::Optimizer2Options options;
+  options.verbose = false;
+  // options.linearSolver = boost::make_shared<aslam::backend::BlockCholeskyLinearSystemSolver>(); // TODO(radam): why not existent?
+  options.nThreads = 2;
+  options.convergenceDeltaX = 1e-4;
+  options.convergenceDeltaJ = 1;
+  options.maxIterations = 50;
+
+  // run the optimization
+  aslam::backend::Optimizer2 optimizer(options);
+  optimizer.setProblem(problem);
+
+  try {
+    optimizer.optimize();
+  } catch (...) {
+    throw std::runtime_error("Failed to obtain orientation prior!");
+  }
+
+  // overwrite the external rotation prior (keep the external translation prior)
+  const auto R_i_c = q_i_c_Dv->toRotationMatrix().transpose();
+  T_extrinsic = sm::kinematics::Transformation( sm::kinematics::rt2Transform( R_i_c, T_extrinsic.t() ) );
+
+  // estimate gravity in the world coordinate frame as the mean specific force
+  std::vector<Eigen::Vector3d> a_w;
+  for (const auto& im : iccImu->imuData) {
+	const auto tk = im.stamp;
+	if (tk > poseSpline->t_min() && tk < poseSpline->t_max()) {
+	  const auto val = poseSpline->orientation(tk) * R_i_c * im.alpha;
+	  a_w.emplace_back(val);
+	}
+  }
+
+  assert(!a_w.empty());
+  const auto mean_a_w = std::accumulate(a_w.begin(), a_w.end(), Eigen::Vector3d(0.,0.,0.)) / a_w.size();
+  gravity_w = mean_a_w / mean_a_w.norm() * 9.80655;
+  std::cout << "Gravity was intialized to " <<  gravity_w.transpose() <<  " [m/s^2]" << std::endl;
+
+  // set the gyro bias prior (if we have more than 1 cameras use recursive average)
+  const auto b_gyro = gyroBiasDv->toExpression().toEuclidean();
+  iccImu->gyroBiasPriorCount++;
+  iccImu->gyroBiasPrior = (iccImu->gyroBiasPriorCount-1.0) /
+  	iccImu->gyroBiasPriorCount * iccImu->gyroBiasPrior + 1.0/iccImu->gyroBiasPriorCount*b_gyro;
+
+  // print result
+  std::cout << "  Orientation prior camera-imu found as: (T_i_c)" << std::endl;
+  std::cout << R_i_c << std::endl;
+  std::cout << "  Gyro bias prior found as: (b_gyro)" << std::endl;
+  std::cout << b_gyro << std::endl;
 }
 
 boost::shared_ptr<bsplines::BSplinePose> IccCamera::initPoseSplineFromCamera(const size_t splineOrder,
