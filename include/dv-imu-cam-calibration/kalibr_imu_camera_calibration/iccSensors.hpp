@@ -100,6 +100,9 @@ protected:
   boost::shared_ptr<aslam::splines::EuclideanBSplineDesignVariable> gyroBiasDv = nullptr;
   boost::shared_ptr<aslam::splines::EuclideanBSplineDesignVariable> accelBiasDv = nullptr;
 
+  // Error terms
+  std::vector<boost::shared_ptr<kalibr_errorterms::EuclideanError>> accelErrors;
+
 public:
 
    double getAccelUncertaintyDiscrete() {
@@ -146,10 +149,10 @@ public:
 								  double accelNoiseScale=1.0) {
 
      const double weight = 1.0 / accelNoiseScale;
-     std::vector<double> accelErrors;
-     size_t num_skipped = 0;
 
-     std::unique_ptr<aslam::backend::MEstimator> mest;
+     size_t numSkipped = 0;
+
+     boost::shared_ptr<aslam::backend::MEstimator> mest;
      if (mSigma > 0.0) {
        mest =  std::make_unique<aslam::backend::HuberMEstimator>(mSigma);
      } else {
@@ -168,22 +171,19 @@ public:
 		 const auto C_i_b = q_i_b_Dv->toExpression();
 		 const auto r_b = r_b_Dv->toExpression();
 		 const auto a = C_i_b * (C_b_w * (a_w - g_w) + \
-                             w_dot_b.cross(r_b) + w_b.cross(w_b.cross(r_b))); finish here
-//		 const auto aerr = aslam::backend ket.EuclideanError(im.alpha, im.alphaInvR * weight, a + b_i)
-//		 aerr.setMEstimatorPolicy(mest)
-//		 accelErrors.append(aerr)
-//		 problem.addErrorTerm(aerr)
+                             w_dot_b.cross(r_b) + w_b.cross(w_b.cross(r_b)));
+		 auto aerr = boost::make_shared<kalibr_errorterms::EuclideanError>(im.alpha, im.alphaInvR * weight, a + b_i);
+		 aerr->setMEstimatorPolicy(mest);
+		 accelErrors.push_back(aerr);
+		 problem->addErrorTerm(aerr);
        } else {
-         ++num_skipped;
+         ++numSkipped;
        }
-
      }
 
+     std::cout << "Added " << imuData.size() - numSkipped << " of " << imuData.size() << " error terms "
+			   << "(skipped " << numSkipped << " out-of-bounds measurements)" << std::endl;
 
-
-
-     // here would be a good next task
-    // TODO(radam): finish
   } // TODO(radam): move to cpp
 
   void addGyroscopeErrorTerms(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem /* finish */, double mSigma=0.0, double gyroNoiseScale=1.0 /* finish*/) {

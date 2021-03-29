@@ -18,6 +18,7 @@ target_link_libraries(calibrator
         bsplines
         incremental_calibration
         sm_boost
-        sm_kinematics)
+        sm_kinematics
+        kalibr_errorterms)
 target_include_directories(calibrator PUBLIC
         ../../include/dv-imu-cam-calibration)
