@@ -203,15 +203,15 @@ void IccCamera::addDesignVariables(boost::shared_ptr<aslam::calibration::Optimiz
 
   T_c_b_Dv_q = boost::make_shared<aslam::backend::RotationQuaternion>(T_extrinsic.q());
   T_c_b_Dv_q->setActive(active);
-  problem->addDesignVariable(T_c_b_Dv_q.get(), baselinedv_group_id);
+  problem->addDesignVariable(T_c_b_Dv_q, baselinedv_group_id);
 
   T_c_b_Dv_t = boost::make_shared<aslam::backend::EuclideanPoint>(T_extrinsic.t());
   T_c_b_Dv_t->setActive(active);
-  problem->addDesignVariable(T_c_b_Dv_t.get(), baselinedv_group_id);
+  problem->addDesignVariable(T_c_b_Dv_t, baselinedv_group_id);
 
   cameraTimeToImuTimeDv = boost::make_shared<aslam::backend::Scalar>(0.0);
   cameraTimeToImuTimeDv->setActive(!noTimeCalibration);
-  problem->addDesignVariable(cameraTimeToImuTimeDv.get(), CALIBRATION_GROUP_ID);
+  problem->addDesignVariable(cameraTimeToImuTimeDv, CALIBRATION_GROUP_ID);
 }
 
 double IccImu::getAccelUncertaintyDiscrete() {
