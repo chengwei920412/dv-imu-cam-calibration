@@ -84,76 +84,7 @@ public:
 
   boost::shared_ptr<bsplines::BSplinePose> initPoseSplineFromCamera(const size_t splineOrder = 6,
 																	const size_t poseKnotsPerSecond = 100,
-																	const double timeOffsetPadding=0.02) {
-	assert(!targetObservation.empty());
-
-    const auto T_c_b = T_extrinsic.T();
-    auto rotationVector = boost::make_shared<sm::kinematics::RotationVector>();
-    auto pose = boost::make_shared<bsplines::BSplinePose>(splineOrder, rotationVector);
-
-    // Get the checkerboard times.
-    std::vector<double> timesVec;
-    timesVec.reserve(targetObservations.size());
-    std::vector<Eigen::VectorXd> curveVec;
-    curveVec.reserve(targetObservations.size());
-    for (int idx = 0 ; idx < targetObservations.size() ; ++idx) {
-      const auto targetObs = targetObservations[static_cast<size_t>(idx)];
-      timesVec.push_back(toSec(targetObs.time) + timeshiftCamToImuPrior);
-      const auto trans = targetObs.T_t_c.T() * T_c_b;
-      const auto column = pose->transformationToCurveValue(trans);
-      curveVec.push_back(column);
-    }
-
-	Eigen::VectorXd times(targetObservations.size()+2);
-	Eigen::Matrix<double, 6, Eigen::Dynamic> curve(6, targetObservations.size()+2);
-
-	auto isNan = [](const Eigen::MatrixXd& mat) {
-	  return (mat.array() == mat.array()).all();
-	};
-
-	if (isNan(curve)) {
-	  throw std::runtime_error("NaNs in curve values");
-	}
-
-	// Add 2 seconds on either end to allow the spline to slide during optimization
-	times[0] = timesVec.front() - (timeOffsetPadding * 2.0);
-	curve.block(0,0,6,1) = curveVec.front();
-	times[static_cast<int>(targetObservations.size()+1)]  =timesVec.back() + (timeOffsetPadding*2.0);
-	curve.block(0,static_cast<int>(targetObservations.size()+1), 6,1) = curveVec.back();
-	for (int idx = 0 ; idx < targetObservations.size() ; ++idx) {
-	  times[idx+1] = timesVec[static_cast<size_t>(idx)];
-	  curve.block(0, idx+1, 6,1) = curveVec[static_cast<size_t>(idx)];
-	}
-
-	// Make sure the rotation vector doesn't flip
-	for (int i = 1 ; i < curve.cols() ; ++i) {
-	  const auto previousRotationVector = curve.block(3,i-1, 6,1);
-	  const auto r = curve.block(3,i, 6,1);
-	  const auto angle = r.norm();
-	  const auto axis = r / angle;
-	  
-	  auto best_r = r;
-	  auto best_dist = (best_r - previousRotationVector).norm();
-	  for (int s = -3 ; s <= 3 ; ++ s) {
-	    const auto aa = axis * (angle + M_PI * 2.0 * s);
-	    const auto dist = (aa - previousRotationVector).norm();
-	    if (dist < best_dist) {
-	      best_r = aa;
-	      best_dist = dist;
-	    }
-	  }
-	  curve.block(3,i,6,1) = best_r;
-	}
-	
-	const auto seconds = timesVec.back() - timesVec.front();
-	const auto knots = static_cast<int>(std::round(seconds * poseKnotsPerSecond));
-	
-	std::cout << "Initializing a pose spline with " << knots
-	<< " knots (" << poseKnotsPerSecond
-	<< " knots per second over " << seconds << " seconds)" << std::endl;
-    pose->initPoseSplineSparse(times, curve, knots, 1e-4);
-	return pose;
-  }
+																	const double timeOffsetPadding=0.02);
 
 };
 
