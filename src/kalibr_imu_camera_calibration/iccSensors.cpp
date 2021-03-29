@@ -4,12 +4,16 @@
 
 #include <kalibr_imu_camera_calibration/iccSensors.hpp>
 
+double toSec(const int64_t time ) {
+  return static_cast<double>(time) / 1e6;
+}
+
 IccCamera::IccCamera(const double reprojectionSigma,
 					 const bool showCorners,
 					 const bool showReproj,
 					 const bool showOneStep) : cornerUncertainty(reprojectionSigma){
 
-  targetObservations = false; // TODO(radam): pass these from constructor?
+  // targetObservations = false; // TODO(radam): They need to be passed somehow?
   gravity_w = Eigen::Vector3d(9.80655, 0., 0.);
 
 }

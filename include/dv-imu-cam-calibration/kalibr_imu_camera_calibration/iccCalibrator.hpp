@@ -84,6 +84,13 @@ public:
 
     // TODO(radam): implement the rest
 
+
+    // Now I can build the problem
+    problem = boost::make_shared<aslam::calibration::OptimizationProblem>();
+
+    // Initialize all design variables
+    //initDesignVariables(problem, ) // TODO(radam): finish
+
   } // TODO(radam): move to cpp
 
 
