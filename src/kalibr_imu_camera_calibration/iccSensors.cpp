@@ -4,6 +4,7 @@
 
 #include <aslam/backend/Optimizer2Options.hpp>
 #include <aslam/backend/Optimizer2.hpp>
+#include <aslam/backend/Scalar.hpp>
 #include <aslam/backend/BlockCholeskyLinearSystemSolver.hpp>
 
 #include <kalibr_imu_camera_calibration/iccSensors.hpp>
@@ -194,12 +195,23 @@ boost::shared_ptr<bsplines::BSplinePose> IccCamera::initPoseSplineFromCamera(con
   return pose;
 }
 
-void IccCamera::addDesignVariables(boost::shared_ptr<aslam::backend::OptimizationProblem> problem,
+void IccCamera::addDesignVariables(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,
 								   bool noExtrinsics,
 								   bool noTimeCalibration,
 								   size_t baselinedv_group_id) {
   const bool active = !noExtrinsics;
-  auto T_c_b_Dv = a
+
+  T_c_b_Dv_q = boost::make_shared<aslam::backend::RotationQuaternion>(T_extrinsic.q());
+  T_c_b_Dv_q->setActive(active);
+  problem->addDesignVariable(T_c_b_Dv_q.get(), baselinedv_group_id);
+
+  T_c_b_Dv_t = boost::make_shared<aslam::backend::EuclideanPoint>(T_extrinsic.t());
+  T_c_b_Dv_t->setActive(active);
+  problem->addDesignVariable(T_c_b_Dv_t.get(), baselinedv_group_id);
+
+  cameraTimeToImuTimeDv = boost::make_shared<aslam::backend::Scalar>(0.0);
+  cameraTimeToImuTimeDv->setActive(!noTimeCalibration);
+  problem->addDesignVariable(cameraTimeToImuTimeDv.get(), CALIBRATION_GROUP_ID);
 }
 
 double IccImu::getAccelUncertaintyDiscrete() {

@@ -52,6 +52,11 @@ protected:
   Eigen::Vector3d gravity_w;
   double timeOffset = 0.0;
 
+  // Design variables
+  boost::shared_ptr<aslam::backend::DesignVariable> T_c_b_Dv_q = nullptr;
+  boost::shared_ptr<aslam::backend::DesignVariable> T_c_b_Dv_t = nullptr;
+  boost::shared_ptr<aslam::backend::DesignVariable> cameraTimeToImuTimeDv = nullptr;
+
 
 
 public:
@@ -72,7 +77,7 @@ public:
 																	const size_t poseKnotsPerSecond = 100,
 																	const double timeOffsetPadding=0.02);
 
-  void addDesignVariables(boost::shared_ptr<aslam::backend::OptimizationProblem> problem,
+  void addDesignVariables(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,
 						  bool noExtrinsics = true,
 						  bool noTimeCalibration = true,
 						  size_t baselinedv_group_id = HELPER_GROUP_ID);

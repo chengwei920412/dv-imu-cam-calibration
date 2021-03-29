@@ -59,8 +59,7 @@ void IccCalibrator::initDesignVariables(boost::shared_ptr<aslam::calibration::Op
   iccImu->addDesignVariables(problem);
 
   // Add all DVs for the camera chain
-  //iccCamera-
-
+  iccCamera->addDesignVariables(problem, noTimeCalibration, noChainExtrinsics);
 }
 
 void IccCalibrator::registerCamera(boost::shared_ptr<IccCamera> camera) {
