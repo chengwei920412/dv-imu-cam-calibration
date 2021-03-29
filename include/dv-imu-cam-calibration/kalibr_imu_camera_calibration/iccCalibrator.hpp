@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <kalibr_imu_camera_calibration/iccSensors.hpp>
+
 #include <aslam/splines/BSplinePoseDesignVariable.hpp>
 #include <aslam/calibration/core/OptimizationProblem.h>
 #include <aslam/backend/Optimizer2.hpp>
@@ -33,6 +35,9 @@ protected:
   boost::shared_ptr<aslam::calibration::OptimizationProblem> problem = nullptr;
 
 
+  boost::shared_ptr<IccImu> iccImu = nullptr;
+  boost::shared_ptr<IccCamera> iccCamera = nullptr;
+
 
 public:
 
@@ -55,13 +60,15 @@ public:
 
 
 
-  void registerCamChain() {} // TODO(radam):
+  void registerCamera(boost::shared_ptr<IccCamera> camera);
 
-  void registerImu() {} // TODO(radam):
+  void registerImu(boost::shared_ptr<IccImu> imu);
 
-  void buildProblem(int splineOrder=6,
-					int poseKnotsPerSecond=70,
-					int biasKnotsPerSecond = 70,
+
+
+  void buildProblem(size_t splineOrder=6,
+					size_t poseKnotsPerSecond=70,
+					size_t biasKnotsPerSecond = 70,
 					bool doPoseMotionError=false,
 					double mrTranslationVariance=1e6,
 					double mrRotationVariance=1e5,
@@ -78,14 +85,33 @@ public:
 					bool verbose=false
   ) {
 
+	// ############################################
+	// ## initialize camera chain
+	// ############################################
+    // #estimate the timeshift for all cameras to the main imu
     if (!noTimeCalibration) {
       throw std::runtime_error("Time shift calibration is not implemented.");
     }
 
-    // TODO(radam): implement the rest
+    assert(iccCamera);
+    assert(iccImu);
+
+    // obtain orientation prior between main imu and camera chain (if no external input provided)
+	// and initial estimate for the direction of gravity
+    iccCamera->findOrientationPriorCameraToImu(iccImu);
+    const auto estimatedGravity = iccCamera->getEstimatedGravity();
 
 
-    // Now I can build the problem
+	// ############################################
+	// ## init optimization problem
+	// ############################################
+	// #initialize a pose spline using the camera poses in the camera chain
+	const auto poseSpline = iccCamera->initPoseSplineFromCamera(splineOrder, poseKnotsPerSecond, timeOffsetPadding);
+
+    // Initialize bias splines for all IMUs
+	iccImu->initBiasSplines(poseSpline, splineOrder, biasKnotsPerSecond);
+
+	// Now I can build the problem
     problem = boost::make_shared<aslam::calibration::OptimizationProblem>();
 
     // Initialize all design variables

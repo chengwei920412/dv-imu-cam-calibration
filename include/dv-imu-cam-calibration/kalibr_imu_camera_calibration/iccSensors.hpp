@@ -19,6 +19,8 @@
 #include <aslam/backend/EuclideanPoint.hpp>
 #include <aslam/backend/OptimizationProblem.hpp>
 
+#include <bsplines/BSpline.hpp>
+
 #include <boost/make_shared.hpp>
 
 #include <Eigen/Eigen>
@@ -59,7 +61,9 @@ public:
 
   // void setupCalibrationTarget // TODO(radam): make sure it is not needed
 
-  void findOrientationPriorCameraToImu(IccImu* iccImu);
+  void findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu);
+
+  Eigen::Vector3d getEstimatedGravity();
 
   // TODO(radam): missing methods here
 
@@ -130,6 +134,10 @@ protected:
   std::vector<boost::shared_ptr<kalibr_errorterms::EuclideanError>> accelErrors;
   std::vector<boost::shared_ptr<kalibr_errorterms::EuclideanError>> gyroErrors;
 
+  // Bias BSplines
+  boost::shared_ptr<bsplines::BSpline> gyroBias = nullptr;
+  boost::shared_ptr<bsplines::BSpline> accelBias = nullptr;
+
 public:
 
    double getAccelUncertaintyDiscrete();
@@ -155,9 +163,9 @@ public:
 							  double gyroNoiseScale=1.0);
 
 
-  void initBiasSplines(/*finish*/) {
-	// TODO(radam): finish
-  } // TODO(radam): move to cpp
+  void initBiasSplines(boost::shared_ptr<bsplines::BSplinePose> poseSpline,
+					   size_t splineOrder,
+					   size_t biasKnotsPerSecond);
 
   void addBiasMotionTerms(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem) {
     const auto Wgyro = Eigen::Matrix3d::Identity() / (gyroRandomWalk * gyroRandomWalk);

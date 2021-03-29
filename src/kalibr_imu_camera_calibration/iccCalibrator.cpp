@@ -60,6 +60,15 @@ void IccCalibrator::initDesignVariables(boost::shared_ptr<aslam::calibration::Op
 
 }
 
+void IccCalibrator::registerCamera(boost::shared_ptr<IccCamera> camera) {
+  iccCamera = camera;
+}
+
+void IccCalibrator::registerImu(boost::shared_ptr<IccImu> imu) {
+  iccImu = imu;
+}
+
+
 void IccCalibrator::optimize(boost::shared_ptr<aslam::backend::Optimizer2Options> options,
 							 const size_t maxIterations,
 							 const bool recoverCov) {

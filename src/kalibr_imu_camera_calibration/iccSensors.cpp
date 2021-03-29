@@ -25,7 +25,7 @@ IccCamera::IccCamera(const double reprojectionSigma,
 
 }
 
-void IccCamera::findOrientationPriorCameraToImu(IccImu *iccImu) {
+void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu) {
   std::cout << std::endl << "Estimating imu-camera rotation prior" << std::endl;
 
   // Build the problem
@@ -115,6 +115,10 @@ void IccCamera::findOrientationPriorCameraToImu(IccImu *iccImu) {
   std::cout << R_i_c << std::endl;
   std::cout << "  Gyro bias prior found as: (b_gyro)" << std::endl;
   std::cout << b_gyro << std::endl;
+}
+
+Eigen::Vector3d IccCamera::getEstimatedGravity() {
+  return gravity_w;
 }
 
 boost::shared_ptr<bsplines::BSplinePose> IccCamera::initPoseSplineFromCamera(const size_t splineOrder,
@@ -304,4 +308,22 @@ void IccImu::addGyroscopeErrorTerms(boost::shared_ptr<aslam::calibration::Optimi
   std::cout << "Added " << imuData.size() - numSkipped << " of " << imuData.size() << " gyroscope error terms "
 			<< "(skipped " << numSkipped << " out-of-bounds measurements)" << std::endl;
 
+}
+
+void IccImu::initBiasSplines(boost::shared_ptr<bsplines::BSplinePose> poseSpline,
+							 const size_t splineOrder,
+							 const size_t biasKnotsPerSecond) {
+  const auto start = poseSpline->t_min();
+  const auto end = poseSpline->t_max();
+  const auto seconds = end - start;
+  const auto knots = static_cast<size_t>(round(seconds * static_cast<double>(biasKnotsPerSecond)));
+
+  std::cout << "Initializing the bias splines with " << knots << " knots" << std::endl;
+
+  // initialize the bias splines
+  gyroBias = boost::make_shared<bsplines::BSpline>(splineOrder);
+  gyroBias->initConstantSpline(start,end,knots, gyroBiasPrior);
+
+  accelBias = boost::make_shared<bsplines::BSpline>(splineOrder);
+  accelBias->initConstantSpline(start,end,knots, Eigen::Vector3d(0.,0.,0.));
 }
