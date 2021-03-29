@@ -194,6 +194,14 @@ boost::shared_ptr<bsplines::BSplinePose> IccCamera::initPoseSplineFromCamera(con
   return pose;
 }
 
+void IccCamera::addDesignVariables(boost::shared_ptr<aslam::backend::OptimizationProblem> problem,
+								   bool noExtrinsics,
+								   bool noTimeCalibration,
+								   size_t baselinedv_group_id) {
+  const bool active = !noExtrinsics;
+  auto T_c_b_Dv = a
+}
+
 double IccImu::getAccelUncertaintyDiscrete() {
   return accelUncertaintyDiscrete;
 }

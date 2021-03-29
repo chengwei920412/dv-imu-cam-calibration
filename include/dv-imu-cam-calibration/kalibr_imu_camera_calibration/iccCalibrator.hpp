@@ -8,6 +8,7 @@
 
 #include <aslam/splines/BSplinePoseDesignVariable.hpp>
 #include <aslam/calibration/core/OptimizationProblem.h>
+#include <aslam/backend/DesignVariable.hpp>
 #include <aslam/backend/Optimizer2.hpp>
 #include <aslam/backend/Optimizer2Options.hpp>
 #include <aslam/backend/BlockCholeskyLinearSystemSolver.hpp>
@@ -31,12 +32,15 @@ protected:
 
   const size_t calibrationGroupId = 0;
 
-  boost::shared_ptr<aslam::splines::BSplinePoseDesignVariable> poseDv = nullptr;
+  boost::shared_ptr<aslam::splines::BSplinePoseDesignVariable> poseDv = nullptr; // TODO(radam): maybe base class?
   boost::shared_ptr<aslam::calibration::OptimizationProblem> problem = nullptr;
 
 
   boost::shared_ptr<IccImu> iccImu = nullptr;
   boost::shared_ptr<IccCamera> iccCamera = nullptr;
+
+  boost::shared_ptr<aslam::backend::DesignVariable> gravityDv = nullptr;
+  boost::shared_ptr<aslam::backend::EuclideanExpression> gravityExpression = nullptr;
 
 
 public:
@@ -45,7 +49,7 @@ public:
 
   // TODO(radam): move to cpp
   void initDesignVariables(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,
-						   const bsplines::BSplinePose& poseSpline,
+						   boost::shared_ptr<bsplines::BSplinePose> poseSpline,
 						   bool noTimeCalibration,
 						   bool noChainExtrinsics=true,
 						   bool estimateGravityLength=false,
@@ -115,7 +119,7 @@ public:
     problem = boost::make_shared<aslam::calibration::OptimizationProblem>();
 
     // Initialize all design variables
-    //initDesignVariables(problem, ) // TODO(radam): finish
+    initDesignVariables(problem, poseSpline, noTimeCalibration, noChainExtrinsics, false, estimatedGravity);
 
   } // TODO(radam): move to cpp
 

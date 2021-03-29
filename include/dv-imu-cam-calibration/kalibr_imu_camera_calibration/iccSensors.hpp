@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <kalibr_imu_camera_calibration/common.hpp>
 
 #include <sm/kinematics/Transformation.hpp>
 #include <sm/kinematics/RotationVector.hpp>
@@ -70,6 +71,11 @@ public:
   boost::shared_ptr<bsplines::BSplinePose> initPoseSplineFromCamera(const size_t splineOrder = 6,
 																	const size_t poseKnotsPerSecond = 100,
 																	const double timeOffsetPadding=0.02);
+
+  void addDesignVariables(boost::shared_ptr<aslam::backend::OptimizationProblem> problem,
+						  bool noExtrinsics = true,
+						  bool noTimeCalibration = true,
+						  size_t baselinedv_group_id = HELPER_GROUP_ID);
 
 };
 

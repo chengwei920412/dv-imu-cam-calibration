@@ -2,6 +2,7 @@
 // Created by radam on 2021-03-25.
 //
 
+#include <kalibr_imu_camera_calibration/common.hpp>
 #include <kalibr_imu_camera_calibration/iccCalibrator.hpp>
 
 #include <aslam/calibration/core/IncrementalEstimator.h>
@@ -9,7 +10,7 @@
 #include <aslam/backend/EuclideanPoint.hpp>
 
 
-static constexpr size_t HELPER_GROUP_ID = 1;
+
 
 void addSplineDesignVariables(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,
 							  boost::shared_ptr<aslam::splines::BSplinePoseDesignVariable> dvc,
@@ -31,32 +32,34 @@ IccCalibrator::IccCalibrator() {
 
 // TODO(radam): use boost shared pointer
 void IccCalibrator::initDesignVariables(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,
-										const bsplines::BSplinePose& poseSpline,
+										boost::shared_ptr<bsplines::BSplinePose> poseSpline,
 										bool noTimeCalibration,
 										bool noChainExtrinsics,
 										bool estimateGravityLength,
 										const Eigen::Vector3d &initialGravityEstimate) {
   // Initialize the system pose spline (always attached to imu0)
-  poseDv = boost::make_shared<aslam::splines::BSplinePoseDesignVariable>(poseSpline);
+  poseDv = boost::make_shared<aslam::splines::BSplinePoseDesignVariable>(*poseSpline);
   addSplineDesignVariables(problem, poseDv);
 
   // Add the calibration target orientation design variable. (expressed as gravity vector in target frame)
   if (estimateGravityLength) {
-    auto gravityDv = aslam::backend::EuclideanPoint(initialGravityEstimate); // TODO(radam): not local
-    gravityDv.toExpression();
+    auto grDv = boost::make_shared<aslam::backend::EuclideanPoint>(initialGravityEstimate);
+	gravityExpression = boost::make_shared<aslam::backend::EuclideanExpression>(grDv->toExpression());
+	grDv->setActive(true);
+    gravityDv = grDv;
   } else {
-    auto gravityDv = aslam::backend::EuclideanDirection(initialGravityEstimate); // TODO(radam): not local
+    auto grDv = boost::make_shared<aslam::backend::EuclideanDirection>(initialGravityEstimate);
+	gravityExpression = boost::make_shared<aslam::backend::EuclideanExpression>(grDv->toExpression());
+	grDv->setActive(true);
+    gravityDv = grDv;
   }
-  // gravityExpression = gravityDv.toExpression(); // TODO(radam): fix
-  // gravityDv.setActive(true); // TODO(radam): fix
+  problem->addDesignVariable(gravityDv, HELPER_GROUP_ID);
 
-//  self.gravityExpression = self.gravityDv.toExpression()
-//  self.gravityDv.setActive( True )
-//  problem.addDesignVariable(self.gravityDv, HELPER_GROUP_ID)
+  // Add all DVs for all IMUs
+  iccImu->addDesignVariables(problem);
 
-  // TODO(radam): add design variables from IMU
-
-  // TODO(radam): add design variables to camera chain
+  // Add all DVs for the camera chain
+  //iccCamera-
 
 }
 
