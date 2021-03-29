@@ -4,7 +4,6 @@
 
 #include <aslam/backend/Optimizer2Options.hpp>
 #include <aslam/backend/Optimizer2.hpp>
-#include <aslam/backend/Scalar.hpp>
 #include <aslam/backend/BlockCholeskyLinearSystemSolver.hpp>
 
 #include <kalibr_imu_camera_calibration/iccSensors.hpp>
@@ -208,6 +207,8 @@ void IccCamera::addDesignVariables(boost::shared_ptr<aslam::calibration::Optimiz
   T_c_b_Dv_t = boost::make_shared<aslam::backend::EuclideanPoint>(T_extrinsic.t());
   T_c_b_Dv_t->setActive(active);
   problem->addDesignVariable(T_c_b_Dv_t, baselinedv_group_id);
+
+  T_c_b_Dv = boost::make_shared<aslam::backend::TransformationBasic>(T_c_b_Dv_q->toExpression(), T_c_b_Dv_t->toExpression());
 
   cameraTimeToImuTimeDv = boost::make_shared<aslam::backend::Scalar>(0.0);
   cameraTimeToImuTimeDv->setActive(!noTimeCalibration);

@@ -121,6 +121,25 @@ public:
     // Initialize all design variables
     initDesignVariables(problem, poseSpline, noTimeCalibration, noChainExtrinsics, false, estimatedGravity);
 
+	// ############################################
+	// ## add error terms
+	// ############################################
+    // #Add calibration target reprojection error terms for all camera in chain
+    iccCamera->addCameraErrorTerms(problem, poseDv, blakeZisserCam, timeOffsetPadding);
+
+//    // # Initialize IMU error terms.
+//	for imu in self.ImuList:
+//	imu.addAccelerometerErrorTerms(problem, self.poseDv, self.gravityExpression, mSigma=huberAccel, accelNoiseScale=accelNoiseScale)
+//	imu.addGyroscopeErrorTerms(problem, self.poseDv, mSigma=huberGyro, gyroNoiseScale=gyroNoiseScale, g_w=self.gravityExpression)
+//
+//    // # Add the bias motion terms.
+//	if doBiasMotionError:
+//	  imu.addBiasMotionTerms(problem)
+//
+//    // # Add the pose motion terms.
+//	if doPoseMotionError:
+//	  self.addPoseMotionTerms(problem, mrTranslationVariance, mrRotationVariance)
+
   } // TODO(radam): move to cpp
 
 
