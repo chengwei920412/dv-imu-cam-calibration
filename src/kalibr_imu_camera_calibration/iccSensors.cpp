@@ -87,8 +87,45 @@ void IccImu::addAccelerometerErrorTerms(boost::shared_ptr<aslam::calibration::Op
 	}
   }
 
-  std::cout << "Added " << imuData.size() - numSkipped << " of " << imuData.size() << " error terms "
+  std::cout << "Added " << imuData.size() - numSkipped << " of " << imuData.size() << " accelerometer error terms "
 			<< "(skipped " << numSkipped << " out-of-bounds measurements)" << std::endl;
 }
 
+void IccImu::addGyroscopeErrorTerms(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,
+									boost::shared_ptr<aslam::splines::BSplinePoseDesignVariable> poseSplineDv,
+									const Eigen::Vector3d &g_w,
+									double mSigma,
+									double gyroNoiseScale) {
+  const double weight = 1.0 / gyroNoiseScale;
 
+  size_t numSkipped = 0;
+
+  boost::shared_ptr<aslam::backend::MEstimator> mest;
+  if (mSigma > 0.0) {
+	mest =  std::make_unique<aslam::backend::HuberMEstimator>(mSigma);
+  } else {
+	mest = std::make_unique<aslam::backend::NoMEstimator>();
+  }
+
+  std::vector<ImuMeasurement> imuData; // TODO(radam): this has to be passed somehow
+  for (const auto& im : imuData) {
+	const auto tk = im.stamp + timeOffset;
+	if (tk > poseSplineDv->spline().t_min() && tk < poseSplineDv->spline().t_max()) {
+	  const auto w_b = poseSplineDv->angularVelocityBodyFrame(tk);
+	  const auto b_i = gyroBiasDv->toEuclideanExpression(tk,0);
+	  const auto C_i_b =q_i_b_Dv->toExpression();
+	  const auto w = C_i_b * w_b;
+	  auto gerr = boost::make_shared<kalibr_errorterms::EuclideanError>(im.omega, im.omegaInvR * weight, w + b_i);
+	  gerr->setMEstimatorPolicy(mest);
+	  gyroErrors.push_back(gerr);
+	  problem->addErrorTerm(gerr);
+	} else {
+	  ++numSkipped;
+	}
+
+  }
+
+  std::cout << "Added " << imuData.size() - numSkipped << " of " << imuData.size() << " gyroscope error terms "
+			<< "(skipped " << numSkipped << " out-of-bounds measurements)" << std::endl;
+
+}

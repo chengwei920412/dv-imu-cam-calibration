@@ -102,6 +102,7 @@ protected:
 
   // Error terms
   std::vector<boost::shared_ptr<kalibr_errorterms::EuclideanError>> accelErrors;
+  std::vector<boost::shared_ptr<kalibr_errorterms::EuclideanError>> gyroErrors;
 
 public:
 
@@ -121,10 +122,11 @@ public:
 								  double mSigma=0.0,
 								  double accelNoiseScale=1.0) ;
 
-  void addGyroscopeErrorTerms(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem /* finish */, double mSigma=0.0, double gyroNoiseScale=1.0 /* finish*/) {
-
-	// TODO(radam): finish
-  } // TODO(radam): move to cpp
+  void addGyroscopeErrorTerms(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,
+							  boost::shared_ptr<aslam::splines::BSplinePoseDesignVariable> poseSplineDv,
+							  const Eigen::Vector3d& g_w,
+							  double mSigma=0.0,
+							  double gyroNoiseScale=1.0);
 
 
   void initBiasSplines(/*finish*/) {
