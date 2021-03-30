@@ -10,7 +10,7 @@ add_definitions(${EIGEN_DEFINITIONS})
 
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++0x")
 
-
+add_definitions(-fPIC)
 
 include_directories(${Boost_INCLUDE_DIRS})
 

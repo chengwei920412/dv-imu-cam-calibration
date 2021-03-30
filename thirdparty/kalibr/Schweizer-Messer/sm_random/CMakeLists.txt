@@ -5,6 +5,8 @@ project(sm_random)
 ## Building ##
 ##############
 
+add_definitions(-fPIC)
+
 add_library(${PROJECT_NAME}
   src/random.cpp
 )

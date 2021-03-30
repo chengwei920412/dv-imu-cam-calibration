@@ -6,6 +6,8 @@ include_directories(SYSTEM ${EIGEN3_INCLUDE_DIR})
 
 ADD_DEFINITIONS(-DASLAM_USE_ROS )
 
+add_definitions(-fPIC)
+
 find_package(Boost REQUIRED COMPONENTS system serialization filesystem)
 
 #common commands for building c++ executables and libraries
