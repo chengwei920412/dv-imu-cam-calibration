@@ -6,6 +6,8 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/../cmake/)
 find_package(Eigen3 REQUIRED)
 include_directories(SYSTEM ${EIGEN3_INCLUDE_DIR})
 
+add_definitions(-fPIC)
+
 if(APPLE)
   set(CMAKE_CXX_FLAGS "-std=c++11")
 else()

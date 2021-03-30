@@ -98,6 +98,12 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
 
   std::vector<cv::Point2f> pointBuf;
 
+  aslam::cameras::GridCalibrationTargetObservation observation;
+  bool success = detector->findTarget(stampedImage.image, aslam::Time(toSec(stampedImage.timestamp)), observation); // TODO(radam): this is not thread safe!
+  if (success) {
+    std::cout << "Success" << std::endl; // TODO(radam): del
+  }
+
   bool found;
 
   switch( calibrationPattern ) // Find feature points on the input format

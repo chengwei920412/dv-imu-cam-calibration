@@ -6,6 +6,8 @@ include_directories(SYSTEM ${EIGEN3_INCLUDE_DIR})
 
 SET(CMAKE_CXX_FLAGS "-std=c++0x")
 
+add_definitions(-fPIC)
+
 include_directories(${EIGEN_INCLUDE_DIRS})
 
 find_package(Boost REQUIRED COMPONENTS system)

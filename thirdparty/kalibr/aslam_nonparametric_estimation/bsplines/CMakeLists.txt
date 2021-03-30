@@ -4,6 +4,8 @@ project(bsplines)
 find_package(Eigen3 REQUIRED)
 include_directories(SYSTEM ${EIGEN3_INCLUDE_DIR})
 
+add_definitions(-fPIC)
+
 add_library(${PROJECT_NAME}
   src/BSpline.cpp
   src/BSplinePose.cpp

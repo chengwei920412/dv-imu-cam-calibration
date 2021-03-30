@@ -59,6 +59,8 @@ SET_TARGET_PROPERTIES(imu-cam-calibration
 
 TARGET_LINK_LIBRARIES(imu-cam-calibration PRIVATE
         ${DV_LIBRARIES}
-        calibrator)
+        calibrator
+        kalibr_imu_camera_calibration
+        )
 
 INSTALL(TARGETS imu-cam-calibration DESTINATION ${DV_MODULES_DIR})

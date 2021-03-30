@@ -8,6 +8,8 @@ include_directories(SYSTEM ${EIGEN3_INCLUDE_DIR})
 find_package(Boost REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 
+add_definitions(-fPIC)
+
 set(CMAKE_CXX_STANDARD 17)
 
 add_library(kalibr_imu_camera_calibration

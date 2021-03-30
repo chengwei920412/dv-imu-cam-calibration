@@ -5,6 +5,8 @@ find_package(Boost REQUIRED COMPONENTS system)
 
 add_definitions(-std=c++0x -D__STRICT_ANSI__)
 
+add_definitions(-fPIC)
+
 include_directories(${Boost_INCLUDE_DIRS})
 
 ##############

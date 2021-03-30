@@ -6,6 +6,8 @@ find_package(Boost REQUIRED COMPONENTS system )
 find_package(Eigen3 REQUIRED)
 include_directories(SYSTEM ${EIGEN3_INCLUDE_DIR})
 
+add_definitions(-fPIC)
+
 add_library(${PROJECT_NAME}
   src/BSplinePoseDesignVariable.cpp
   src/BSplineExpressions.cpp
