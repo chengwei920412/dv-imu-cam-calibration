@@ -7,6 +7,8 @@ include_directories(${Boost_INCLUDE_DIRS})
 
 add_definitions(-std=c++0x)
 
+add_definitions(-fPIC)
+
 ##############
 ## Building ##
 ##############

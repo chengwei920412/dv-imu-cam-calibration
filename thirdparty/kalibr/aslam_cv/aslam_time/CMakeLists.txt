@@ -3,6 +3,8 @@ project(aslam_time)
 
 find_package(Boost REQUIRED COMPONENTS system)
 
+add_definitions(-fPIC)
+
 add_library(${PROJECT_NAME}
     src/time.cpp
     src/duration.cpp)
