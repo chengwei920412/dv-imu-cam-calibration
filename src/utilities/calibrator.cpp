@@ -26,8 +26,31 @@ Calibrator::StampedImage previewImageWithText(const std::string &text, const int
 Calibrator::Calibrator() : iccImu(imuParameters){
   setPreviewImage(previewImageWithText("No image arrived so far", previewTimestamp));
   detectionsQueue.start(5);
-  boardSize  = cv::Size(4, 11); // TODO(radam): param
-  calibrationPattern = CalibrationPattern::ASYMMETRIC_CIRCLES_GRID;; // TODO(radam): param
+
+  size_t rows = 4; // TODO(radam): param
+  size_t cols = 11; // TODO(radam): param
+  double spacingMeters = 0.05; // TODO(radam): param
+  calibrationPattern = CalibrationPattern::ASYMMETRIC_CIRCLES_GRID; // TODO(radam): param
+
+  aslam::cameras::GridCalibrationTargetBase grid;
+  switch (calibrationPattern) {
+  case CalibrationPattern::ASYMMETRIC_CIRCLES_GRID: {
+	auto options = aslam::cameras::GridCalibrationTargetCirclegrid::CirclegridOptions();
+	options.showExtractionVideo = false;
+	options.useAsymmetricCirclegrid = true;
+	grid = aslam::cameras::GridCalibrationTargetCirclegrid(rows, cols, spacingMeters, options);
+    break;
+  }
+  default:
+    throw std::runtime_error("Not implemented calibration pattern");
+  }
+
+  auto detectorOptions = aslam::cameras::GridDetector::GridDetectorOptions();
+  detectorOptions.imageStepping = false;
+  detectorOptions.plotCornerReprojection = false;
+  detectorOptions.filterCornerOutliers = true;
+  //auto detector = aslam::cameras::GridDetector(iccCamera.getCameraGeometry())
+
 }
 
 void Calibrator::addImu(const int64_t timestamp,
@@ -42,7 +65,7 @@ void Calibrator::addImu(const int64_t timestamp,
   const auto Rgyro = Eigen::Matrix3d::Identity() * iccImu.getGyroUncertaintyDiscrete();
   const auto Raccel = Eigen::Matrix3d::Identity() * iccImu.getAccelUncertaintyDiscrete();
   const Eigen::Vector3d omega(gyroX, gyroY, gyroZ);
-  const Eigen::Vector3d alpha(accelY, accelY, accelZ);
+  const Eigen::Vector3d alpha(accelX, accelY, accelZ);
   ImuMeasurement imuMeas(tsS, omega, alpha, Rgyro, Raccel);
   imuData.push_back(imuMeas);
 } // TODO(radam): move to cpp
@@ -83,9 +106,10 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
   case CalibrationPattern::CHESSBOARD:
 	found = findChessboardCorners(stampedImage.image, boardSize, pointBuf, cv::CALIB_CB_ADAPTIVE_THRESH | cv::CALIB_CB_NORMALIZE_IMAGE);
 	break;
-  case CalibrationPattern::CIRCLES_GRID:
-	found = cv::findCirclesGrid(stampedImage.image, boardSize, pointBuf);
-	break;
+//	// TODO(radam): fix
+//  case CalibrationPattern::CIRCLES_GRID:
+//	found = cv::findCirclesGrid(stampedImage.image, boardSize, pointBuf);
+//	break;
   case CalibrationPattern::ASYMMETRIC_CIRCLES_GRID:
     found = cv::findCirclesGrid(stampedImage.image, boardSize, pointBuf, cv::CALIB_CB_ASYMMETRIC_GRID);
 	break;

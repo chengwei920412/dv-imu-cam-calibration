@@ -5,6 +5,7 @@
 #include <kalibr_common/ConfigReader.hpp>
 
 #include <aslam/cameras/EquidistantDistortion.hpp>
+#include <aslam/cameras/PinholeProjection.hpp>
 
 PinholeEquidistantCamera::PinholeEquidistantCamera(const std::vector<double> &intrinsics, const std::vector<double> &distCoeff, const cv::Size &resolution) {
 
@@ -13,9 +14,15 @@ PinholeEquidistantCamera::PinholeEquidistantCamera(const std::vector<double> &in
 
   assert(distCoeff.size() >= 4);
   const auto dist = aslam::cameras::EquidistantDistortion(distCoeff.at(0), distCoeff.at(1), distCoeff.at(2), distCoeff.at(3));
-  //const auto proj = aslam::cameras:: // TODO(radam): this is missing
+  const auto proj = aslam::cameras::PinholeProjection<aslam::cameras::EquidistantDistortion>(focalLength[0],
+																							 focalLength[1],
+																							 principalPoint[0],
+																							 principalPoint[1],
+																							 resolution.width,
+																							 resolution.height,
+																							 dist);
 
-  // geometry = // TODO(radam): missing
+  //auto geometry =
 
   // TODO(radam): everything is missing here...
 

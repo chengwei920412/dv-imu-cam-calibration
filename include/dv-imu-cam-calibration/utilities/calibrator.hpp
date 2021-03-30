@@ -7,6 +7,9 @@
 #include <kalibr_imu_camera_calibration/iccCalibrator.hpp>
 #include <kalibr_imu_camera_calibration/iccSensors.hpp>
 
+#include <aslam/cameras/GridCalibrationTargetCirclegrid.hpp>
+#include <aslam/cameras/GridDetector.hpp>
+
 #include <opencv2/opencv.hpp>
 
 #include <sm/boost/JobQueue.hpp>
@@ -44,13 +47,14 @@ public:
 	}
   };
 
+  enum CalibrationPattern {
+	CHESSBOARD, ASYMMETRIC_CIRCLES_GRID, APRIL_GRID
+  };
+
 protected:
 
   // Calibration settings
   cv::Size boardSize;
-  enum CalibrationPattern {
-    CHESSBOARD, CIRCLES_GRID, ASYMMETRIC_CIRCLES_GRID
-  };
   CalibrationPattern calibrationPattern;
 
   // Queue scheduling pattern detection jobs
@@ -68,6 +72,7 @@ protected:
   // IccCalibrator
   IccCalibrator iccCalibrator;
   IccImu iccImu;
+  IccCamera iccCamera;
 
 public:
   /**

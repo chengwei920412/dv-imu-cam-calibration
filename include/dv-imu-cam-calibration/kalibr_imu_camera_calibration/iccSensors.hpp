@@ -74,6 +74,11 @@ public:
 
   void findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu);
 
+  PinholeEquidistantCamera& getCameraGeometry() {
+
+    return camera;
+  }
+
   Eigen::Vector3d getEstimatedGravity();
 
   // TODO(radam): missing methods here
