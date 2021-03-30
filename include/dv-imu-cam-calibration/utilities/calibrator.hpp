@@ -74,6 +74,9 @@ protected:
   IccImu iccImu;
   IccCamera iccCamera;
 
+  // Calibration target grid detector
+  boost::shared_ptr<aslam::cameras::GridDetector> detector = nullptr;
+
 public:
   /**
    * Constructor.

@@ -6,6 +6,7 @@
 
 #include <aslam/cameras/EquidistantDistortion.hpp>
 #include <aslam/cameras/PinholeProjection.hpp>
+#include <aslam/cameras.hpp>
 
 PinholeEquidistantCamera::PinholeEquidistantCamera(const std::vector<double> &intrinsics, const std::vector<double> &distCoeff, const cv::Size &resolution) {
 
@@ -22,9 +23,9 @@ PinholeEquidistantCamera::PinholeEquidistantCamera(const std::vector<double> &in
 																							 resolution.height,
 																							 dist);
 
-  //auto geometry =
+  geometry =  boost::make_shared<aslam::cameras::EquidistantDistortedPinholeCameraGeometry>(proj);
 
-  // TODO(radam): everything is missing here...
+  // TODO(radam): finish
 
 
 

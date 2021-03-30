@@ -74,9 +74,8 @@ public:
 
   void findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu);
 
-  PinholeEquidistantCamera& getCameraGeometry() {
-
-    return camera;
+  boost::shared_ptr<aslam::cameras::CameraGeometryBase> getCameraGeometry() {
+    return camera.getGeometry();
   }
 
   Eigen::Vector3d getEstimatedGravity();

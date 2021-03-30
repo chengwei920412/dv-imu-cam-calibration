@@ -32,13 +32,13 @@ Calibrator::Calibrator() : iccImu(imuParameters){
   double spacingMeters = 0.05; // TODO(radam): param
   calibrationPattern = CalibrationPattern::ASYMMETRIC_CIRCLES_GRID; // TODO(radam): param
 
-  aslam::cameras::GridCalibrationTargetBase grid;
+  boost::shared_ptr<aslam::cameras::GridCalibrationTargetBase> grid;
   switch (calibrationPattern) {
   case CalibrationPattern::ASYMMETRIC_CIRCLES_GRID: {
 	auto options = aslam::cameras::GridCalibrationTargetCirclegrid::CirclegridOptions();
 	options.showExtractionVideo = false;
 	options.useAsymmetricCirclegrid = true;
-	grid = aslam::cameras::GridCalibrationTargetCirclegrid(rows, cols, spacingMeters, options);
+	grid = boost::make_shared<aslam::cameras::GridCalibrationTargetCirclegrid>(rows, cols, spacingMeters, options);
     break;
   }
   default:
@@ -49,8 +49,7 @@ Calibrator::Calibrator() : iccImu(imuParameters){
   detectorOptions.imageStepping = false;
   detectorOptions.plotCornerReprojection = false;
   detectorOptions.filterCornerOutliers = true;
-  //auto detector = aslam::cameras::GridDetector(iccCamera.getCameraGeometry())
-
+  detector = boost::make_shared<aslam::cameras::GridDetector>(iccCamera.getCameraGeometry(), grid, detectorOptions);
 }
 
 void Calibrator::addImu(const int64_t timestamp,

@@ -41,7 +41,7 @@ class AslamCamera(object):
                 
                 self.geometry = cv.EquidistantDistortedPinholeCameraGeometry(proj)
                 
-                    self.frameType = cv.EquidistantDistortedPinholeFrame
+                self.frameType = cv.EquidistantDistortedPinholeFrame
                 self.keypointType = cv.Keypoint2
                 self.reprojectionErrorType = cvb.EquidistantDistortedPinholeReprojectionErrorSimple
                 self.undistorterType = cv.EquidistantPinholeUndistorterNoMask

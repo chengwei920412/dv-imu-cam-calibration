@@ -4,6 +4,10 @@
 
 #pragma once
 
+#include <aslam/cameras/CameraGeometryBase.hpp>
+
+#include <boost/shared_ptr.hpp>
+
 #include <opencv2/opencv.hpp>
 
 #include <vector>
@@ -14,12 +18,19 @@ public:
 
 protected:
 
+  boost::shared_ptr<aslam::cameras::CameraGeometryBase> geometry = nullptr;
 
 public:
 
   PinholeEquidistantCamera(const std::vector<double>& intrinsics, const std::vector<double>& distCoeff, const cv::Size& resolution);
 
-  static PinholeEquidistantCamera fromParameters() {}; // TODO(radam): implement
+  static PinholeEquidistantCamera fromParameters() {}; // TODO(radam): implement?
+
+  boost::shared_ptr<aslam::cameras::CameraGeometryBase> getGeometry() {
+    return geometry;
+  }
+
+
 
 
 };
