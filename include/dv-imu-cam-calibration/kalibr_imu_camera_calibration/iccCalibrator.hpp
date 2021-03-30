@@ -12,6 +12,7 @@
 #include <aslam/backend/Optimizer2.hpp>
 #include <aslam/backend/Optimizer2Options.hpp>
 #include <aslam/backend/BlockCholeskyLinearSystemSolver.hpp>
+#include <aslam/backend/BSplineMotionErrorFactory.hpp>
 #include <aslam/backend/LevenbergMarquardtTrustRegionPolicy.hpp>
 
 #include <bsplines/BSplinePose.hpp>
@@ -58,7 +59,9 @@ public:
 
 
 
-  void addPoseMotionTerms(){} // TODO(radam):
+  void addPoseMotionTerms(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,
+						  const double tv,
+						  const double rv);
 
 
 
@@ -138,8 +141,7 @@ public:
 
     // # Add the pose motion terms.
 	if (doPoseMotionError) {
-	  // TODO(radam): implement
-	  //addPoseMotionTerms(problem, mrTranslationVariance, mrRotationVariance);
+	  addPoseMotionTerms(problem, mrTranslationVariance, mrRotationVariance);
 	}
 
   } // TODO(radam): move to cpp

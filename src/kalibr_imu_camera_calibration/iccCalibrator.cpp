@@ -10,6 +10,7 @@
 #include <aslam/backend/EuclideanPoint.hpp>
 
 
+#include <iostream>
 
 
 void addSplineDesignVariables(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,
@@ -60,6 +61,25 @@ void IccCalibrator::initDesignVariables(boost::shared_ptr<aslam::calibration::Op
 
   // Add all DVs for the camera chain
   iccCamera->addDesignVariables(problem, noTimeCalibration, noChainExtrinsics);
+}
+
+void IccCalibrator::addPoseMotionTerms(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,
+									   const double tv,
+									   const double rv) {
+  const auto wt = 1.0/tv;
+  const auto wr = 1.0/rv;
+  Eigen::Matrix<double, 6,6> W;
+  W.setZero();
+  W(0,0) = wt;
+  W(1,1) = wt;
+  W(2,2) = wt;
+  W(3,3) = wr;
+  W(4,4) = wr;
+  W(5,5) = wr;
+  // TODO(radam): order is incorrect
+  const unsigned int errorOrder = 1;
+  throw std::runtime_error("Not implemented addPoseMotionTerms");
+  //aslam::backend::addMotionErrorTerms(problem, *poseDv, W, errorOrder);
 }
 
 void IccCalibrator::registerCamera(boost::shared_ptr<IccCamera> camera) {
