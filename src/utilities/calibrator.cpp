@@ -27,17 +27,11 @@ Calibrator::Calibrator() : iccImu(imuParameters){
   setPreviewImage(previewImageWithText("No image arrived so far", previewTimestamp));
 
 
-  const bool preview = false; // TODO(radam): param
-
-  if (preview) {
-	detectionsQueue.start(1);
-  } else {
-	detectionsQueue.start(5);
-  }
+  detectionsQueue.start(5);
 
 
-  size_t rows = 4; // TODO(radam): param
-  size_t cols = 11; // TODO(radam): param
+  size_t rows = 11; // TODO(radam): param
+  size_t cols = 4; // TODO(radam): param
   double spacingMeters = 0.05; // TODO(radam): param
   calibrationPattern = CalibrationPattern::ASYMMETRIC_CIRCLES_GRID; // TODO(radam): param
 
@@ -48,7 +42,6 @@ Calibrator::Calibrator() : iccImu(imuParameters){
 	auto options = aslam::cameras::GridCalibrationTargetCirclegrid::CirclegridOptions();
 	options.showExtractionVideo = false;
 	options.useAsymmetricCirclegrid = true;
-	options.showExtractionVideo = preview;
 	grid = boost::make_shared<aslam::cameras::GridCalibrationTargetCirclegrid>(rows, cols, spacingMeters, options);
     break;
   }
@@ -112,13 +105,34 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
   auto detector = boost::make_shared<aslam::cameras::GridDetector>(iccCamera.getCameraGeometry(), grid, detectorOptions);
 
   bool success = detector->findTarget(stampedImage.image, aslam::Time(toSec(stampedImage.timestamp)), observation); // TODO(radam): this is not thread safe!
+  auto preview = stampedImage.clone();
   if (success) {
-    std::cout << "Success" << std::endl; // TODO(radam): del
+    if (observation.hasSuccessfulObservation()) {
+      std::cout << "Successful observation " << grid->size() << std::endl; // TODO(radam): del
+
+      std::cout << "observation.T_t_c() " << observation.T_t_c().T() << std::endl; // TODO(radam): delete
+	  std::cout << "grid->size() " << grid->size() << std::endl; // TODO(radam): delete
+
+	  cv::cvtColor(preview.image, preview.image, cv::COLOR_GRAY2BGR);
+
+	  for (size_t i = 0 ; i < grid->size() ; ++i) {
+		Eigen::Vector2d point;
+		if (observation.imagePoint(i, point)) {
+		  cv::Point cvPoint(point.x(), point.y());
+		  cv::circle(preview.image, cvPoint, 10, cv::Scalar(255,0,0), 5);
+		} else {
+		  std::cout << "Wrong" << std::endl; // TODO(radam): del
+		}
+	  }
+
+    } else {
+      std::cout << "Failed observation" << std::endl; // TODO(radam): del
+    }
   } else {
     std::cout << "pattern not found" << std::endl; // TODO(radam): del
   }
 
-  auto preview = stampedImage;
+
   setPreviewImage(preview);
   return;
 
