@@ -4,3 +4,4 @@
 ## Dependencies
 - boost
 - eigen
+- libsuitesparse-dev
