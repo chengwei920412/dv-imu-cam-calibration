@@ -78,6 +78,32 @@ protected:
   aslam::cameras::GridDetector::GridDetectorOptions detectorOptions;
   boost::shared_ptr<aslam::cameras::GridCalibrationTargetBase> grid = nullptr;
 
+  // Colors used in visualization of detected calibtion pattern
+  const std::vector<cv::Scalar> colors{
+	  cv::Scalar(255, 0, 0),
+	  cv::Scalar(128, 0, 0),
+	  cv::Scalar(0, 255, 0),
+	  cv::Scalar(0, 128, 0),
+	  cv::Scalar(0, 0, 255),
+	  cv::Scalar(0, 0, 128),
+	  cv::Scalar(255, 255, 0),
+	  cv::Scalar(128, 255, 0),
+	  cv::Scalar(0, 255, 255),
+	  cv::Scalar(0, 255, 128),
+	  cv::Scalar(255, 128, 0),
+	  cv::Scalar(128, 128, 0),
+	  cv::Scalar(0, 128, 255),
+	  cv::Scalar(0, 128, 128),
+	  cv::Scalar(255, 0, 255),
+	  cv::Scalar(128, 0, 255),
+	  cv::Scalar(0, 255, 255),
+	  cv::Scalar(0, 128, 255),
+	  cv::Scalar(255, 0, 128),
+	  cv::Scalar(128, 0, 128),
+	  cv::Scalar(0, 255, 128),
+	  cv::Scalar(0, 128, 128)
+  };
+
 public:
   /**
    * Constructor.

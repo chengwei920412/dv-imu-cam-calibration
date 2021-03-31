@@ -102,36 +102,28 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
 
   aslam::cameras::GridCalibrationTargetObservation observation;
 
+  // Construct a detector each time to ensure thread safety
   auto detector = boost::make_shared<aslam::cameras::GridDetector>(iccCamera.getCameraGeometry(), grid, detectorOptions);
 
-  bool success = detector->findTarget(stampedImage.image, aslam::Time(toSec(stampedImage.timestamp)), observation); // TODO(radam): this is not thread safe!
+  // Search for pattern and draw it on the image frame
+  bool success = detector->findTarget(stampedImage.image, aslam::Time(toSec(stampedImage.timestamp)), observation);
   auto preview = stampedImage.clone();
   if (success) {
-    if (observation.hasSuccessfulObservation()) {
-      std::cout << "Successful observation " << grid->size() << std::endl; // TODO(radam): del
-
-      std::cout << "observation.T_t_c() " << observation.T_t_c().T() << std::endl; // TODO(radam): delete
-	  std::cout << "grid->size() " << grid->size() << std::endl; // TODO(radam): delete
-
-	  cv::cvtColor(preview.image, preview.image, cv::COLOR_GRAY2BGR);
-
-	  for (size_t i = 0 ; i < grid->size() ; ++i) {
+	cv::cvtColor(preview.image, preview.image, cv::COLOR_GRAY2BGR);
+	for (size_t y = 0 ; y < grid->rows() ; ++y) {
+	  const auto color = colors[y & colors.size()];
+      for (size_t x = 0 ; x < grid->cols() ; ++x ) {
+        const auto idx = y*grid->rows() + x;
 		Eigen::Vector2d point;
-		if (observation.imagePoint(i, point)) {
-		  cv::Point cvPoint(point.x(), point.y());
-		  cv::circle(preview.image, cvPoint, 10, cv::Scalar(255,0,0), 5);
-		} else {
-		  std::cout << "Wrong" << std::endl; // TODO(radam): del
-		}
-	  }
-
-    } else {
-      std::cout << "Failed observation" << std::endl; // TODO(radam): del
+        if (observation.imagePoint(idx, point)) {
+		  const cv::Point cvPoint(point.x(), point.y());
+		  cv::circle(preview.image, cvPoint, 5, color, 1);
+        } else {
+          std::cout << "No obs for given index " << idx << " " << grid->size() << std::endl; // TODO(radam): del
+        }
+      }
     }
-  } else {
-    std::cout << "pattern not found" << std::endl; // TODO(radam): del
   }
-
 
   setPreviewImage(preview);
   return;
