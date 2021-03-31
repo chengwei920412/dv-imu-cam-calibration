@@ -25,19 +25,30 @@ Calibrator::StampedImage previewImageWithText(const std::string &text, const int
 
 Calibrator::Calibrator() : iccImu(imuParameters){
   setPreviewImage(previewImageWithText("No image arrived so far", previewTimestamp));
-  detectionsQueue.start(5);
+
+
+  const bool preview = false; // TODO(radam): param
+
+  if (preview) {
+	detectionsQueue.start(1);
+  } else {
+	detectionsQueue.start(5);
+  }
+
 
   size_t rows = 4; // TODO(radam): param
   size_t cols = 11; // TODO(radam): param
   double spacingMeters = 0.05; // TODO(radam): param
   calibrationPattern = CalibrationPattern::ASYMMETRIC_CIRCLES_GRID; // TODO(radam): param
 
-  boost::shared_ptr<aslam::cameras::GridCalibrationTargetBase> grid;
+
+
   switch (calibrationPattern) {
   case CalibrationPattern::ASYMMETRIC_CIRCLES_GRID: {
 	auto options = aslam::cameras::GridCalibrationTargetCirclegrid::CirclegridOptions();
 	options.showExtractionVideo = false;
 	options.useAsymmetricCirclegrid = true;
+	options.showExtractionVideo = preview;
 	grid = boost::make_shared<aslam::cameras::GridCalibrationTargetCirclegrid>(rows, cols, spacingMeters, options);
     break;
   }
@@ -45,11 +56,9 @@ Calibrator::Calibrator() : iccImu(imuParameters){
     throw std::runtime_error("Not implemented calibration pattern");
   }
 
-  auto detectorOptions = aslam::cameras::GridDetector::GridDetectorOptions();
   detectorOptions.imageStepping = false;
   detectorOptions.plotCornerReprojection = false;
   detectorOptions.filterCornerOutliers = true;
-  detector = boost::make_shared<aslam::cameras::GridDetector>(iccCamera.getCameraGeometry(), grid, detectorOptions);
 }
 
 void Calibrator::addImu(const int64_t timestamp,
@@ -99,10 +108,20 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
   std::vector<cv::Point2f> pointBuf;
 
   aslam::cameras::GridCalibrationTargetObservation observation;
+
+  auto detector = boost::make_shared<aslam::cameras::GridDetector>(iccCamera.getCameraGeometry(), grid, detectorOptions);
+
   bool success = detector->findTarget(stampedImage.image, aslam::Time(toSec(stampedImage.timestamp)), observation); // TODO(radam): this is not thread safe!
   if (success) {
     std::cout << "Success" << std::endl; // TODO(radam): del
+  } else {
+    std::cout << "pattern not found" << std::endl; // TODO(radam): del
   }
+
+  auto preview = stampedImage;
+  setPreviewImage(preview);
+  return;
+
 
   bool found;
 

@@ -10,6 +10,8 @@
 
 PinholeEquidistantCamera::PinholeEquidistantCamera(const std::vector<double> &intrinsics, const std::vector<double> &distCoeff, const cv::Size &resolution) {
 
+
+  assert(intrinsics.size() >= 4);
   const auto focalLength = std::vector<double>(intrinsics.begin(), intrinsics.begin()+2);
   const auto principalPoint = std::vector<double>(intrinsics.begin()+2, intrinsics.begin()+4);
 

@@ -46,11 +46,16 @@ protected:
   // TODO(radam): cam config
   // TODO(radam): target config
 
+  //        distortion_coefficients: [],
+  //        distortion_type: radialtangential,
+  //        focal_length: [],
+  //        principal_point: []}
+
   const double cornerUncertainty;
   sm::kinematics::Transformation T_extrinsic;
   double timeshiftCamToImuPrior = 0.0;
-  PinholeEquidistantCamera camera{std::vector<double>(),
-      std::vector<double>(),
+  PinholeEquidistantCamera camera{std::vector<double>{6.1982681497359658e+02, 6.2027527379491937e+02, 2.9590645781122009e+02, 2.4359719473954027e+02},
+      std::vector<double>{-3.8620817947560659e-01, 2.7670984121686787e-01, -1.2984654836296217e-04, -6.9927656141977837e-04, -2.0510314474330094e-01},
       cv::Size(640, 480)}; // TODO(radam): pass these in constructor
   std::vector<TargetObservation> targetObservations;
   Eigen::Vector3d gravity_w;

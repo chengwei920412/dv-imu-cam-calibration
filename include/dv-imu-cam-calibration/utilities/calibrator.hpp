@@ -75,7 +75,8 @@ protected:
   IccCamera iccCamera;
 
   // Calibration target grid detector
-  boost::shared_ptr<aslam::cameras::GridDetector> detector = nullptr;
+  aslam::cameras::GridDetector::GridDetectorOptions detectorOptions;
+  boost::shared_ptr<aslam::cameras::GridCalibrationTargetBase> grid = nullptr;
 
 public:
   /**
