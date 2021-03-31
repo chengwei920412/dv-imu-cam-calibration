@@ -14,7 +14,7 @@ include_directories(${Boost_INCLUDE_DIRS})
 ## Building ##
 ##############
 
-add_library(${PROJECT_NAME}
+add_library(${PROJECT_NAME} SHARED
   src/PropertyTree.cpp
   src/BoostPropertyTreeImplementation.cpp
   src/BoostPropertyTree.cpp

@@ -12,7 +12,7 @@ include_directories(${EIGEN_INCLUDE_DIRS})
 
 find_package(Boost REQUIRED COMPONENTS system)
 
-add_library(${PROJECT_NAME}
+add_library(${PROJECT_NAME} SHARED
   src/RotationExpression.cpp
   src/RotationExpressionNode.cpp
   src/RotationQuaternion.cpp

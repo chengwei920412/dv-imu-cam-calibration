@@ -8,7 +8,7 @@ include_directories(SYSTEM ${EIGEN3_INCLUDE_DIR})
 
 add_definitions(-fPIC)
 
-add_library(${PROJECT_NAME}
+add_library(${PROJECT_NAME} SHARED
   src/MEstimatorPolicies.cpp
   src/JacobianContainer.cpp
   src/DesignVariable.cpp
@@ -51,7 +51,7 @@ target_link_libraries(${PROJECT_NAME}
         sm_timing
         sm_logging
         sm_property_tree
-        suitesparse
+        ${SUITESPARSE_LIBRARIES}
         )
 
 target_include_directories(${PROJECT_NAME} PUBLIC

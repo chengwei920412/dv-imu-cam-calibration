@@ -7,7 +7,7 @@ add_definitions(-std=c++0x -D__STRICT_ANSI__)
 
 include_directories(${Boost_INCLUDE_DIRS})
 
-add_library(${PROJECT_NAME}
+add_library(${PROJECT_NAME} SHARED
         src/empty.cpp)
 target_include_directories(${PROJECT_NAME} PUBLIC
         include)

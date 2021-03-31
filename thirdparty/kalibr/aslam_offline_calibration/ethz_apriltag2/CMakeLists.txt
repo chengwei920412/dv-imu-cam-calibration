@@ -23,7 +23,8 @@ include_directories(include  ${Eigen_INCLUDE_DIRS} ${catkin_INCLUDE_DIRS})
 
 #library
 file(GLOB SOURCE_FILES "src/*.cc")
-add_library(${PROJECT_NAME}  ${SOURCE_FILES})
+add_library(${PROJECT_NAME} SHARED
+        ${SOURCE_FILES})
 target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS} ${catkin_LIBRARIES})
 
 #demo

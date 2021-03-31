@@ -59,8 +59,19 @@ SET_TARGET_PROPERTIES(imu-cam-calibration
 
 TARGET_LINK_LIBRARIES(imu-cam-calibration PRIVATE
         ${DV_LIBRARIES}
+        ${OpenCV_LIBS}
+        ${Boost_LIBRARIES}
+        aslam_backend
+        aslam_cameras
+        aslam_splines
+        bsplines
         calibrator
+        config_reader
+        incremental_calibration
+        kalibr_errorterms
         kalibr_imu_camera_calibration
+        sm_boost
+        sm_kinematics
         )
 
 INSTALL(TARGETS imu-cam-calibration DESTINATION ${DV_MODULES_DIR})

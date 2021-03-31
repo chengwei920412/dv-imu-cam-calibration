@@ -5,7 +5,7 @@ find_package(Boost REQUIRED COMPONENTS system)
 
 add_definitions(-fPIC)
 
-add_library(${PROJECT_NAME}
+add_library(${PROJECT_NAME} SHARED
     src/time.cpp
     src/duration.cpp)
 

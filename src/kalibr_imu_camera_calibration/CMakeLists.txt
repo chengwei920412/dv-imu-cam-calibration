@@ -12,7 +12,7 @@ add_definitions(-fPIC)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_library(kalibr_imu_camera_calibration
+add_library(kalibr_imu_camera_calibration SHARED
         iccCalibrator.cpp
         iccSensors.cpp)
 target_link_libraries(kalibr_imu_camera_calibration
@@ -20,10 +20,12 @@ target_link_libraries(kalibr_imu_camera_calibration
         aslam_cameras
         aslam_splines
         bsplines
+        config_reader
         incremental_calibration
         sm_kinematics
         kalibr_errorterms
         ${Boost_LIBRARIES}
+        ${OpenCV_LIBS}
         )
 target_include_directories(kalibr_imu_camera_calibration PUBLIC
         ../../include/dv-imu-cam-calibration)

@@ -6,7 +6,7 @@ include_directories(SYSTEM ${EIGEN3_INCLUDE_DIR})
 
 add_definitions(-fPIC)
 
-add_library(${PROJECT_NAME}_errorterms
+add_library(${PROJECT_NAME}_errorterms SHARED
   src/EuclideanError.cpp
   src/GyroscopeError.cpp
   src/AccelerometerError.cpp

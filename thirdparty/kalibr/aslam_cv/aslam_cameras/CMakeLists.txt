@@ -11,7 +11,7 @@ add_definitions(-fPIC)
 find_package(Boost REQUIRED COMPONENTS system serialization filesystem)
 
 #common commands for building c++ executables and libraries
-add_library(${PROJECT_NAME}
+add_library(${PROJECT_NAME} SHARED
   src/CameraGeometryBase.cpp
   src/GlobalShutter.cpp
   src/RollingShutter.cpp

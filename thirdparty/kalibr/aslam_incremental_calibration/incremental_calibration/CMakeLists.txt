@@ -14,7 +14,7 @@ else()
   set(CMAKE_CXX_FLAGS "-std=c++0x")
 endif()
 
-add_library(${PROJECT_NAME}
+add_library(${PROJECT_NAME} SHARED
   src/base/Serializable.cpp
   src/base/Timestamp.cpp
   src/base/Condition.cpp

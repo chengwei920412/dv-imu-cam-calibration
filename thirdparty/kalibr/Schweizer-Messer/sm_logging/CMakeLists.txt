@@ -13,7 +13,7 @@ add_definitions(-fPIC)
 ## Building ##
 ##############
 
-add_library(${PROJECT_NAME} 
+add_library(${PROJECT_NAME}  SHARED
   src/Logger.cpp
   src/StdOutLogger.cpp
   src/LoggingEvent.cpp

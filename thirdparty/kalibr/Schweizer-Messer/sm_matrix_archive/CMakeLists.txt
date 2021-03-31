@@ -22,7 +22,7 @@ include_directories(include ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
 ## Building ##
 ##############
 
-add_library(${PROJECT_NAME}
+add_library(${PROJECT_NAME} SHARED
   src/MatrixArchive.cpp
 )
 

@@ -8,7 +8,7 @@ include_directories(SYSTEM ${EIGEN3_INCLUDE_DIR})
 
 add_definitions(-fPIC)
 
-add_library(${PROJECT_NAME}
+add_library(${PROJECT_NAME} SHARED
   src/BSplinePoseDesignVariable.cpp
   src/BSplineExpressions.cpp
   src/EuclideanBSplineDesignVariable.cpp

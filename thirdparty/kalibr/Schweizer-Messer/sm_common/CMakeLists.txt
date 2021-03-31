@@ -7,7 +7,7 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++0x -D__STRICT_ANSI__")
 
 include_directories(${Boost_INCLUDE_DIRS})
 
-add_library(${PROJECT_NAME}
+add_library(${PROJECT_NAME} SHARED
   src/progress_info.cpp
 )
 target_link_libraries(${PROJECT_NAME} 
