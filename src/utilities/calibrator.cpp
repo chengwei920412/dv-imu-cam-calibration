@@ -101,28 +101,28 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
   std::vector<cv::Point2f> pointBuf;
 
   aslam::cameras::GridCalibrationTargetObservation observation;
-
-  // Construct a detector each time to ensure thread safety
   auto detector = boost::make_shared<aslam::cameras::GridDetector>(iccCamera.getCameraGeometry(), grid, detectorOptions);
 
   // Search for pattern and draw it on the image frame
-  bool success = detector->findTarget(stampedImage.image, aslam::Time(toSec(stampedImage.timestamp)), observation);
+  bool success = detector->findTarget(stampedImage.image, aslam::Time(toSec(stampedImage.timestamp)), observation); // TODO(radam): this is not thread safe!
   auto preview = stampedImage.clone();
+
   if (success) {
-	cv::cvtColor(preview.image, preview.image, cv::COLOR_GRAY2BGR);
-	for (size_t y = 0 ; y < grid->rows() ; ++y) {
-	  const auto color = colors[y & colors.size()];
-      for (size_t x = 0 ; x < grid->cols() ; ++x ) {
-        const auto idx = y*grid->rows() + x;
-		Eigen::Vector2d point;
-        if (observation.imagePoint(idx, point)) {
-		  const cv::Point cvPoint(point.x(), point.y());
-		  cv::circle(preview.image, cvPoint, 5, color, 1);
-        } else {
-          std::cout << "No obs for given index " << idx << " " << grid->size() << std::endl; // TODO(radam): del
-        }
-      }
-    }
+	if (observation.hasSuccessfulObservation()) {
+	  cv::cvtColor(preview.image, preview.image, cv::COLOR_GRAY2BGR);
+	  preview.image = preview.image.clone();
+	  for (size_t y = 0; y < grid->rows(); ++y) {
+		const auto color = colors[y % colors.size()];
+		for (size_t x = 0; x < grid->cols(); ++x) {
+		  const auto idx = y * grid->cols() + x;
+		  Eigen::Vector2d point;
+		  if (observation.imagePoint(idx, point)) {
+			const cv::Point cvPoint(point.x(), point.y());
+			cv::circle(preview.image, cvPoint, 10, color, 2);
+		  }
+		}
+	  }
+	}
   }
 
   setPreviewImage(preview);
