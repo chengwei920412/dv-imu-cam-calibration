@@ -111,6 +111,7 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
 	if (observation.hasSuccessfulObservation()) {
 	  cv::cvtColor(preview.image, preview.image, cv::COLOR_GRAY2BGR);
 	  preview.image = preview.image.clone();
+	  cv::Point prevPoint(-1, -1);
 	  for (size_t y = 0; y < grid->rows(); ++y) {
 		const auto color = colors[y % colors.size()];
 		for (size_t x = 0; x < grid->cols(); ++x) {
@@ -118,7 +119,11 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
 		  Eigen::Vector2d point;
 		  if (observation.imagePoint(idx, point)) {
 			const cv::Point cvPoint(point.x(), point.y());
-			cv::circle(preview.image, cvPoint, 10, color, 2);
+			cv::circle(preview.image, cvPoint, 8, color, 2);
+			if (prevPoint != cv::Point(-1, -1)) {
+			  cv::line(preview.image, prevPoint, cvPoint, color, 2);
+			}
+			prevPoint = cvPoint;
 		  }
 		}
 	  }
