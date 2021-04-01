@@ -131,5 +131,4 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
   }
 
   setPreviewImage(preview);
-  return;
 }
