@@ -77,6 +77,8 @@ protected:
   // Calibration target grid detector
   aslam::cameras::GridDetector::GridDetectorOptions detectorOptions;
   boost::shared_ptr<aslam::cameras::GridCalibrationTargetBase> grid = nullptr;
+  std::vector<aslam::cameras::GridCalibrationTargetObservation> targetObservations;
+  std::mutex targetObservationsMutex;
 
   // Colors used in visualization of detected calibtion pattern
   const std::vector<cv::Scalar> colors{

@@ -127,6 +127,8 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
 		  }
 		}
 	  }
+	  std::lock_guard<std::mutex> lock(targetObservationsMutex);
+	  targetObservations.push_back(observation);
 	}
   }
 

@@ -124,7 +124,10 @@ Eigen::Vector3d IccCamera::getEstimatedGravity() {
 boost::shared_ptr<bsplines::BSplinePose> IccCamera::initPoseSplineFromCamera(const size_t splineOrder,
 																			 const size_t poseKnotsPerSecond,
 																			 const double timeOffsetPadding) {
-  assert(!targetObservation.empty());
+
+
+  std::vector<aslam::cameras::GridCalibrationTargetObservation> targetObservations; // TODO(radam): pass is somehow
+  assert(!targetObservations.empty());
 
   const auto T_c_b = T_extrinsic.T();
   auto rotationVector = boost::make_shared<sm::kinematics::RotationVector>();
@@ -137,8 +140,8 @@ boost::shared_ptr<bsplines::BSplinePose> IccCamera::initPoseSplineFromCamera(con
   curveVec.reserve(targetObservations.size());
   for (int idx = 0 ; idx < targetObservations.size() ; ++idx) {
 	const auto targetObs = targetObservations[static_cast<size_t>(idx)];
-	timesVec.push_back(toSec(targetObs.time) + timeshiftCamToImuPrior);
-	const auto trans = targetObs.T_t_c.T() * T_c_b;
+	timesVec.push_back(targetObs.time().toSec() + timeshiftCamToImuPrior);
+	const auto trans = targetObs.T_t_c().T() * T_c_b;
 	const auto column = pose->transformationToCurveValue(trans);
 	curveVec.push_back(column);
   }
@@ -213,6 +216,81 @@ void IccCamera::addDesignVariables(boost::shared_ptr<aslam::calibration::Optimiz
   cameraTimeToImuTimeDv = boost::make_shared<aslam::backend::Scalar>(0.0);
   cameraTimeToImuTimeDv->setActive(!noTimeCalibration);
   problem->addDesignVariable(cameraTimeToImuTimeDv, CALIBRATION_GROUP_ID);
+}
+
+void IccCamera::addCameraErrorTerms(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,
+									boost::shared_ptr<aslam::splines::BSplinePoseDesignVariable> poseSplineDv,
+									double blakeZissermanDf,
+									double timeOffsetPadding) {
+  const auto T_cN_b = T_c_b_Dv->toExpression();
+
+  std::vector<double> allReprojectionErrors; // TODO(radam): this should be a member variable
+  allReprojectionErrors.clear();
+
+
+  std::vector<aslam::cameras::GridCalibrationTargetObservation> targetObservations; // TODO(radam): pass is somehow
+  for (const auto& obs : targetObservations) {
+	const auto frameTime = cameraTimeToImuTimeDv->toExpression() + obs.time().toSec() + timeshiftCamToImuPrior;
+	const auto frameTimeScalar = frameTime.toScalar();
+
+	// #as we are applying an initial time shift outside the optimization so
+	// #we need to make sure that we dont add data outside the spline definition
+	if (frameTimeScalar <= poseSplineDv->spline().t_min() || frameTimeScalar >= poseSplineDv->spline().t_max()) {
+	  continue;
+	}
+
+	const auto T_w_b = poseSplineDv->transformationAtTime(frameTime, timeOffsetPadding, timeOffsetPadding);
+	const auto T_b_w = T_w_b.inverse();
+
+
+	// #calibration target coords to camera N coords
+	// #T_b_w: from world to imu coords
+	// #T_cN_b: from imu to camera N coords
+	const auto T_c_w = T_cN_b * T_b_w;
+
+	// #get the image and target points corresponding to the frame
+	//imageCornerPoints =  np.array( obs.getCornersImageFrame() ).T // TODO(radam): detections need to be finished
+	//targetCornerPoints = np.array( obs.getCornersTargetFrame() ).T
+
+	// TODO(radam): finish here
+//	  // #setup an aslam frame (handles the distortion)
+//	  frame = camera.frameType();
+//	  frame.setGeometry(self.camera.geometry)
+//
+//	  // #corner uncertainty
+//	  R = np.eye(2) * self.cornerUncertainty * self.cornerUncertainty
+//	  invR = np.linalg.inv(R)
+//
+//	  for pidx in range(0,imageCornerPoints.shape[1]):
+//	  // #add all image points
+//	  k = self.camera.keypointType()
+//	  k.setMeasurement( imageCornerPoints[:,pidx] )
+//	  k.setInverseMeasurementCovariance(invR)
+//	  frame.addKeypoint(k)
+//
+//	  reprojectionErrors=list()
+//	  for pidx in range(0,imageCornerPoints.shape[1]):
+//	  // #add all target points
+//	  targetPoint = np.insert( targetCornerPoints.transpose()[pidx], 3, 1)
+//	  p = T_c_w *  aopt.HomogeneousExpression( targetPoint )
+//
+//	  // #build and append the error term
+//	  rerr = error_t(frame, pidx, p)
+//
+//	  // #add blake-zisserman m-estimator
+//	  if blakeZissermanDf>0.0:
+//	  mest = aopt.BlakeZissermanMEstimator( blakeZissermanDf )
+//	  rerr.setMEstimatorPolicy(mest)
+//
+//	  problem.addErrorTerm(rerr)
+//	  reprojectionErrors.append(rerr)
+//
+//	  allReprojectionErrors.append(reprojectionErrors)
+  }
+
+  std::cout << "  Added " << targetObservations.size() << " camera error tems" << std::endl;
+
+
 }
 
 double IccImu::getAccelUncertaintyDiscrete() {
