@@ -100,17 +100,17 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
 
   std::vector<cv::Point2f> pointBuf;
 
-  aslam::cameras::GridCalibrationTargetObservation observation;
+  // Make a copy of the detector in each thread to avoid memory issues
   auto detector = boost::make_shared<aslam::cameras::GridDetector>(iccCamera.getCameraGeometry(), grid, detectorOptions);
 
   // Search for pattern and draw it on the image frame
-  bool success = detector->findTarget(stampedImage.image, aslam::Time(toSec(stampedImage.timestamp)), observation); // TODO(radam): this is not thread safe!
-  auto preview = stampedImage.clone();
+  aslam::cameras::GridCalibrationTargetObservation observation;
+  bool success = detector->findTarget(stampedImage.image, aslam::Time(toSec(stampedImage.timestamp)), observation);
+  auto preview = stampedImage;
 
   if (success) {
 	if (observation.hasSuccessfulObservation()) {
 	  cv::cvtColor(preview.image, preview.image, cv::COLOR_GRAY2BGR);
-	  preview.image = preview.image.clone();
 	  cv::Point prevPoint(-1, -1);
 	  for (size_t y = 0; y < grid->rows(); ++y) {
 		const auto color = colors[y % colors.size()];
@@ -132,33 +132,4 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
 
   setPreviewImage(preview);
   return;
-
-
-  bool found;
-
-  switch( calibrationPattern ) // Find feature points on the input format
-  {
-  case CalibrationPattern::CHESSBOARD:
-	found = findChessboardCorners(stampedImage.image, boardSize, pointBuf, cv::CALIB_CB_ADAPTIVE_THRESH | cv::CALIB_CB_NORMALIZE_IMAGE);
-	break;
-//	// TODO(radam): fix
-//  case CalibrationPattern::CIRCLES_GRID:
-//	found = cv::findCirclesGrid(stampedImage.image, boardSize, pointBuf);
-//	break;
-  case CalibrationPattern::ASYMMETRIC_CIRCLES_GRID:
-    found = cv::findCirclesGrid(stampedImage.image, boardSize, pointBuf, cv::CALIB_CB_ASYMMETRIC_GRID);
-	break;
-  default:
-	throw std::runtime_error("Unsupported calibration pattern");
-  }
-
-  if (found) {
-    auto preview = stampedImage;
-    cv::cvtColor(preview.image, preview.image, cv::COLOR_GRAY2BGR);
-	cv::drawChessboardCorners(preview.image, boardSize, cv::Mat(pointBuf), found);
-	setPreviewImage(preview);
-  } else {
-    setPreviewImage(stampedImage);
-  }
-
 }
