@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <aslam/backend/CameraDesignVariable.hpp>
+
 #include <aslam/cameras.hpp>
 #include <aslam/cameras/EquidistantDistortion.hpp>
 #include <aslam/cameras/PinholeProjection.hpp>
@@ -31,6 +33,10 @@ public:
   static PinholeEquidistantCamera fromParameters() {}; // TODO(radam): implement?
 
   boost::shared_ptr<aslam::cameras::EquidistantDistortedPinholeCameraGeometry> getGeometry();
+
+  boost::shared_ptr<aslam::backend::CameraDesignVariable<aslam::cameras::EquidistantDistortedPinholeCameraGeometry>> getDesignVariable() {
+    return boost::make_shared<aslam::backend::CameraDesignVariable<aslam::cameras::EquidistantDistortedPinholeCameraGeometry>>(geometry);
+  }
 
   boost::shared_ptr<aslam::Frame<aslam::cameras::EquidistantDistortedPinholeCameraGeometry>> frame() ;
 

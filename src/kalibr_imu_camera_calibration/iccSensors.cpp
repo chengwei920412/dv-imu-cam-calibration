@@ -292,6 +292,8 @@ void IccCamera::addCameraErrorTerms(boost::shared_ptr<aslam::calibration::Optimi
 		frame->addKeypoint(k);
 	  }
 
+	  const auto cameraDesignVariable = camera.getDesignVariable();
+
 	  for (size_t idx = 0 ; idx < outImageCorners.size() ; ++idx) {
 	    const auto& imageCornerPoint = outImageCorners[idx];
 	    const auto& targetPoint = targetObservations[idx];
@@ -299,18 +301,18 @@ void IccCamera::addCameraErrorTerms(boost::shared_ptr<aslam::calibration::Optimi
 	    // Target points
 		const auto p = T_c_w *  aslam::backend::HomogeneousExpression(targetPoint.T_t_c().q()); // TODO(radam): not entirely sure this is correct
 
-		//auto rerr = aslam::backend::Reprojec
-//		// #build and append the error term
-//		frame.erro
-//		rerr = error_t(frame, pidx, p) // EquidistantDistortedOmniReprojectionErrorSimple
-//
-//		// #add blake-zisserman m-estimator
-//		if blakeZissermanDf>0.0:
-//		mest = aopt.BlakeZissermanMEstimator( blakeZissermanDf )
-//		rerr.setMEstimatorPolicy(mest)
-//
-//		problem.addErrorTerm(rerr)
-//		reprojectionErrors.append(rerr)
+		// #build and append the error term
+		auto rerr = boost::make_shared<aslam::backend::ReprojectionError<aslam::cameras::EquidistantDistortedPinholeCameraGeometry>>(frame.get(), idx, p, *cameraDesignVariable);
+
+		// #add blake-zisserman m-estimator
+		if (blakeZissermanDf > 0.0) {
+       	  throw std::runtime_error("Not implemented blake-zisserman");
+		  // mest = aopt.BlakeZissermanMEstimator( blakeZissermanDf )
+		  // rerr.setMEstimatorPolicy(mest)
+		}
+
+		problem->addErrorTerm(rerr);
+		//reprojectionErrors.append(rerr) // TODO(radam): fix
 	  }
 
 	  // TODO(radam): fix

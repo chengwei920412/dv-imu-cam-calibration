@@ -8,7 +8,9 @@ include_directories(SYSTEM ${EIGEN3_INCLUDE_DIR})
 add_library(config_reader SHARED
         ConfigReader.cpp)
 target_link_libraries(config_reader
-        aslam_cameras)
+        aslam_cameras
+        aslam_cv_backend
+        )
 target_include_directories(config_reader PUBLIC
         ../../include/dv-imu-cam-calibration)
 
