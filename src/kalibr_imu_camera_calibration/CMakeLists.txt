@@ -18,8 +18,8 @@ add_library(kalibr_imu_camera_calibration SHARED
 target_link_libraries(kalibr_imu_camera_calibration
         aslam_backend
         aslam_cameras
-        #aslam_cv_backend
-        #aslam_cv_error_terms
+        aslam_cv_backend
+        this is bad aslam_cv_error_terms
         aslam_splines
         bsplines
         config_reader
