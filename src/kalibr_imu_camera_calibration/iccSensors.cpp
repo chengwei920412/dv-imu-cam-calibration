@@ -5,6 +5,8 @@
 #include <aslam/backend/Optimizer2Options.hpp>
 #include <aslam/backend/Optimizer2.hpp>
 #include <aslam/backend/BlockCholeskyLinearSystemSolver.hpp>
+//#include <aslam/backend/ReprojectionError.hpp>
+#include <aslam/Keypoint.hpp>
 
 #include <kalibr_imu_camera_calibration/iccSensors.hpp>
 #include <kalibr_errorterms/GyroscopeError.hpp>
@@ -242,49 +244,76 @@ void IccCamera::addCameraErrorTerms(boost::shared_ptr<aslam::calibration::Optimi
 	const auto T_w_b = poseSplineDv->transformationAtTime(frameTime, timeOffsetPadding, timeOffsetPadding);
 	const auto T_b_w = T_w_b.inverse();
 
-
 	// #calibration target coords to camera N coords
 	// #T_b_w: from world to imu coords
 	// #T_cN_b: from imu to camera N coords
 	const auto T_c_w = T_cN_b * T_b_w;
 
 	// #get the image and target points corresponding to the frame
+	std::vector<cv::Point2f> outImageCorners;
+	size_t nImageCorners = obs.getCornersImageFrame(outImageCorners);
+	// TODO(radam): matrix
+	std::vector<cv::Point3f> outTargetCorners;
+	size_t nTargetCorners = obs.getCornersTargetFrame(outTargetCorners);
+	// TODO(radam): matrix
+	assert(nImageCorners == nTargetCorners);
+
 	//imageCornerPoints =  np.array( obs.getCornersImageFrame() ).T // TODO(radam): detections need to be finished
 	//targetCornerPoints = np.array( obs.getCornersTargetFrame() ).T
 
-	// TODO(radam): finish here
-//	  // #setup an aslam frame (handles the distortion)
-//	  frame = camera.frameType();
-//	  frame.setGeometry(self.camera.geometry)
+
+
+	  // #setup an aslam frame (handles the distortion)
+	  auto frame = camera.frame();
+	  frame->setGeometry(camera.getGeometry());
+
+
+	  // #corner uncertainty
+	  const auto cornerUncVal = cornerUncertainty * cornerUncertainty;
+	  Eigen::Matrix2d R;
+	  R.setZero();
+	  R(0,0) = cornerUncVal;
+	  R(1,1) = cornerUncVal;
+	  const auto invR = R.inverse();
+
+
+	  std::vector<double> reprojectionErrors;
+	  reprojectionErrors.reserve(outImageCorners.size());
+	  for (size_t idx = 0 ; idx < outImageCorners.size() ; ++idx) {
+		const auto &imageCornerPoint = outImageCorners[idx];
+
+		// Image points
+		aslam::Keypoint<2> k;
+		Eigen::Matrix<double, 2, 1> mat;
+		mat(0, 0) = imageCornerPoint.x;
+		mat(1, 1) = imageCornerPoint.y;
+		k.setMeasurement(mat);
+		k.setInverseMeasurementCovariance(invR);
+		frame->addKeypoint(k);
+	  }
+
+	  for (size_t idx = 0 ; idx < outImageCorners.size() ; ++idx) {
+	    const auto& imageCornerPoint = outImageCorners[idx];
+	    const auto& targetPoint = targetObservations[idx];
+
+	    // Target points
+		const auto p = T_c_w *  aslam::backend::HomogeneousExpression(targetPoint.T_t_c().q()); // TODO(radam): not entirely sure this is correct
+
+		//auto rerr = aslam::backend::Reprojec
+//		// #build and append the error term
+//		frame.erro
+//		rerr = error_t(frame, pidx, p) // EquidistantDistortedOmniReprojectionErrorSimple
 //
-//	  // #corner uncertainty
-//	  R = np.eye(2) * self.cornerUncertainty * self.cornerUncertainty
-//	  invR = np.linalg.inv(R)
+//		// #add blake-zisserman m-estimator
+//		if blakeZissermanDf>0.0:
+//		mest = aopt.BlakeZissermanMEstimator( blakeZissermanDf )
+//		rerr.setMEstimatorPolicy(mest)
 //
-//	  for pidx in range(0,imageCornerPoints.shape[1]):
-//	  // #add all image points
-//	  k = self.camera.keypointType()
-//	  k.setMeasurement( imageCornerPoints[:,pidx] )
-//	  k.setInverseMeasurementCovariance(invR)
-//	  frame.addKeypoint(k)
-//
-//	  reprojectionErrors=list()
-//	  for pidx in range(0,imageCornerPoints.shape[1]):
-//	  // #add all target points
-//	  targetPoint = np.insert( targetCornerPoints.transpose()[pidx], 3, 1)
-//	  p = T_c_w *  aopt.HomogeneousExpression( targetPoint )
-//
-//	  // #build and append the error term
-//	  rerr = error_t(frame, pidx, p)
-//
-//	  // #add blake-zisserman m-estimator
-//	  if blakeZissermanDf>0.0:
-//	  mest = aopt.BlakeZissermanMEstimator( blakeZissermanDf )
-//	  rerr.setMEstimatorPolicy(mest)
-//
-//	  problem.addErrorTerm(rerr)
-//	  reprojectionErrors.append(rerr)
-//
+//		problem.addErrorTerm(rerr)
+//		reprojectionErrors.append(rerr)
+	  }
+
+	  // TODO(radam): fix
 //	  allReprojectionErrors.append(reprojectionErrors)
   }
 

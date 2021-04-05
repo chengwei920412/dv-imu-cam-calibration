@@ -4,7 +4,11 @@
 
 #pragma once
 
+#include <aslam/cameras.hpp>
+#include <aslam/cameras/EquidistantDistortion.hpp>
+#include <aslam/cameras/PinholeProjection.hpp>
 #include <aslam/cameras/CameraGeometryBase.hpp>
+#include <aslam/Frame.hpp>
 
 #include <boost/shared_ptr.hpp>
 
@@ -18,7 +22,7 @@ public:
 
 protected:
 
-  boost::shared_ptr<aslam::cameras::CameraGeometryBase> geometry = nullptr;
+  boost::shared_ptr<aslam::cameras::EquidistantDistortedPinholeCameraGeometry> geometry = nullptr;
 
 public:
 
@@ -26,11 +30,9 @@ public:
 
   static PinholeEquidistantCamera fromParameters() {}; // TODO(radam): implement?
 
-  boost::shared_ptr<aslam::cameras::CameraGeometryBase> getGeometry() {
-    return geometry;
-  }
+  boost::shared_ptr<aslam::cameras::EquidistantDistortedPinholeCameraGeometry> getGeometry();
 
-
+  boost::shared_ptr<aslam::Frame<aslam::cameras::EquidistantDistortedPinholeCameraGeometry>> frame() ;
 
 
 };

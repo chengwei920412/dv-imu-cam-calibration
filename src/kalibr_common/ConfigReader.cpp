@@ -4,8 +4,7 @@
 
 #include <kalibr_common/ConfigReader.hpp>
 
-#include <aslam/cameras/EquidistantDistortion.hpp>
-#include <aslam/cameras/PinholeProjection.hpp>
+
 #include <aslam/cameras.hpp>
 
 PinholeEquidistantCamera::PinholeEquidistantCamera(const std::vector<double> &intrinsics, const std::vector<double> &distCoeff, const cv::Size &resolution) {
@@ -31,4 +30,13 @@ PinholeEquidistantCamera::PinholeEquidistantCamera(const std::vector<double> &in
 
 
 
+}
+
+boost::shared_ptr<aslam::cameras::EquidistantDistortedPinholeCameraGeometry> PinholeEquidistantCamera::getGeometry() {
+  return geometry;
+}
+
+boost::shared_ptr<aslam::Frame<aslam::cameras::EquidistantDistortedPinholeCameraGeometry>> PinholeEquidistantCamera::frame() {
+  auto frame = boost::make_shared<aslam::Frame<aslam::cameras::EquidistantDistortedPinholeCameraGeometry>>(aslam::Frame<aslam::cameras::EquidistantDistortedPinholeCameraGeometry>());
+  return frame;
 }
