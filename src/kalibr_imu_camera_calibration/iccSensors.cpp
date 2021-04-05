@@ -5,7 +5,7 @@
 #include <aslam/backend/Optimizer2Options.hpp>
 #include <aslam/backend/Optimizer2.hpp>
 #include <aslam/backend/BlockCholeskyLinearSystemSolver.hpp>
-//#include <aslam/backend/ReprojectionError.hpp>
+#include <aslam/backend/ReprojectionError.hpp>
 #include <aslam/Keypoint.hpp>
 
 #include <kalibr_imu_camera_calibration/iccSensors.hpp>
