@@ -90,6 +90,76 @@ void IccCalibrator::registerImu(boost::shared_ptr<IccImu> imu) {
   iccImu = imu;
 }
 
+void IccCalibrator::buildProblem(size_t splineOrder,
+								 size_t poseKnotsPerSecond,
+								 size_t biasKnotsPerSecond,
+								 bool doPoseMotionError,
+								 double mrTranslationVariance,
+								 double mrRotationVariance,
+								 bool doBiasMotionError,
+								 int blakeZisserCam,
+								 int huberAccel,
+								 int huberGyro,
+								 bool noTimeCalibration,
+								 bool noChainExtrinsics,
+								 int maxIterations,
+								 double gyroNoiseScale,
+								 double accelNoiseScale,
+								 double timeOffsetPadding,
+								 bool verbose) {
+  // ############################################
+  // ## initialize camera chain
+  // ############################################
+  // #estimate the timeshift for all cameras to the main imu
+  if (!noTimeCalibration) {
+	throw std::runtime_error("Time shift calibration is not implemented.");
+  }
+
+  assert(iccCamera);
+  assert(iccImu);
+
+  // obtain orientation prior between main imu and camera chain (if no external input provided)
+  // and initial estimate for the direction of gravity
+  iccCamera->findOrientationPriorCameraToImu(iccImu);
+  const auto estimatedGravity = iccCamera->getEstimatedGravity();
+
+
+  // ############################################
+  // ## init optimization problem
+  // ############################################
+  // #initialize a pose spline using the camera poses in the camera chain
+  const auto poseSpline = iccCamera->initPoseSplineFromCamera(splineOrder, poseKnotsPerSecond, timeOffsetPadding);
+
+  // Initialize bias splines for all IMUs
+  iccImu->initBiasSplines(poseSpline, splineOrder, biasKnotsPerSecond);
+
+  // Now I can build the problem
+  problem = boost::make_shared<aslam::calibration::OptimizationProblem>();
+
+  // Initialize all design variables
+  initDesignVariables(problem, poseSpline, noTimeCalibration, noChainExtrinsics, false, estimatedGravity);
+
+  // ############################################
+  // ## add error terms
+  // ############################################
+  // #Add calibration target reprojection error terms for all camera in chain
+  iccCamera->addCameraErrorTerms(problem, poseDv, blakeZisserCam, timeOffsetPadding);
+
+  // # Initialize IMU error terms.
+  iccImu->addAccelerometerErrorTerms(problem, poseDv, gravityExpression->toValue(), huberAccel, accelNoiseScale=accelNoiseScale);
+  iccImu->addGyroscopeErrorTerms(problem, poseDv, gravityExpression->toValue(), huberGyro, gyroNoiseScale);
+
+  // # Add the bias motion terms.
+  if (doBiasMotionError) {
+	iccImu->addBiasMotionTerms(problem);
+  }
+
+  // # Add the pose motion terms.
+  if (doPoseMotionError) {
+	addPoseMotionTerms(problem, mrTranslationVariance, mrRotationVariance);
+  }
+}
+
 
 void IccCalibrator::optimize(boost::shared_ptr<aslam::backend::Optimizer2Options> options,
 							 const size_t maxIterations,
