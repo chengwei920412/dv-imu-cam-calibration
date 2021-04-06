@@ -155,4 +155,27 @@ protected:
    */
   void detectPattern(const StampedImage& stampedImage);
 
+  // TODO(radam): rethink this
+  void calibrate() {
+    const size_t maxIter = 30;
+    iccCalibrator.buildProblem(4,
+							   100,
+							   50,
+							   false,
+							   1e6,
+							   1e5,
+							   true,
+							   -1,
+							   -1,
+							   -1,
+							   true,
+							   true,
+							   maxIter,
+							   1.0,
+							   1.0,
+							   30.e-3,
+							   false);
+    iccCalibrator.optimize(nullptr, maxIter, false);
+  }
+
 };

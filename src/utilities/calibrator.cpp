@@ -24,7 +24,7 @@ Calibrator::StampedImage previewImageWithText(const std::string &text, const int
 }
 
 Calibrator::Calibrator() : iccImu(imuParameters){
-  setPreviewImage(previewImageWithText("No image arrived so far", previewTimestamp));
+  setPreviewImage(previewImageWithText("No image arrived yet", previewTimestamp));
 
 
   detectionsQueue.start(5);
@@ -129,6 +129,10 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
 	  }
 	  std::lock_guard<std::mutex> lock(targetObservationsMutex);
 	  targetObservations.push_back(observation);
+
+	  if (targetObservations.size() > 20) { // TODO(radam): param
+	    calibrate();
+	  }
 	}
   }
 
