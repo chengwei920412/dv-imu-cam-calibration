@@ -22,7 +22,6 @@ IccCamera::IccCamera(const double reprojectionSigma,
 					 const bool showReproj,
 					 const bool showOneStep) : cornerUncertainty(reprojectionSigma){
 
-  // targetObservations = false; // TODO(radam): They need to be passed somehow?
   gravity_w = Eigen::Vector3d(9.80655, 0., 0.);
 
 }
@@ -456,4 +455,13 @@ void IccImu::initBiasSplines(boost::shared_ptr<bsplines::BSplinePose> poseSpline
 
   accelBias = boost::make_shared<bsplines::BSpline>(splineOrder);
   accelBias->initConstantSpline(start,end,knots, Eigen::Vector3d(0.,0.,0.));
+}
+
+void IccImu::addBiasMotionTerms(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem) {
+  const auto Wgyro = Eigen::Matrix3d::Identity() / (gyroRandomWalk * gyroRandomWalk);
+  const auto Waccel = Eigen::Matrix3d::Identity() / (accelRandomWalk * accelRandomWalk);
+  const auto gyroBiasMotionErr = boost::make_shared<aslam::backend::BSplineMotionError<aslam::splines::EuclideanBSplineDesignVariable>>(gyroBiasDv.get(), Wgyro,1);
+  problem->addErrorTerm(gyroBiasMotionErr);
+  const auto accelBiasMotionErr = boost::make_shared<aslam::backend::BSplineMotionError<aslam::splines::EuclideanBSplineDesignVariable>>(accelBiasDv.get(), Waccel,1);
+  problem->addErrorTerm(accelBiasMotionErr);
 }

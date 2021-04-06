@@ -69,7 +69,7 @@ void Calibrator::addImu(const int64_t timestamp,
   const Eigen::Vector3d alpha(accelX, accelY, accelZ);
   ImuMeasurement imuMeas(tsS, omega, alpha, Rgyro, Raccel);
   imuData.push_back(imuMeas);
-} // TODO(radam): move to cpp
+}
 
 
 

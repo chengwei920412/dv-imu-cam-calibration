@@ -192,15 +192,7 @@ public:
 					   size_t splineOrder,
 					   size_t biasKnotsPerSecond);
 
-  void addBiasMotionTerms(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem) {
-    const auto Wgyro = Eigen::Matrix3d::Identity() / (gyroRandomWalk * gyroRandomWalk);
-    const auto Waccel = Eigen::Matrix3d::Identity() / (accelRandomWalk * accelRandomWalk);
-    const auto gyroBiasMotionErr = aslam::backend::BSplineMotionError<aslam::splines::EuclideanBSplineDesignVariable>(gyroBiasDv.get(), Wgyro,1);
-	// problem->addErrorTerm(gyroBiasMotionErr);     // TODO(radam): fix
-	const auto accelBiasMotionErr = aslam::backend::BSplineMotionError<aslam::splines::EuclideanBSplineDesignVariable>(accelBiasDv.get(), Waccel,1);
-	// problem->addErrorTerm(accelBiasMotionErr); // TODO(radam): fix
-
-  } // TODO(radam): move to cpp
+  void addBiasMotionTerms(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem) ;
 
   void getTransformationFromBodyToImu() {
 	// TODO(radam): finish

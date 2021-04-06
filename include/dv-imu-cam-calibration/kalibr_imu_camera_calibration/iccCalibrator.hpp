@@ -33,7 +33,7 @@ protected:
 
   const size_t calibrationGroupId = 0;
 
-  boost::shared_ptr<aslam::splines::BSplinePoseDesignVariable> poseDv = nullptr; // TODO(radam): maybe base class?
+  boost::shared_ptr<aslam::splines::BSplinePoseDesignVariable> poseDv = nullptr;
   boost::shared_ptr<aslam::calibration::OptimizationProblem> problem = nullptr;
 
 
@@ -48,7 +48,6 @@ public:
 
   IccCalibrator();
 
-  // TODO(radam): move to cpp
   void initDesignVariables(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,
 						   boost::shared_ptr<bsplines::BSplinePose> poseSpline,
 						   bool noTimeCalibration,

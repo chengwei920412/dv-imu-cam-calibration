@@ -31,7 +31,6 @@ IccCalibrator::IccCalibrator() {
 
 
 
-// TODO(radam): use boost shared pointer
 void IccCalibrator::initDesignVariables(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,
 										boost::shared_ptr<bsplines::BSplinePose> poseSpline,
 										bool noTimeCalibration,
