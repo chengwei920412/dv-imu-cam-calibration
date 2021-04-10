@@ -27,12 +27,13 @@ Calibrator::Calibrator() {
   iccImu = boost::make_shared<IccImu>(imuParameters);
   iccCamera = boost::make_shared<IccCamera>();
   targetObservations = boost::make_shared<std::vector<aslam::cameras::GridCalibrationTargetObservation>>();
-
+  imuData = boost::make_shared<std::vector<ImuMeasurement>>();
 
   setPreviewImage(previewImageWithText("No image arrived yet", previewTimestamp));
 
 
-  detectionsQueue.start(5);
+  detectionsQueue.start(1);
+ // detectionsQueue.start(5); // TODO(radam): what about joining? exceptions are not handled well
 
 
   size_t rows = 11; // TODO(radam): param
@@ -62,6 +63,7 @@ Calibrator::Calibrator() {
   iccCalibrator.registerCamera(iccCamera);
   iccCalibrator.registerObservations(targetObservations);
   iccCamera->registerObservations(targetObservations);
+  iccImu->registerImuData(imuData);
 }
 
 void Calibrator::addImu(const int64_t timestamp,
@@ -78,7 +80,7 @@ void Calibrator::addImu(const int64_t timestamp,
   const Eigen::Vector3d omega(gyroX, gyroY, gyroZ);
   const Eigen::Vector3d alpha(accelX, accelY, accelZ);
   ImuMeasurement imuMeas(tsS, omega, alpha, Rgyro, Raccel);
-  imuData.push_back(imuMeas);
+  imuData->push_back(imuMeas);
 }
 
 
@@ -141,7 +143,14 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
 	  targetObservations->push_back(observation);
 
 	  if (targetObservations->size() > 20) { // TODO(radam): param
-	    calibrate();
+
+	    try {
+	      calibrate();
+	    } catch (...) {
+	      std::cout << "Worker threw exception" << std::endl; // TODO(radam): del
+		  detectionsQueue.stop();
+	    }
+	    std::cout << "CALIBRATED!!!!!" << std::endl; // TODO(radam): del
 	    throw std::runtime_error("CALIBRATED!!!"); // TODO(radam): delete
 	  }
 	}

@@ -137,8 +137,6 @@ public:
 
   // TODO(radam): update imu config
 
-  std::vector<ImuMeasurement> imuData; // TODO(radam): this probably should not be public
-
   Eigen::Vector3d gyroBiasPrior;
   size_t gyroBiasPriorCount = 0;
 
@@ -171,6 +169,9 @@ protected:
   boost::shared_ptr<bsplines::BSpline> gyroBias = nullptr;
   boost::shared_ptr<bsplines::BSpline> accelBias = nullptr;
 
+  // TODO(radam): this is ugly
+  boost::shared_ptr<std::vector<ImuMeasurement>> imuData = nullptr;
+
 public:
 
    double getAccelUncertaintyDiscrete();
@@ -179,6 +180,17 @@ public:
 
 
   IccImu(const ImuParameters& imuParams);
+
+  // TODO(radam): this is nasty
+  void registerImuData(boost::shared_ptr<std::vector<ImuMeasurement>> data) {
+    imuData = data;
+  } // TODO(radam): move to cpp
+
+  // TODO(radam): nasty
+  boost::shared_ptr<std::vector<ImuMeasurement>> getImuData() {
+    return imuData;
+  } // TODO(radam): move to cpp
+
 
 
   void addDesignVariables(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem);

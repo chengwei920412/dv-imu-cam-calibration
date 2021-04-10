@@ -31,7 +31,7 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
 
   // Build the problem
   auto problem = boost::make_shared<aslam::backend::OptimizationProblem>();
-
+  
   // Add the rotation as design variable
   auto q_i_c_Dv = boost::make_shared<aslam::backend::RotationQuaternion>(T_extrinsic.q());
   q_i_c_Dv->setActive(true);
@@ -41,13 +41,11 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
   auto gyroBiasDv = boost::make_shared<aslam::backend::EuclideanPoint>(Eigen::Vector3d(0.0, 0.0, 0.0));
   gyroBiasDv->setActive(true);
   problem->addDesignVariable(gyroBiasDv);
-
+  
   // Initialize a pose spline using the camera poses
   auto poseSpline = initPoseSplineFromCamera(6, 100, 0.0);
   
-  std::cout << "A" << std::endl; // TODO(radam): del
-
-  for (const auto& im : iccImu->imuData) {
+  for (const auto& im : *(iccImu->getImuData())) {
     const auto tk = im.stamp;
     if (tk > poseSpline->t_min() && tk < poseSpline->t_max()) {
       // DV expressions
@@ -64,13 +62,11 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
     }
   }
   
-  std::cout << "B" << std::endl; // TODO(radam): del
-
   if (problem->numErrorTerms() == 0) {
     throw std::runtime_error("Failed to obtain orientation prior."
 							 "Please make sure that your sensors are synchronized correctly.");
   }
-
+  
   // Define the optimization
   aslam::backend::Optimizer2Options options;
   options.verbose = false;
@@ -96,7 +92,7 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
 
   // estimate gravity in the world coordinate frame as the mean specific force
   std::vector<Eigen::Vector3d> a_w;
-  for (const auto& im : iccImu->imuData) {
+  for (const auto& im : *(iccImu->getImuData())) {
 	const auto tk = im.stamp;
 	if (tk > poseSpline->t_min() && tk < poseSpline->t_max()) {
 	  const auto val = poseSpline->orientation(tk) * R_i_c * im.alpha;
@@ -116,8 +112,10 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
   	iccImu->gyroBiasPriorCount * iccImu->gyroBiasPrior + 1.0/iccImu->gyroBiasPriorCount*b_gyro;
 
   // print result
-  std::cout << "  Orientation prior camera-imu found as: (T_i_c)" << std::endl;
-  std::cout << R_i_c << std::endl;
+  std::cout << " Transformation prior camera-imu found as: (T_extrinsic)" << std::endl;
+  std::cout << T_extrinsic.T() << std::endl;
+  std::cout << "  Orientation prior camera-imu found as: (T_i_c)" << std::endl; // TODO(radam): does this make sense?
+  std::cout << R_i_c << std::endl; // TODO(radam): does this make sense?
   std::cout << "  Gyro bias prior found as: (b_gyro)" << std::endl;
   std::cout << b_gyro << std::endl;
 }
@@ -153,14 +151,10 @@ boost::shared_ptr<bsplines::BSplinePose> IccCamera::initPoseSplineFromCamera(con
   Eigen::VectorXd times(targetObservations->size()+2);
   Eigen::Matrix<double, 6, Eigen::Dynamic> curve(6, targetObservations->size()+2);
   curve.setZero();
-
+  
   auto isNan = [](const Eigen::MatrixXd& mat) {
-	return (mat.array() == mat.array()).all();
+	return !(mat.array() == mat.array()).all();
   };
-
-  if (isNan(curve)) {
-	throw std::runtime_error("NaNs in curve values");
-  }
 
   // Add 2 seconds on either end to allow the spline to slide during optimization
   times[0] = timesVec.front() - (timeOffsetPadding * 2.0);
@@ -172,12 +166,14 @@ boost::shared_ptr<bsplines::BSplinePose> IccCamera::initPoseSplineFromCamera(con
 	curve.block(0, idx+1, 6,1) = curveVec[static_cast<size_t>(idx)];
   }
 
-  std::cout << "curve size " << curve.size() << std::endl; // TODO(radam): del
-
+  if (isNan(curve)) {
+	throw std::runtime_error("NaNs in curve values");
+  }
+  
   // Make sure the rotation vector doesn't flip
   for (int i = 1 ; i < curve.cols() ; ++i) {
-	const auto previousRotationVector = curve.block(3,i-1, 6,1);
-	const auto r = curve.block(3,i, 6,1);
+	const auto previousRotationVector = curve.block(3,i-1, 3,1);
+	const auto r = curve.block(3,i, 3,1);
 	const auto angle = r.norm();
 	const auto axis = r / angle;
 
@@ -191,8 +187,9 @@ boost::shared_ptr<bsplines::BSplinePose> IccCamera::initPoseSplineFromCamera(con
 		best_dist = dist;
 	  }
 	}
-	curve.block(3,i,6,1) = best_r;
+	curve.block(3,i,3,1) = best_r;
   }
+  
 
   const auto seconds = timesVec.back() - timesVec.front();
   const auto knots = static_cast<int>(std::round(seconds * poseKnotsPerSecond));
@@ -337,6 +334,7 @@ double IccImu::getGyroUncertaintyDiscrete() {
 }
 
 IccImu::IccImu(const ImuParameters &imuParams)  :imuParameters(imuParams) {
+  imuData = boost::make_shared<std::vector<ImuMeasurement>>();
 
   const auto [aud, 	arw, 	au ] = imuParams.getAccelerometerStatistics();
   const auto [gud, 	grw, 	gu ] = imuParams.getGyroStatistics();

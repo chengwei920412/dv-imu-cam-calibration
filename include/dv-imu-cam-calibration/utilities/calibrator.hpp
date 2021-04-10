@@ -66,7 +66,7 @@ protected:
   int64_t previewTimestamp = 0LL;
 
   // IMU data
-  std::vector<ImuMeasurement> imuData;
+  boost::shared_ptr<std::vector<ImuMeasurement>> imuData = nullptr;
   ImuParameters imuParameters; // TODO(radam): take them as input
 
   // IccCalibrator
