@@ -138,9 +138,13 @@ void IccCalibrator::buildProblem(size_t splineOrder,
 
   // Now I can build the problem
   problem = boost::make_shared<aslam::calibration::OptimizationProblem>();
+  
+  std::cout << "A" << std::endl; // TODO(radam): del
 
   // Initialize all design variables
   initDesignVariables(problem, poseSpline, noTimeCalibration, noChainExtrinsics, false, estimatedGravity);
+  
+  std::cout << "B" << std::endl; // TODO(radam): del
 
   // ############################################
   // ## add error terms
@@ -148,10 +152,14 @@ void IccCalibrator::buildProblem(size_t splineOrder,
   // #Add calibration target reprojection error terms for all camera in chain
   iccCamera->addCameraErrorTerms(problem, poseDv, blakeZisserCam, timeOffsetPadding);
 
+  std::cout << "C" << std::endl; // TODO(radam): del
+  
   // # Initialize IMU error terms.
   iccImu->addAccelerometerErrorTerms(problem, poseDv, gravityExpression->toValue(), huberAccel, accelNoiseScale=accelNoiseScale);
   iccImu->addGyroscopeErrorTerms(problem, poseDv, gravityExpression->toValue(), huberGyro, gyroNoiseScale);
 
+  std::cout << "D" << std::endl; // TODO(radam): del
+  
   // # Add the bias motion terms.
   if (doBiasMotionError) {
 	iccImu->addBiasMotionTerms(problem);

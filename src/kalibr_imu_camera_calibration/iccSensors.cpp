@@ -231,6 +231,7 @@ void IccCamera::addCameraErrorTerms(boost::shared_ptr<aslam::calibration::Optimi
   std::vector<double> allReprojectionErrors; // TODO(radam): this should be a member variable
   allReprojectionErrors.clear();
 
+  throwing errors somewhere here
 
   for (const auto& obs : *targetObservations) {
 	const auto frameTime = cameraTimeToImuTimeDv->toExpression() + obs.time().toSec() + timeshiftCamToImuPrior;
@@ -287,7 +288,7 @@ void IccCamera::addCameraErrorTerms(boost::shared_ptr<aslam::calibration::Optimi
 		aslam::Keypoint<2> k;
 		Eigen::Matrix<double, 2, 1> mat;
 		mat(0, 0) = imageCornerPoint.x;
-		mat(1, 1) = imageCornerPoint.y;
+		mat(1, 0) = imageCornerPoint.y;
 		k.setMeasurement(mat);
 		k.setInverseMeasurementCovariance(invR);
 		frame->addKeypoint(k);
