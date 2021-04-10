@@ -46,6 +46,9 @@ protected:
   //        focal_length: [],
   //        principal_point: []}
 
+
+  boost::shared_ptr<std::vector<aslam::cameras::GridCalibrationTargetObservation>> targetObservations = nullptr; // TODO(radam): this is dirty
+
   const double cornerUncertainty;
   sm::kinematics::Transformation T_extrinsic;
   double timeshiftCamToImuPrior = 0.0;
@@ -69,6 +72,11 @@ public:
 			const bool showCorners=true,
 			const bool showReproj = true,
 			const bool showOneStep=false); // TODO(radam): params
+
+
+  void registerObservations(boost::shared_ptr<std::vector<aslam::cameras::GridCalibrationTargetObservation>> obs) {
+    targetObservations = obs;
+  }
 
   // void setupCalibrationTarget // TODO(radam): make sure it is not needed
 

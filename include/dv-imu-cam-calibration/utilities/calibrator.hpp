@@ -71,13 +71,13 @@ protected:
 
   // IccCalibrator
   IccCalibrator iccCalibrator;
-  IccImu iccImu;
-  IccCamera iccCamera;
+  boost::shared_ptr<IccImu> iccImu = nullptr;
+  boost::shared_ptr<IccCamera> iccCamera = nullptr;
 
   // Calibration target grid detector
   aslam::cameras::GridDetector::GridDetectorOptions detectorOptions;
   boost::shared_ptr<aslam::cameras::GridCalibrationTargetBase> grid = nullptr;
-  std::vector<aslam::cameras::GridCalibrationTargetObservation> targetObservations;
+  boost::shared_ptr<std::vector<aslam::cameras::GridCalibrationTargetObservation>> targetObservations = nullptr;
   std::mutex targetObservationsMutex;
 
   // Colors used in visualization of detected calibtion pattern

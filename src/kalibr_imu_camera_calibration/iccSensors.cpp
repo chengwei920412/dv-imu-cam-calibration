@@ -23,14 +23,14 @@ IccCamera::IccCamera(const double reprojectionSigma,
 					 const bool showOneStep) : cornerUncertainty(reprojectionSigma){
 
   gravity_w = Eigen::Vector3d(9.80655, 0., 0.);
-
+  T_extrinsic = sm::kinematics::Transformation();
 }
 
 void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu) {
   std::cout << std::endl << "Estimating imu-camera rotation prior" << std::endl;
 
   // Build the problem
-  auto problem = boost::shared_ptr<aslam::backend::OptimizationProblem>();
+  auto problem = boost::make_shared<aslam::backend::OptimizationProblem>();
 
   // Add the rotation as design variable
   auto q_i_c_Dv = boost::make_shared<aslam::backend::RotationQuaternion>(T_extrinsic.q());
@@ -44,8 +44,10 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
 
   // Initialize a pose spline using the camera poses
   auto poseSpline = initPoseSplineFromCamera(6, 100, 0.0);
+  
+  std::cout << "A" << std::endl; // TODO(radam): del
 
-  for (const auto im : iccImu->imuData) {
+  for (const auto& im : iccImu->imuData) {
     const auto tk = im.stamp;
     if (tk > poseSpline->t_min() && tk < poseSpline->t_max()) {
       // DV expressions
@@ -61,6 +63,8 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
 	  problem->addErrorTerm(gerr);
     }
   }
+  
+  std::cout << "B" << std::endl; // TODO(radam): del
 
   if (problem->numErrorTerms() == 0) {
     throw std::runtime_error("Failed to obtain orientation prior."
@@ -127,8 +131,7 @@ boost::shared_ptr<bsplines::BSplinePose> IccCamera::initPoseSplineFromCamera(con
 																			 const double timeOffsetPadding) {
 
 
-  std::vector<aslam::cameras::GridCalibrationTargetObservation> targetObservations; // TODO(radam): pass is somehow
-  assert(!targetObservations.empty());
+  assert(!targetObservations->empty());
 
   const auto T_c_b = T_extrinsic.T();
   auto rotationVector = boost::make_shared<sm::kinematics::RotationVector>();
@@ -136,19 +139,20 @@ boost::shared_ptr<bsplines::BSplinePose> IccCamera::initPoseSplineFromCamera(con
 
   // Get the checkerboard times.
   std::vector<double> timesVec;
-  timesVec.reserve(targetObservations.size());
+  timesVec.reserve(targetObservations->size());
   std::vector<Eigen::VectorXd> curveVec;
-  curveVec.reserve(targetObservations.size());
-  for (int idx = 0 ; idx < targetObservations.size() ; ++idx) {
-	const auto targetObs = targetObservations[static_cast<size_t>(idx)];
+  curveVec.reserve(targetObservations->size());
+  for (int idx = 0 ; idx < targetObservations->size() ; ++idx) {
+	const auto targetObs = (*targetObservations)[static_cast<size_t>(idx)];
 	timesVec.push_back(targetObs.time().toSec() + timeshiftCamToImuPrior);
 	const auto trans = targetObs.T_t_c().T() * T_c_b;
 	const auto column = pose->transformationToCurveValue(trans);
 	curveVec.push_back(column);
   }
 
-  Eigen::VectorXd times(targetObservations.size()+2);
-  Eigen::Matrix<double, 6, Eigen::Dynamic> curve(6, targetObservations.size()+2);
+  Eigen::VectorXd times(targetObservations->size()+2);
+  Eigen::Matrix<double, 6, Eigen::Dynamic> curve(6, targetObservations->size()+2);
+  curve.setZero();
 
   auto isNan = [](const Eigen::MatrixXd& mat) {
 	return (mat.array() == mat.array()).all();
@@ -161,12 +165,14 @@ boost::shared_ptr<bsplines::BSplinePose> IccCamera::initPoseSplineFromCamera(con
   // Add 2 seconds on either end to allow the spline to slide during optimization
   times[0] = timesVec.front() - (timeOffsetPadding * 2.0);
   curve.block(0,0,6,1) = curveVec.front();
-  times[static_cast<int>(targetObservations.size()+1)]  =timesVec.back() + (timeOffsetPadding*2.0);
-  curve.block(0,static_cast<int>(targetObservations.size()+1), 6,1) = curveVec.back();
-  for (int idx = 0 ; idx < targetObservations.size() ; ++idx) {
+  times[static_cast<int>(targetObservations->size()+1)]  =timesVec.back() + (timeOffsetPadding*2.0);
+  curve.block(0,static_cast<int>(targetObservations->size()+1), 6,1) = curveVec.back();
+  for (int idx = 0 ; idx < targetObservations->size() ; ++idx) {
 	times[idx+1] = timesVec[static_cast<size_t>(idx)];
 	curve.block(0, idx+1, 6,1) = curveVec[static_cast<size_t>(idx)];
   }
+
+  std::cout << "curve size " << curve.size() << std::endl; // TODO(radam): del
 
   // Make sure the rotation vector doesn't flip
   for (int i = 1 ; i < curve.cols() ; ++i) {
@@ -229,8 +235,7 @@ void IccCamera::addCameraErrorTerms(boost::shared_ptr<aslam::calibration::Optimi
   allReprojectionErrors.clear();
 
 
-  std::vector<aslam::cameras::GridCalibrationTargetObservation> targetObservations; // TODO(radam): pass is somehow
-  for (const auto& obs : targetObservations) {
+  for (const auto& obs : *targetObservations) {
 	const auto frameTime = cameraTimeToImuTimeDv->toExpression() + obs.time().toSec() + timeshiftCamToImuPrior;
 	const auto frameTimeScalar = frameTime.toScalar();
 
@@ -295,7 +300,7 @@ void IccCamera::addCameraErrorTerms(boost::shared_ptr<aslam::calibration::Optimi
 
 	  for (size_t idx = 0 ; idx < outImageCorners.size() ; ++idx) {
 	    const auto& imageCornerPoint = outImageCorners[idx];
-	    const auto& targetPoint = targetObservations[idx];
+	    const auto& targetPoint = (*targetObservations)[idx];
 
 	    // Target points
 		const auto p = T_c_w *  aslam::backend::HomogeneousExpression(targetPoint.T_t_c().q()); // TODO(radam): not entirely sure this is correct
@@ -318,7 +323,7 @@ void IccCamera::addCameraErrorTerms(boost::shared_ptr<aslam::calibration::Optimi
 //	  allReprojectionErrors.append(reprojectionErrors)
   }
 
-  std::cout << "  Added " << targetObservations.size() << " camera error tems" << std::endl;
+  std::cout << "  Added " << targetObservations->size() << " camera error tems" << std::endl;
 
 
 }

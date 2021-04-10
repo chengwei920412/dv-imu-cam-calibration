@@ -82,11 +82,15 @@ void IccCalibrator::addPoseMotionTerms(boost::shared_ptr<aslam::calibration::Opt
 }
 
 void IccCalibrator::registerCamera(boost::shared_ptr<IccCamera> camera) {
-  iccCamera = camera;
+  iccCamera = camera; // TODO(radam): move
 }
 
 void IccCalibrator::registerImu(boost::shared_ptr<IccImu> imu) {
-  iccImu = imu;
+  iccImu = imu; // TODO(radam): move
+}
+
+void IccCalibrator::registerObservations(boost::shared_ptr<std::vector<aslam::cameras::GridCalibrationTargetObservation>> obs) {
+  targetObservations = obs; // TODO(radam): move
 }
 
 void IccCalibrator::buildProblem(size_t splineOrder,
@@ -116,7 +120,7 @@ void IccCalibrator::buildProblem(size_t splineOrder,
 
   assert(iccCamera);
   assert(iccImu);
-
+  
   // obtain orientation prior between main imu and camera chain (if no external input provided)
   // and initial estimate for the direction of gravity
   iccCamera->findOrientationPriorCameraToImu(iccImu);

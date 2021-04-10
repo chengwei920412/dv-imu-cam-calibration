@@ -39,6 +39,7 @@ protected:
 
   boost::shared_ptr<IccImu> iccImu = nullptr;
   boost::shared_ptr<IccCamera> iccCamera = nullptr;
+  boost::shared_ptr<std::vector<aslam::cameras::GridCalibrationTargetObservation>> targetObservations = nullptr;
 
   boost::shared_ptr<aslam::backend::DesignVariable> gravityDv = nullptr;
   boost::shared_ptr<aslam::backend::EuclideanExpression> gravityExpression = nullptr;
@@ -70,6 +71,7 @@ public:
 
   void registerImu(boost::shared_ptr<IccImu> imu);
 
+  void registerObservations(boost::shared_ptr<std::vector<aslam::cameras::GridCalibrationTargetObservation>> obs);
 
 
   void buildProblem(size_t splineOrder=6,

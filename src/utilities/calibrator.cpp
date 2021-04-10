@@ -23,7 +23,12 @@ Calibrator::StampedImage previewImageWithText(const std::string &text, const int
   return Calibrator::StampedImage(img, timestamp);
 }
 
-Calibrator::Calibrator() : iccImu(imuParameters){
+Calibrator::Calibrator() {
+  iccImu = boost::make_shared<IccImu>(imuParameters);
+  iccCamera = boost::make_shared<IccCamera>();
+  targetObservations = boost::make_shared<std::vector<aslam::cameras::GridCalibrationTargetObservation>>();
+
+
   setPreviewImage(previewImageWithText("No image arrived yet", previewTimestamp));
 
 
@@ -52,6 +57,11 @@ Calibrator::Calibrator() : iccImu(imuParameters){
   detectorOptions.imageStepping = false;
   detectorOptions.plotCornerReprojection = false;
   detectorOptions.filterCornerOutliers = true;
+
+  iccCalibrator.registerImu(iccImu);
+  iccCalibrator.registerCamera(iccCamera);
+  iccCalibrator.registerObservations(targetObservations);
+  iccCamera->registerObservations(targetObservations);
 }
 
 void Calibrator::addImu(const int64_t timestamp,
@@ -63,8 +73,8 @@ void Calibrator::addImu(const int64_t timestamp,
 						const double accelZ) {
 
   const double tsS = static_cast<double>(timestamp) / 1e6;
-  const auto Rgyro = Eigen::Matrix3d::Identity() * iccImu.getGyroUncertaintyDiscrete();
-  const auto Raccel = Eigen::Matrix3d::Identity() * iccImu.getAccelUncertaintyDiscrete();
+  const auto Rgyro = Eigen::Matrix3d::Identity() * iccImu->getGyroUncertaintyDiscrete();
+  const auto Raccel = Eigen::Matrix3d::Identity() * iccImu->getAccelUncertaintyDiscrete();
   const Eigen::Vector3d omega(gyroX, gyroY, gyroZ);
   const Eigen::Vector3d alpha(accelX, accelY, accelZ);
   ImuMeasurement imuMeas(tsS, omega, alpha, Rgyro, Raccel);
@@ -101,7 +111,7 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
   std::vector<cv::Point2f> pointBuf;
 
   // Make a copy of the detector in each thread to avoid memory issues
-  auto detector = boost::make_shared<aslam::cameras::GridDetector>(iccCamera.getCameraGeometry(), grid, detectorOptions);
+  auto detector = boost::make_shared<aslam::cameras::GridDetector>(iccCamera->getCameraGeometry(), grid, detectorOptions);
 
   // Search for pattern and draw it on the image frame
   aslam::cameras::GridCalibrationTargetObservation observation;
@@ -128,10 +138,11 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
 		}
 	  }
 	  std::lock_guard<std::mutex> lock(targetObservationsMutex);
-	  targetObservations.push_back(observation);
+	  targetObservations->push_back(observation);
 
-	  if (targetObservations.size() > 20) { // TODO(radam): param
+	  if (targetObservations->size() > 20) { // TODO(radam): param
 	    calibrate();
+	    throw std::runtime_error("CALIBRATED!!!"); // TODO(radam): delete
 	  }
 	}
   }
