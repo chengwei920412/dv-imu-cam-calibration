@@ -36,6 +36,9 @@ class IccImu;
 
 class IccCamera {
 
+public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
 protected:
   // TODO(radam): dataset
   // TODO(radam): cam config
@@ -108,6 +111,10 @@ public:
 
 
 struct ImuMeasurement {
+
+public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
   Eigen::Vector3d omega, alpha;
   Eigen::Matrix3d omegaR, omegaInvR, alphaR, alphaInvR;
   double stamp;
@@ -129,6 +136,9 @@ struct ImuMeasurement {
 
 
 class IccImu {
+
+public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 public:
   // TODO(radam): ImuParameters?

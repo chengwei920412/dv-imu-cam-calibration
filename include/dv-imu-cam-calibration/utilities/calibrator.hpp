@@ -139,26 +139,11 @@ public:
    */
   StampedImage getPreviewImage();
 
-protected:
-
-  /**
-   * Set the preview image to the given stamped image.
-   *
-   * @param stampedImage
-   */
-  void setPreviewImage(const StampedImage& stampedImage);
-
-  /**
-   * Detect the calibration pattern on the given stamped image.
-   *
-   * @param stampedImage
-   */
-  void detectPattern(const StampedImage& stampedImage);
-
+  // TODO(radam): think how to nicely handle mutexes and stuff
   // TODO(radam): rethink this
   void calibrate() {
-    const size_t maxIter = 30;
-    iccCalibrator.buildProblem(4,
+	const size_t maxIter = 30;
+	iccCalibrator.buildProblem(4,
 							   100,
 							   50,
 							   false,
@@ -175,7 +160,25 @@ protected:
 							   1.0,
 							   30.e-3,
 							   false);
-    iccCalibrator.optimize(nullptr, maxIter, false);
+	iccCalibrator.optimize(nullptr, maxIter, false);
   }
+
+protected:
+
+  /**
+   * Set the preview image to the given stamped image.
+   *
+   * @param stampedImage
+   */
+  void setPreviewImage(const StampedImage& stampedImage);
+
+  /**
+   * Detect the calibration pattern on the given stamped image.
+   *
+   * @param stampedImage
+   */
+  void detectPattern(const StampedImage& stampedImage);
+
+
 
 };

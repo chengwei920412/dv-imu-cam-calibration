@@ -31,8 +31,8 @@ Calibrator::Calibrator() {
 
   setPreviewImage(previewImageWithText("No image arrived yet", previewTimestamp));
 
-
- detectionsQueue.start(5); // TODO(radam): what about joining? exceptions are not handled well
+  detectionsQueue.start(1); // TODO(radam): make it 5 like below
+ //detectionsQueue.start(5); // TODO(radam): what about joining? exceptions are not handled well
 
 
   size_t rows = 11; // TODO(radam): param
@@ -90,7 +90,7 @@ void Calibrator::addImage(const StampedImage& stampedImage) {
   {
 	std::lock_guard<std::mutex> lock(targetObservationsMutex);
 
-	if (targetObservations->size() > 1000) { // TODO(radam): param
+	if (targetObservations->size() >= 2) { // TODO(radam): param
 	  detectionsQueue.stop(); // TODO(radam): make it more correct using detectionsQueue.waitForEmptyQueue();
 	  setPreviewImage(previewImageWithText("Calibrating...", previewTimestamp));
 
@@ -127,6 +127,7 @@ void Calibrator::setPreviewImage(const StampedImage &stampedImage) {
 }
 
 void Calibrator::detectPattern(const StampedImage &stampedImage) {
+  // TODO(radam): this thread never throws. Fix it!
 
 // TODO(radam): read input image and undistort points before passing to kalibr
 
@@ -142,7 +143,9 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
 
   if (success) {
 	if (observation.hasSuccessfulObservation()) {
-	  cv::cvtColor(preview.image, preview.image, cv::COLOR_GRAY2BGR);
+	  if (preview.image.channels() == 1) {
+		cv::cvtColor(preview.image, preview.image, cv::COLOR_GRAY2BGR);
+	  }
 	  cv::Point prevPoint(-1, -1);
 	  for (size_t y = 0; y < grid->rows(); ++y) {
 		const auto color = colors[y % colors.size()];
@@ -161,6 +164,7 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
 	  }
 	  std::lock_guard<std::mutex> lock(targetObservationsMutex);
 	  targetObservations->push_back(observation);
+	  std::cout << "Detected! " << stampedImage.timestamp << std::endl; // TODO(radam): del
 	}
   }
 
