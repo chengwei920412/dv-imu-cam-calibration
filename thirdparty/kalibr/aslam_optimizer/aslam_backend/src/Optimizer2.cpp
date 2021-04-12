@@ -259,6 +259,7 @@ namespace aslam {
                     }
                     srv.iterations++;
 
+                    here can try to land the debugger
                     _options.verbose && std::cout << "[" << srv.iterations << "]: J: " << _J << ", dJ: " << deltaJ << ", deltaX: " << deltaX << ", ";
                     _options.verbose && _trustRegionPolicy->printState(std::cout);
                     _options.verbose && std::cout << std::endl;
