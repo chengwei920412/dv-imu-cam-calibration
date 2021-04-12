@@ -30,13 +30,8 @@ public:
 
   PinholeEquidistantCamera(const std::vector<double>& intrinsics, const std::vector<double>& distCoeff, const cv::Size& resolution);
 
-  static PinholeEquidistantCamera fromParameters() {}; // TODO(radam): implement?
 
   boost::shared_ptr<aslam::cameras::EquidistantDistortedPinholeCameraGeometry> getGeometry();
-
-  boost::shared_ptr<aslam::backend::CameraDesignVariable<aslam::cameras::EquidistantDistortedPinholeCameraGeometry>> getDesignVariable() {
-    return boost::make_shared<aslam::backend::CameraDesignVariable<aslam::cameras::EquidistantDistortedPinholeCameraGeometry>>(geometry);
-  }
 
   boost::shared_ptr<aslam::Frame<aslam::cameras::EquidistantDistortedPinholeCameraGeometry>> frame() ;
 

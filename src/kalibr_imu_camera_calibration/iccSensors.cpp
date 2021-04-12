@@ -6,6 +6,7 @@
 #include <aslam/backend/Optimizer2.hpp>
 #include <aslam/backend/BlockCholeskyLinearSystemSolver.hpp>
 #include <aslam/backend/ReprojectionError.hpp>
+#include <aslam/backend/SimpleReprojectionError.hpp>
 #include <aslam/Keypoint.hpp>
 
 #include <kalibr_imu_camera_calibration/iccSensors.hpp>
@@ -114,10 +115,8 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
   // print result
   std::cout << " Transformation prior camera-imu found as: (T_extrinsic)" << std::endl;
   std::cout << T_extrinsic.T() << std::endl;
-  std::cout << "  Orientation prior camera-imu found as: (T_i_c)" << std::endl; // TODO(radam): does this make sense?
-  std::cout << R_i_c << std::endl; // TODO(radam): does this make sense?
   std::cout << "  Gyro bias prior found as: (b_gyro)" << std::endl;
-  std::cout << b_gyro << std::endl;
+  std::cout << b_gyro.transpose() << std::endl;
 }
 
 Eigen::Vector3d IccCamera::getEstimatedGravity() {
@@ -149,6 +148,7 @@ boost::shared_ptr<bsplines::BSplinePose> IccCamera::initPoseSplineFromCamera(con
   }
 
   Eigen::VectorXd times(targetObservations->size()+2);
+  times.setZero();
   Eigen::Matrix<double, 6, Eigen::Dynamic> curve(6, targetObservations->size()+2);
   curve.setZero();
   
@@ -226,12 +226,9 @@ void IccCamera::addCameraErrorTerms(boost::shared_ptr<aslam::calibration::Optimi
 									boost::shared_ptr<aslam::splines::BSplinePoseDesignVariable> poseSplineDv,
 									double blakeZissermanDf,
 									double timeOffsetPadding) {
+  std::cout << "Adding camera error terms (" << targetObservations->size() << ") ..." << std::endl;
+
   const auto T_cN_b = T_c_b_Dv->toExpression();
-
-  std::vector<double> allReprojectionErrors; // TODO(radam): this should be a member variable
-  allReprojectionErrors.clear();
-
-  throwing errors somewhere here
 
   for (const auto& obs : *targetObservations) {
 	const auto frameTime = cameraTimeToImuTimeDv->toExpression() + obs.time().toSec() + timeshiftCamToImuPrior;
@@ -252,16 +249,11 @@ void IccCamera::addCameraErrorTerms(boost::shared_ptr<aslam::calibration::Optimi
 	const auto T_c_w = T_cN_b * T_b_w;
 
 	// #get the image and target points corresponding to the frame
-	std::vector<cv::Point2f> outImageCorners;
-	size_t nImageCorners = obs.getCornersImageFrame(outImageCorners);
-	// TODO(radam): matrix
-	std::vector<cv::Point3f> outTargetCorners;
-	size_t nTargetCorners = obs.getCornersTargetFrame(outTargetCorners);
-	// TODO(radam): matrix
+	std::vector<cv::Point2f> imageCornerPoints;
+	size_t nImageCorners = obs.getCornersImageFrame(imageCornerPoints);
+	std::vector<cv::Point3f> targetCornerPoints;
+	size_t nTargetCorners = obs.getCornersTargetFrame(targetCornerPoints);
 	assert(nImageCorners == nTargetCorners);
-
-	//imageCornerPoints =  np.array( obs.getCornersImageFrame() ).T // TODO(radam): detections need to be finished
-	//targetCornerPoints = np.array( obs.getCornersTargetFrame() ).T
 
 
 
@@ -279,14 +271,13 @@ void IccCamera::addCameraErrorTerms(boost::shared_ptr<aslam::calibration::Optimi
 	  const auto invR = R.inverse();
 
 
-	  std::vector<double> reprojectionErrors;
-	  reprojectionErrors.reserve(outImageCorners.size());
-	  for (size_t idx = 0 ; idx < outImageCorners.size() ; ++idx) {
-		const auto &imageCornerPoint = outImageCorners[idx];
+	  for (size_t idx = 0 ; idx < imageCornerPoints.size() ; ++idx) {
+		const auto &imageCornerPoint = imageCornerPoints[idx];
 
 		// Image points
 		aslam::Keypoint<2> k;
 		Eigen::Matrix<double, 2, 1> mat;
+		mat.setZero();
 		mat(0, 0) = imageCornerPoint.x;
 		mat(1, 0) = imageCornerPoint.y;
 		k.setMeasurement(mat);
@@ -294,18 +285,18 @@ void IccCamera::addCameraErrorTerms(boost::shared_ptr<aslam::calibration::Optimi
 		frame->addKeypoint(k);
 	  }
 
-	  const auto cameraDesignVariable = camera.getDesignVariable();
 
-	  for (size_t idx = 0 ; idx < outImageCorners.size() ; ++idx) {
-	    const auto& imageCornerPoint = outImageCorners[idx];
+
+	  for (size_t idx = 0 ; idx < imageCornerPoints.size() ; ++idx) {
+	    const auto& imageCornerPoint = imageCornerPoints[idx];
 	    const auto& targetPoint = (*targetObservations)[idx];
 
 	    // Target points
 		const auto p = T_c_w *  aslam::backend::HomogeneousExpression(targetPoint.T_t_c().q()); // TODO(radam): not entirely sure this is correct
 
 		// #build and append the error term
-		auto rerr = boost::make_shared<aslam::backend::ReprojectionError<aslam::cameras::EquidistantDistortedPinholeCameraGeometry>>(frame.get(), idx, p, *cameraDesignVariable);
-
+		auto rerr = boost::make_shared<aslam::backend::SimpleReprojectionError<aslam::Frame<aslam::cameras::EquidistantDistortedPinholeCameraGeometry>>>(frame.get(), idx, p);
+		
 		// #add blake-zisserman m-estimator
 		if (blakeZissermanDf > 0.0) {
        	  throw std::runtime_error("Not implemented blake-zisserman");
@@ -314,11 +305,7 @@ void IccCamera::addCameraErrorTerms(boost::shared_ptr<aslam::calibration::Optimi
 		}
 
 		problem->addErrorTerm(rerr);
-		//reprojectionErrors.append(rerr) // TODO(radam): fix
 	  }
-
-	  // TODO(radam): fix
-//	  allReprojectionErrors.append(reprojectionErrors)
   }
 
   std::cout << "  Added " << targetObservations->size() << " camera error tems" << std::endl;
@@ -354,11 +341,18 @@ IccImu::IccImu(const ImuParameters &imuParams)  :imuParameters(imuParams) {
 }
 
 void IccImu::addDesignVariables(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem) {
-  //gyroBiasDv = aslam::splines::EuclideanBSplineDesignVariable(gyroBias); // TODO(radam): fix
-  //accelBiasDv = aslam::splines::EuclideanBSplineDesignVariable(accelBias); // TODO(radam): fix
+  gyroBiasDv = boost::make_shared<aslam::splines::EuclideanBSplineDesignVariable>(*gyroBias);
+  accelBiasDv = boost::make_shared<aslam::splines::EuclideanBSplineDesignVariable>(*accelBias);
 
-  // TODO(radam): implement the rest
+  addSplineDesignVariables(problem, gyroBiasDv, true, HELPER_GROUP_ID);
+  addSplineDesignVariables(problem, accelBiasDv, true, HELPER_GROUP_ID);
 
+  q_i_b_Dv = boost::make_shared<aslam::backend::RotationQuaternion>(q_i_b_prior);
+  problem->addDesignVariable(q_i_b_Dv, HELPER_GROUP_ID);
+  q_i_b_Dv->setActive(false);
+  r_b_Dv = boost::make_shared<aslam::backend::EuclideanPoint>(Eigen::Vector3d(0.0, 0.0, 0.0));
+  problem->addDesignVariable(r_b_Dv, HELPER_GROUP_ID);
+  r_b_Dv->setActive(false);
 }
 
 void IccImu::addAccelerometerErrorTerms(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,
@@ -366,6 +360,8 @@ void IccImu::addAccelerometerErrorTerms(boost::shared_ptr<aslam::calibration::Op
 										const Eigen::Vector3d &g_w,
 										double mSigma,
 										double accelNoiseScale) {
+  std::cout << "Adding accelerometer error terms (" << imuData->size() << ") ..." << std::endl;
+
 
   const double weight = 1.0 / accelNoiseScale;
 
@@ -378,8 +374,7 @@ void IccImu::addAccelerometerErrorTerms(boost::shared_ptr<aslam::calibration::Op
 	mest = std::make_unique<aslam::backend::NoMEstimator>();
   }
 
-  std::vector<ImuMeasurement> imuData; // TODO(radam): this has to be passed somehow
-  for (const auto& im : imuData) {
+  for (const auto& im : *imuData) {
 	const auto tk = im.stamp + timeOffset;
 	if (tk > poseSplineDv->spline().t_min() && tk < poseSplineDv->spline().t_max()) {
 	  const auto C_b_w = poseSplineDv->orientation(tk).inverse();
@@ -400,7 +395,7 @@ void IccImu::addAccelerometerErrorTerms(boost::shared_ptr<aslam::calibration::Op
 	}
   }
 
-  std::cout << "Added " << imuData.size() - numSkipped << " of " << imuData.size() << " accelerometer error terms "
+  std::cout << "  Added " << imuData->size() - numSkipped << " of " << imuData->size() << " accelerometer error terms "
 			<< "(skipped " << numSkipped << " out-of-bounds measurements)" << std::endl;
 }
 
@@ -409,6 +404,8 @@ void IccImu::addGyroscopeErrorTerms(boost::shared_ptr<aslam::calibration::Optimi
 									const Eigen::Vector3d &g_w,
 									double mSigma,
 									double gyroNoiseScale) {
+  std::cout << "Adding gyroscope error terms (" << imuData->size() << ") ..." << std::endl;
+
   const double weight = 1.0 / gyroNoiseScale;
 
   size_t numSkipped = 0;
@@ -420,8 +417,7 @@ void IccImu::addGyroscopeErrorTerms(boost::shared_ptr<aslam::calibration::Optimi
 	mest = std::make_unique<aslam::backend::NoMEstimator>();
   }
 
-  std::vector<ImuMeasurement> imuData; // TODO(radam): this has to be passed somehow
-  for (const auto& im : imuData) {
+  for (const auto& im : *imuData) {
 	const auto tk = im.stamp + timeOffset;
 	if (tk > poseSplineDv->spline().t_min() && tk < poseSplineDv->spline().t_max()) {
 	  const auto w_b = poseSplineDv->angularVelocityBodyFrame(tk);
@@ -438,7 +434,7 @@ void IccImu::addGyroscopeErrorTerms(boost::shared_ptr<aslam::calibration::Optimi
 
   }
 
-  std::cout << "Added " << imuData.size() - numSkipped << " of " << imuData.size() << " gyroscope error terms "
+  std::cout << "  Added " << imuData->size() - numSkipped << " of " << imuData->size() << " gyroscope error terms "
 			<< "(skipped " << numSkipped << " out-of-bounds measurements)" << std::endl;
 
 }

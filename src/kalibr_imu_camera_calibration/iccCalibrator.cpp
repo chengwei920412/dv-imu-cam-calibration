@@ -13,22 +13,11 @@
 #include <iostream>
 
 
-void addSplineDesignVariables(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,
-							  boost::shared_ptr<aslam::splines::BSplinePoseDesignVariable> dvc,
-							  bool setActive=true,
-							  size_t groupId = HELPER_GROUP_ID) {
-  for (size_t i = 0 ; i < dvc->numDesignVariables() ; ++i) {
-    auto dv = dvc->designVariable(i);
-    dv->setActive(setActive);
-    //problem->addDesignVariable(dv, groupId); // TODO(radam): fix type
-  }
 
-}
 
 IccCalibrator::IccCalibrator() {
 
 }
-
 
 
 void IccCalibrator::initDesignVariables(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,
@@ -138,28 +127,20 @@ void IccCalibrator::buildProblem(size_t splineOrder,
 
   // Now I can build the problem
   problem = boost::make_shared<aslam::calibration::OptimizationProblem>();
-  
-  std::cout << "A" << std::endl; // TODO(radam): del
 
   // Initialize all design variables
   initDesignVariables(problem, poseSpline, noTimeCalibration, noChainExtrinsics, false, estimatedGravity);
-  
-  std::cout << "B" << std::endl; // TODO(radam): del
 
   // ############################################
   // ## add error terms
   // ############################################
   // #Add calibration target reprojection error terms for all camera in chain
   iccCamera->addCameraErrorTerms(problem, poseDv, blakeZisserCam, timeOffsetPadding);
-
-  std::cout << "C" << std::endl; // TODO(radam): del
   
   // # Initialize IMU error terms.
   iccImu->addAccelerometerErrorTerms(problem, poseDv, gravityExpression->toValue(), huberAccel, accelNoiseScale=accelNoiseScale);
   iccImu->addGyroscopeErrorTerms(problem, poseDv, gravityExpression->toValue(), huberGyro, gyroNoiseScale);
 
-  std::cout << "D" << std::endl; // TODO(radam): del
-  
   // # Add the bias motion terms.
   if (doBiasMotionError) {
 	iccImu->addBiasMotionTerms(problem);

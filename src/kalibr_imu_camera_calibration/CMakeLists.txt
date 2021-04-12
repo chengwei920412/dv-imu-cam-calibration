@@ -13,6 +13,7 @@ add_definitions(-fPIC)
 set(CMAKE_CXX_STANDARD 17)
 
 add_library(kalibr_imu_camera_calibration SHARED
+        common.cpp
         iccCalibrator.cpp
         iccSensors.cpp)
 target_link_libraries(kalibr_imu_camera_calibration

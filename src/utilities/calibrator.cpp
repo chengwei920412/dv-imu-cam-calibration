@@ -32,8 +32,7 @@ Calibrator::Calibrator() {
   setPreviewImage(previewImageWithText("No image arrived yet", previewTimestamp));
 
 
-  detectionsQueue.start(1);
- // detectionsQueue.start(5); // TODO(radam): what about joining? exceptions are not handled well
+ detectionsQueue.start(5); // TODO(radam): what about joining? exceptions are not handled well
 
 
   size_t rows = 11; // TODO(radam): param
@@ -87,6 +86,27 @@ void Calibrator::addImu(const int64_t timestamp,
 
 
 void Calibrator::addImage(const StampedImage& stampedImage) {
+
+  {
+	std::lock_guard<std::mutex> lock(targetObservationsMutex);
+
+	if (targetObservations->size() > 1000) { // TODO(radam): param
+	  detectionsQueue.stop(); // TODO(radam): make it more correct using detectionsQueue.waitForEmptyQueue();
+	  setPreviewImage(previewImageWithText("Calibrating...", previewTimestamp));
+
+	  std::sort(targetObservations->begin(), targetObservations->end(),
+			 [](const aslam::cameras::GridCalibrationTargetObservation & a, const aslam::cameras::GridCalibrationTargetObservation & b) -> bool {
+
+	  return a.time() < b.time();
+	  });
+
+	  calibrate();
+	  throw std::runtime_error("CALIBRATED!!!"); // TODO(radam): delete
+	}
+  }
+
+
+  // TODO(radam): only schedule if in the correct mode
   boost::unique_future<void> job;
   detectionsQueue.scheduleFuture<void>(boost::bind(&Calibrator::detectPattern, this, stampedImage.clone()), job);
 }
@@ -141,18 +161,6 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
 	  }
 	  std::lock_guard<std::mutex> lock(targetObservationsMutex);
 	  targetObservations->push_back(observation);
-
-	  if (targetObservations->size() > 20) { // TODO(radam): param
-
-	    try {
-	      calibrate();
-	    } catch (...) {
-	      std::cout << "Worker threw exception" << std::endl; // TODO(radam): del
-		  detectionsQueue.stop();
-	    }
-	    std::cout << "CALIBRATED!!!!!" << std::endl; // TODO(radam): del
-	    throw std::runtime_error("CALIBRATED!!!"); // TODO(radam): delete
-	  }
 	}
   }
 
