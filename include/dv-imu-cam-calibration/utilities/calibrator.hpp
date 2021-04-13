@@ -15,6 +15,7 @@
 #include <sm/boost/JobQueue.hpp>
 
 #include <mutex>
+#include <atomic>
 
 /**
  * IMU camera calibration.
@@ -22,6 +23,7 @@
 class Calibrator {
 
 public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
   /**
    * Hold image and corresponding timestamp.
@@ -51,7 +53,14 @@ public:
 	CHESSBOARD, ASYMMETRIC_CIRCLES_GRID, APRIL_GRID
   };
 
+  enum State {
+    INITIALIZED, COLLECTING, CALIBRATING, CALIBRATED
+  };
+
 protected:
+
+  // Internal state
+  std::atomic<State> state;
 
   // Calibration settings
   cv::Size boardSize;
@@ -60,6 +69,7 @@ protected:
   // Queue scheduling pattern detection jobs
   sm::JobQueue detectionsQueue;
 
+  // TODO(radam): del the block below and render preview only on request
   // Preview image
   std::mutex previewMutex;
   cv::Mat previewImage;
@@ -139,29 +149,13 @@ public:
    */
   StampedImage getPreviewImage();
 
-  // TODO(radam): think how to nicely handle mutexes and stuff
-  // TODO(radam): rethink this
-  void calibrate() {
-	const size_t maxIter = 30;
-	iccCalibrator.buildProblem(4,
-							   100,
-							   50,
-							   false,
-							   1e6,
-							   1e5,
-							   true,
-							   -1,
-							   -1,
-							   -1,
-							   true,
-							   true,
-							   maxIter,
-							   1.0,
-							   1.0,
-							   30.e-3,
-							   false);
-	iccCalibrator.optimize(nullptr, maxIter, false);
-  }
+  /**
+   * @return number of successful target detections
+   */
+  size_t getNumDetections();
+
+  // TODO(radam): doc
+  void calibrate();
 
 protected:
 

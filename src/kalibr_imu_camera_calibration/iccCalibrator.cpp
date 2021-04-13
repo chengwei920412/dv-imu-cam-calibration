@@ -189,6 +189,10 @@ void IccCalibrator::optimize(boost::shared_ptr<aslam::backend::Optimizer2Options
 	throw std::runtime_error("Optimization failed");
   }
 
+
+  std::cout << "Transformation T_cam_imu:\n" << iccCamera->getTransformation().T() << std::endl;
+
+  // TODO(radam): we dont actually do this
   if (recoverCov) {
 	recoverCovariance();
   }

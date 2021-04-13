@@ -24,6 +24,7 @@ Calibrator::StampedImage previewImageWithText(const std::string &text, const int
 }
 
 Calibrator::Calibrator() {
+  state = INITIALIZED;
   iccImu = boost::make_shared<IccImu>(imuParameters);
   iccCamera = boost::make_shared<IccCamera>();
   targetObservations = boost::make_shared<std::vector<aslam::cameras::GridCalibrationTargetObservation>>();
@@ -31,8 +32,7 @@ Calibrator::Calibrator() {
 
   setPreviewImage(previewImageWithText("No image arrived yet", previewTimestamp));
 
-  detectionsQueue.start(5); // TODO(radam): make it 5 like below
- //detectionsQueue.start(5); // TODO(radam): what about joining? exceptions are not handled well
+  detectionsQueue.start(std::max(1u, std::thread::hardware_concurrency()-1)); // TODO(radam): what about joining? exceptions are not handled well
 
 
   size_t rows = 11; // TODO(radam): param
@@ -72,6 +72,13 @@ void Calibrator::addImu(const int64_t timestamp,
 						const double accelX,
 						const double accelY,
 						const double accelZ) {
+  if (state == INITIALIZED) {
+    state = COLLECTING;
+  }
+
+  if (state != COLLECTING) {
+    return;
+  }
 
   const double tsS = static_cast<double>(timestamp) / 1e6;
   const auto Rgyro = Eigen::Matrix3d::Identity() * iccImu->getGyroUncertaintyDiscrete();
@@ -86,27 +93,14 @@ void Calibrator::addImu(const int64_t timestamp,
 
 
 void Calibrator::addImage(const StampedImage& stampedImage) {
-
-  {
-	std::lock_guard<std::mutex> lock(targetObservationsMutex);
-
-	if (targetObservations->size() >= 800) { // TODO(radam): param
-	  detectionsQueue.stop(); // TODO(radam): make it more correct using detectionsQueue.waitForEmptyQueue();
-	  setPreviewImage(previewImageWithText("Calibrating...", previewTimestamp));
-
-	  std::sort(targetObservations->begin(), targetObservations->end(),
-			 [](const aslam::cameras::GridCalibrationTargetObservation & a, const aslam::cameras::GridCalibrationTargetObservation & b) -> bool {
-
-	  return a.time() < b.time();
-	  });
-
-	  calibrate();
-	  throw std::runtime_error("CALIBRATED!!!"); // TODO(radam): delete
-	}
+  if (state == INITIALIZED) {
+	state = COLLECTING;
   }
 
+  if (state != COLLECTING) {
+    return;
+  }
 
-  // TODO(radam): only schedule if in the correct mode
   boost::unique_future<void> job;
   detectionsQueue.scheduleFuture<void>(boost::bind(&Calibrator::detectPattern, this, stampedImage.clone()), job);
 }
@@ -116,8 +110,76 @@ void Calibrator::addImage(const cv::Mat &img, int64_t timestamp) {
 }
 
 Calibrator::StampedImage Calibrator::getPreviewImage() {
+  switch (state) {
+  case INITIALIZED:
+    break;
+  case COLLECTING:
+    break;
+  case CALIBRATING:
+    break;
+  case CALIBRATED:
+    break;
+  default:
+    throw std::runtime_error("Unknown state");
+  }
+
 	std::lock_guard<std::mutex> lock(previewMutex);
 	return StampedImage(previewImage, previewTimestamp).clone();
+}
+
+size_t Calibrator::getNumDetections() {
+  std::lock_guard<std::mutex> lock(targetObservationsMutex);
+  return targetObservations->size();
+}
+
+void Calibrator::calibrate()  {
+  state = CALIBRATING;
+
+  // TODO(radam): everything below should happen in a separate thread
+
+  std::cout << "Waiting for the detector to finish..." << std::endl;
+  detectionsQueue.waitForEmptyQueue();
+  detectionsQueue.stop();
+
+  std::lock_guard<std::mutex> lock(targetObservationsMutex);
+  std::cout << "Calibrating using " << targetObservations->size() << " detections." << std::endl;
+
+  setPreviewImage(previewImageWithText("Calibrating...", previewTimestamp));
+
+
+  const auto sortFun =[](const aslam::cameras::GridCalibrationTargetObservation & a,
+						 const aslam::cameras::GridCalibrationTargetObservation & b) -> bool {
+	return a.time() < b.time();
+  };
+  std::sort(targetObservations->begin(), targetObservations->end(),sortFun);
+
+
+  // TODO(radam): del block below
+  if (targetObservations->size() > 400) {
+	targetObservations = boost::make_shared<std::vector<aslam::cameras::GridCalibrationTargetObservation>>
+		(targetObservations->begin()+100, targetObservations->end()-250);
+  }
+
+
+  const size_t maxIter = 30; // TODO(radam): param
+  iccCalibrator.buildProblem(4,
+							 100,
+							 50,
+							 false,
+							 1e6,
+							 1e5,
+							 true,
+							 -1,
+							 -1,
+							 -1,
+							 true,
+							 true,
+							 maxIter,
+							 1.0,
+							 1.0,
+							 30.e-3,
+							 false);
+  iccCalibrator.optimize(nullptr, maxIter, false);
 }
 
 void Calibrator::setPreviewImage(const StampedImage &stampedImage) {
@@ -164,7 +226,6 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
 	  }
 	  std::lock_guard<std::mutex> lock(targetObservationsMutex);
 	  targetObservations->push_back(observation);
-	  std::cout << "Detected! " << targetObservations->size() << " " << stampedImage.timestamp << std::endl; // TODO(radam): del
 	}
   }
 

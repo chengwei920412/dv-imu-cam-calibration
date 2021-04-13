@@ -77,8 +77,16 @@ public:
 			const bool showOneStep=false); // TODO(radam): params
 
 
+  // TODO(radam): fix
   void registerObservations(boost::shared_ptr<std::vector<aslam::cameras::GridCalibrationTargetObservation>> obs) {
     targetObservations = obs;
+  }
+
+  // TODO(radam): fix
+  sm::kinematics::Transformation getTransformation() {
+    assert(T_c_b_Dv != nullptr);
+
+    return sm::kinematics::Transformation(T_c_b_Dv->toTransformationMatrix());
   }
 
   // void setupCalibrationTarget // TODO(radam): make sure it is not needed

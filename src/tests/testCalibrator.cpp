@@ -35,9 +35,12 @@ TEST(CalibratorTestSuite, smokeTest) {
     std::sort(imgPaths.begin(), imgPaths.end());
 
     // We don't need many images for testing
-//    const size_t startIdx = 40;
-//    const size_t nIdx = 5;
-//    imgPaths = std::vector<fs::path>(imgPaths.begin()+startIdx, imgPaths.begin() + startIdx + nIdx);
+    bool useAll = true;
+    if (!useAll) {
+	  const size_t startIdx = 40;
+	  const size_t nIdx = 20;
+	  imgPaths = std::vector<fs::path>(imgPaths.begin()+startIdx, imgPaths.begin() + startIdx + nIdx);
+    }
 
     for (const auto& path : imgPaths){
       cv::Mat img = cv::imread(path.string());
@@ -63,22 +66,22 @@ TEST(CalibratorTestSuite, smokeTest) {
 	int64_t ts = str2int(line);
 
 	std::getline(infile, line);
-	double gX = std::stod(line);
+	double gX = std::stod(line)* M_PI / 180;
 
 	std::getline(infile, line);
-	double gY = std::stod(line);
+	double gY = std::stod(line)* M_PI / 180;
 
 	std::getline(infile, line);
-	double gZ = std::stod(line);
+	double gZ = std::stod(line)* M_PI / 180;
 
 	std::getline(infile, line);
-	double aX = std::stod(line);
+	double aX = std::stod(line)* 9.81;
 
 	std::getline(infile, line);
-	double aY = std::stod(line);
+	double aY = std::stod(line)* 9.81;
 
 	std::getline(infile, line);
-	double aZ = std::stod(line);
+	double aZ = std::stod(line)* 9.81;
 
 	calibrator.addImu(ts, gX, gY, gZ, aX, aY, aZ);
   }
@@ -87,20 +90,11 @@ TEST(CalibratorTestSuite, smokeTest) {
   /// Try to calibrate - this is the actual test
   ////
 
-
-  // TODO(radam): this should be handled by the calibrator
-  std::cout << "Before sleep" << std::endl; // TODO(radam): del
-  sleep(60); // Give some time for the image processing to finish
-  std::cout << "After sleep" << std::endl; // TODO(radam): del
-  
-
   calibrator.calibrate();
   	
-  	
 
 
-
-    EXPECT_TRUE(false);
+  EXPECT_TRUE(true);
 }
 
 int main(int argc, char **argv){

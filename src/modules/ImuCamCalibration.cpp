@@ -37,24 +37,24 @@ public:
 
 
 	// TODO(radam): del
-//		std::stringstream ss;
-//		ss << "/tmp/imu_" << singleImu.timestamp << ".txt";
-//		std::ofstream myfile(ss.str());
-//		myfile << singleImu.timestamp << std::endl;
-//		myfile << singleImu.gyroscopeX << std::endl;
-//		myfile <<  singleImu.gyroscopeY<< std::endl;
-//		myfile <<  singleImu.gyroscopeZ<< std::endl;
-//		myfile <<  singleImu.accelerometerX<< std::endl;
-//		myfile <<  singleImu.accelerometerY<< std::endl;
-//		myfile <<  singleImu.accelerometerZ << std::endl;
+		std::stringstream ss;
+		ss << "/tmp/imu_" << singleImu.timestamp << ".txt";
+		std::ofstream myfile(ss.str());
+		myfile << singleImu.timestamp << std::endl;
+		myfile << singleImu.gyroscopeX << std::endl;
+		myfile <<  singleImu.gyroscopeY<< std::endl;
+		myfile <<  singleImu.gyroscopeZ<< std::endl;
+		myfile <<  singleImu.accelerometerX<< std::endl;
+		myfile <<  singleImu.accelerometerY<< std::endl;
+		myfile <<  singleImu.accelerometerZ << std::endl;
 
 		calibrator.addImu(singleImu.timestamp,
-					static_cast<double>(singleImu.gyroscopeX),
-						static_cast<double>(singleImu.gyroscopeY),
-							static_cast<double>(singleImu.gyroscopeZ),
-								static_cast<double>(singleImu.accelerometerX),
-									static_cast<double>(singleImu.accelerometerY),
-										static_cast<double>(singleImu.accelerometerZ));
+					static_cast<double>(singleImu.gyroscopeX) * M_PI / 180,
+						static_cast<double>(singleImu.gyroscopeY) * M_PI / 180,
+							static_cast<double>(singleImu.gyroscopeZ) * M_PI / 180,
+								static_cast<double>(singleImu.accelerometerX) * 9.81,
+									static_cast<double>(singleImu.accelerometerY) * 9.81,
+										static_cast<double>(singleImu.accelerometerZ) * 9.81);
 	  }
 	}
 
@@ -66,16 +66,21 @@ public:
 
 
 	  // TODO(radam): del
-//
-//	  std::stringstream ss;
-//	  ss << "/tmp/" << frame.timestamp() << ".png";
-//	  cv::imwrite(ss.str(), img);
+
+	  std::stringstream ss;
+	  ss << "/tmp/" << frame.timestamp() << ".png";
+	  cv::imwrite(ss.str(), img);
 	}
+
+//	// TODO(radam): param
+//	if (calibrator.getNumDetections() > 500) {
+//	  calibrator.calibrate();
+//	  throw std::runtime_error("END"); // TODO(radam): delete
+//	}
 
 	// Output preview image
 	auto preview = calibrator.getPreviewImage();
 	outputs.getFrameOutput("preview") << preview.timestamp << preview.image << dv::commit;
-
   }
 };
 
