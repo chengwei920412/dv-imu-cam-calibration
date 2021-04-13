@@ -35,9 +35,9 @@ TEST(CalibratorTestSuite, smokeTest) {
     std::sort(imgPaths.begin(), imgPaths.end());
 
     // We don't need many images for testing
-    const size_t startIdx = 40;
-    const size_t nIdx = 5;
-    imgPaths = std::vector<fs::path>(imgPaths.begin()+startIdx, imgPaths.begin() + startIdx + nIdx);
+//    const size_t startIdx = 40;
+//    const size_t nIdx = 5;
+//    imgPaths = std::vector<fs::path>(imgPaths.begin()+startIdx, imgPaths.begin() + startIdx + nIdx);
 
     for (const auto& path : imgPaths){
       cv::Mat img = cv::imread(path.string());
@@ -90,7 +90,7 @@ TEST(CalibratorTestSuite, smokeTest) {
 
   // TODO(radam): this should be handled by the calibrator
   std::cout << "Before sleep" << std::endl; // TODO(radam): del
-  sleep(2); // Give some time for the image processing to finish
+  sleep(60); // Give some time for the image processing to finish
   std::cout << "After sleep" << std::endl; // TODO(radam): del
   
 

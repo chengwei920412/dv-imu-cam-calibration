@@ -171,48 +171,6 @@ void IccCalibrator::optimize(boost::shared_ptr<aslam::backend::Optimizer2Options
 
   }
 
-  auto isNan = [](const Eigen::MatrixXd& mat) {
-	return !(mat.array() == mat.array()).all();
-  };
-
-  // TODO(radam): del
-  for (const auto& errterm : problem->getErrorTerms()) {
-
-    if (errterm.get() == nullptr) {
-      std::cout << "Errterm nullptr" << std::endl; // TODO(radam): del
-    }
-
-
-    aslam::backend::DesignVariable::set_t dvset;
-	errterm->getDesignVariables(dvset);
-	for (const auto& dv : dvset) {
-	  if (dv == nullptr) {
-		std::cout << "Errterm DV nullptr" << std::endl; // TODO(radam): del
-	  }
-
-	  Eigen::MatrixXd contents;
-	  dv->getParameters(contents);
-	  
-	  if (isNan(contents)) {
-	    std::cout << "Errterm DV contents NaN" << std::endl; // TODO(radam): del
-	  }
-
-
-	}
-  }
-
-  for (const auto&  dvg: problem->getDesignVariablesGroups()) {
-    std::cout << "Group " << dvg.first << std::endl; // TODO(radam): del
-
-
-    for (const auto& dv : dvg.second) {
-      if (dv.get() == nullptr) {
-		std::cout << "DV nullptr" << std::endl; // TODO(radam): del
-      }
-
-    }
-
-  }
 
   auto optimizer = aslam::backend::Optimizer2(*options);
   optimizer.setProblem(problem);

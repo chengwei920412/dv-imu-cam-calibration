@@ -31,7 +31,7 @@ Calibrator::Calibrator() {
 
   setPreviewImage(previewImageWithText("No image arrived yet", previewTimestamp));
 
-  detectionsQueue.start(1); // TODO(radam): make it 5 like below
+  detectionsQueue.start(5); // TODO(radam): make it 5 like below
  //detectionsQueue.start(5); // TODO(radam): what about joining? exceptions are not handled well
 
 
@@ -90,7 +90,7 @@ void Calibrator::addImage(const StampedImage& stampedImage) {
   {
 	std::lock_guard<std::mutex> lock(targetObservationsMutex);
 
-	if (targetObservations->size() >= 2) { // TODO(radam): param
+	if (targetObservations->size() >= 800) { // TODO(radam): param
 	  detectionsQueue.stop(); // TODO(radam): make it more correct using detectionsQueue.waitForEmptyQueue();
 	  setPreviewImage(previewImageWithText("Calibrating...", previewTimestamp));
 
@@ -164,7 +164,7 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
 	  }
 	  std::lock_guard<std::mutex> lock(targetObservationsMutex);
 	  targetObservations->push_back(observation);
-	  std::cout << "Detected! " << stampedImage.timestamp << std::endl; // TODO(radam): del
+	  std::cout << "Detected! " << targetObservations->size() << " " << stampedImage.timestamp << std::endl; // TODO(radam): del
 	}
   }
 

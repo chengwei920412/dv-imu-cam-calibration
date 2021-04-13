@@ -286,13 +286,13 @@ void IccCamera::addCameraErrorTerms(boost::shared_ptr<aslam::calibration::Optimi
 	  }
 
 
-
 	  for (size_t idx = 0 ; idx < imageCornerPoints.size() ; ++idx) {
 	    const auto& imageCornerPoint = imageCornerPoints[idx];
-	    const auto& targetPoint = (*targetObservations)[idx];
+	    const auto& targetPoint = targetCornerPoints[idx];
 
 	    // Target points
-		const auto p = T_c_w *  aslam::backend::HomogeneousExpression(targetPoint.T_t_c().q()); // TODO(radam): not entirely sure this is correct
+	    const Eigen::Vector3d eigenPoint(static_cast<double>(targetPoint.x), static_cast<double>(targetPoint.y), static_cast<double>(targetPoint.z));
+		const auto p = T_c_w *  aslam::backend::HomogeneousExpression(eigenPoint);
 
 		// #build and append the error term
 		auto rerr = boost::make_shared<aslam::backend::SimpleReprojectionError<aslam::Frame<aslam::cameras::EquidistantDistortedPinholeCameraGeometry>>>(frame.get(), idx, p);
