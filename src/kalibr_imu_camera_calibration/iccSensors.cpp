@@ -18,13 +18,21 @@ double toSec(const int64_t time ) {
   return static_cast<double>(time) / 1e6;
 }
 
-IccCamera::IccCamera(const double reprojectionSigma,
+IccCamera::IccCamera(boost::shared_ptr<std::vector<aslam::cameras::GridCalibrationTargetObservation>> observations,
+	 			     const double reprojectionSigma,
 					 const bool showCorners,
 					 const bool showReproj,
 					 const bool showOneStep) : cornerUncertainty(reprojectionSigma){
 
+  targetObservations = observations;
   gravity_w = Eigen::Vector3d(9.80655, 0., 0.);
   T_extrinsic = sm::kinematics::Transformation();
+}
+
+sm::kinematics::Transformation IccCamera::getTransformation() {
+  assert(T_c_b_Dv != nullptr);
+
+  return sm::kinematics::Transformation(T_c_b_Dv->toTransformationMatrix());
 }
 
 void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu) {
@@ -71,7 +79,7 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
   // Define the optimization
   aslam::backend::Optimizer2Options options;
   options.verbose = false;
-  // options.linearSolver = boost::make_shared<aslam::backend::BlockCholeskyLinearSystemSolver>(); // TODO(radam): why not existent?
+  options.linearSystemSolver = boost::make_shared<aslam::backend::BlockCholeskyLinearSystemSolver>();
   options.nThreads = 2;
   options.convergenceDeltaX = 1e-4;
   options.convergenceDeltaJ = 1;

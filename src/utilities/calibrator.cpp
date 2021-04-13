@@ -25,14 +25,15 @@ Calibrator::StampedImage previewImageWithText(const std::string &text, const int
 
 Calibrator::Calibrator() {
   state = INITIALIZED;
-  iccImu = boost::make_shared<IccImu>(imuParameters);
-  iccCamera = boost::make_shared<IccCamera>();
   targetObservations = boost::make_shared<std::vector<aslam::cameras::GridCalibrationTargetObservation>>();
+  iccImu = boost::make_shared<IccImu>(imuParameters);
+  iccCamera = boost::make_shared<IccCamera>(targetObservations);
+  iccCalibrator = boost::make_shared<IccCalibrator>(iccCamera, iccImu);
   imuData = boost::make_shared<std::vector<ImuMeasurement>>();
 
   setPreviewImage(previewImageWithText("No image arrived yet", previewTimestamp));
 
-  detectionsQueue.start(std::max(1u, std::thread::hardware_concurrency()-1)); // TODO(radam): what about joining? exceptions are not handled well
+  detectionsQueue.start(std::max(1u, std::thread::hardware_concurrency()-1));
 
 
   size_t rows = 11; // TODO(radam): param
@@ -58,10 +59,6 @@ Calibrator::Calibrator() {
   detectorOptions.plotCornerReprojection = false;
   detectorOptions.filterCornerOutliers = true;
 
-  iccCalibrator.registerImu(iccImu);
-  iccCalibrator.registerCamera(iccCamera);
-  iccCalibrator.registerObservations(targetObservations);
-  iccCamera->registerObservations(targetObservations);
   iccImu->registerImuData(imuData);
 }
 
@@ -73,7 +70,7 @@ void Calibrator::addImu(const int64_t timestamp,
 						const double accelY,
 						const double accelZ) {
   if (state == INITIALIZED) {
-    state = COLLECTING;
+    state = COLLECTING; // TODO(radam): this has to be triggered by DV and data vectors need to be cleaned
   }
 
   if (state != COLLECTING) {
@@ -139,7 +136,7 @@ void Calibrator::calibrate()  {
 
   std::cout << "Waiting for the detector to finish..." << std::endl;
   detectionsQueue.waitForEmptyQueue();
-  detectionsQueue.stop();
+  detectionsQueue.join();
 
   std::lock_guard<std::mutex> lock(targetObservationsMutex);
   std::cout << "Calibrating using " << targetObservations->size() << " detections." << std::endl;
@@ -158,13 +155,12 @@ void Calibrator::calibrate()  {
   if (targetObservations->size() > 400) {
     targetObservations->erase(targetObservations->begin(), targetObservations->begin() + 100);
     targetObservations->erase(targetObservations->end()-250, targetObservations->end());
-
 	std::cout << "Size after deleting: " << targetObservations->size() << std::endl; // TODO(radam): del
   }
 
 
   const size_t maxIter = 30; // TODO(radam): param
-  iccCalibrator.buildProblem(4,
+  iccCalibrator->buildProblem(4,
 							 100,
 							 50,
 							 false,
@@ -181,7 +177,7 @@ void Calibrator::calibrate()  {
 							 1.0,
 							 30.e-3,
 							 false);
-  iccCalibrator.optimize(nullptr, maxIter, false);
+  iccCalibrator->optimize(nullptr, maxIter, false);
 }
 
 void Calibrator::setPreviewImage(const StampedImage &stampedImage) {

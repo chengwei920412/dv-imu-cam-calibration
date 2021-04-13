@@ -80,7 +80,7 @@ protected:
   ImuParameters imuParameters; // TODO(radam): take them as input
 
   // IccCalibrator
-  IccCalibrator iccCalibrator;
+  boost::shared_ptr<IccCalibrator> iccCalibrator = nullptr;
   boost::shared_ptr<IccImu> iccImu = nullptr;
   boost::shared_ptr<IccCamera> iccCamera = nullptr;
 

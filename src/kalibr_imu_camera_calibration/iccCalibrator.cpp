@@ -12,13 +12,10 @@
 
 #include <iostream>
 
-
-
-
-IccCalibrator::IccCalibrator() {
-
+IccCalibrator::IccCalibrator(boost::shared_ptr<IccCamera> camera, boost::shared_ptr<IccImu> imu) {
+  iccCamera = camera;
+  iccImu = imu;
 }
-
 
 void IccCalibrator::initDesignVariables(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,
 										boost::shared_ptr<bsplines::BSplinePose> poseSpline,
@@ -48,7 +45,7 @@ void IccCalibrator::initDesignVariables(boost::shared_ptr<aslam::calibration::Op
   iccImu->addDesignVariables(problem);
 
   // Add all DVs for the camera chain
-  iccCamera->addDesignVariables(problem, noTimeCalibration, noChainExtrinsics);
+  iccCamera->addDesignVariables(problem, noChainExtrinsics, noTimeCalibration );
 }
 
 void IccCalibrator::addPoseMotionTerms(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,
@@ -64,22 +61,9 @@ void IccCalibrator::addPoseMotionTerms(boost::shared_ptr<aslam::calibration::Opt
   W(3,3) = wr;
   W(4,4) = wr;
   W(5,5) = wr;
-  // TODO(radam): order is incorrect
   const unsigned int errorOrder = 1;
   throw std::runtime_error("Not implemented addPoseMotionTerms");
   //aslam::backend::addMotionErrorTerms(problem, *poseDv, W, errorOrder);
-}
-
-void IccCalibrator::registerCamera(boost::shared_ptr<IccCamera> camera) {
-  iccCamera = camera; // TODO(radam): move
-}
-
-void IccCalibrator::registerImu(boost::shared_ptr<IccImu> imu) {
-  iccImu = imu; // TODO(radam): move
-}
-
-void IccCalibrator::registerObservations(boost::shared_ptr<std::vector<aslam::cameras::GridCalibrationTargetObservation>> obs) {
-  targetObservations = obs; // TODO(radam): move
 }
 
 void IccCalibrator::buildProblem(size_t splineOrder,
@@ -160,7 +144,6 @@ void IccCalibrator::optimize(boost::shared_ptr<aslam::backend::Optimizer2Options
   if (options == nullptr) {
 	options = boost::make_shared<aslam::backend::Optimizer2Options>();
 	options->verbose = true;
-	// options.doLevenbergMarquardt = True // TODO(radam): ??
 	const double levenbergMarquardtLambdaInit = 10.0;
 	options->nThreads = std::max(1u, std::thread::hardware_concurrency()-1);
 	options->convergenceDeltaX = 1e-5;
@@ -189,10 +172,8 @@ void IccCalibrator::optimize(boost::shared_ptr<aslam::backend::Optimizer2Options
 	throw std::runtime_error("Optimization failed");
   }
 
-
   std::cout << "Transformation T_cam_imu:\n" << iccCamera->getTransformation().T() << std::endl;
 
-  // TODO(radam): we dont actually do this
   if (recoverCov) {
 	recoverCovariance();
   }
@@ -206,7 +187,7 @@ void IccCalibrator::recoverCovariance() {
   auto rval = estimator.addBatch(problem, true);
   auto est_stds = estimator.getSigma2Theta().diagonal().cwiseSqrt();
 
-  // TODO(radam): finish once knowing what the dimensions are
+  throw std::runtime_error("Not implemented recoverCovariance");
 
   // # split and store the variance
   // self.std_trafo_ic = np.array(est_stds[0:6])

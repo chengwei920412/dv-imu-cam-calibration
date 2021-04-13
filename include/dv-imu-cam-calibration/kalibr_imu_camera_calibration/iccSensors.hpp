@@ -40,17 +40,8 @@ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 protected:
-  // TODO(radam): dataset
-  // TODO(radam): cam config
-  // TODO(radam): target config
-
-  //        distortion_coefficients: [],
-  //        distortion_type: radialtangential,
-  //        focal_length: [],
-  //        principal_point: []}
 
 
-  boost::shared_ptr<std::vector<aslam::cameras::GridCalibrationTargetObservation>> targetObservations = nullptr; // TODO(radam): this is dirty
 
   const double cornerUncertainty;
   sm::kinematics::Transformation T_extrinsic;
@@ -68,28 +59,19 @@ protected:
   boost::shared_ptr<aslam::backend::TransformationBasic> T_c_b_Dv = nullptr;
   boost::shared_ptr<aslam::backend::Scalar> cameraTimeToImuTimeDv = nullptr;
 
+  // Observations of the calibration target
+  boost::shared_ptr<std::vector<aslam::cameras::GridCalibrationTargetObservation>> targetObservations = nullptr;
 
 
 public:
-  IccCamera(const double reprojectionSigma=1.0,
+  IccCamera(boost::shared_ptr<std::vector<aslam::cameras::GridCalibrationTargetObservation>> observations,
+  		    const double reprojectionSigma=1.0,
 			const bool showCorners=true,
 			const bool showReproj = true,
-			const bool showOneStep=false); // TODO(radam): params
+			const bool showOneStep=false); // TODO(radam): params do not work, just remove them
 
 
-  // TODO(radam): fix
-  void registerObservations(boost::shared_ptr<std::vector<aslam::cameras::GridCalibrationTargetObservation>> obs) {
-    targetObservations = obs;
-  }
-
-  // TODO(radam): fix
-  sm::kinematics::Transformation getTransformation() {
-    assert(T_c_b_Dv != nullptr);
-
-    return sm::kinematics::Transformation(T_c_b_Dv->toTransformationMatrix());
-  }
-
-  // void setupCalibrationTarget // TODO(radam): make sure it is not needed
+  sm::kinematics::Transformation getTransformation();
 
   void findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu);
 
@@ -99,7 +81,6 @@ public:
 
   Eigen::Vector3d getEstimatedGravity();
 
-  // TODO(radam): missing methods here
 
   boost::shared_ptr<bsplines::BSplinePose> initPoseSplineFromCamera(const size_t splineOrder = 6,
 																	const size_t poseKnotsPerSecond = 100,
