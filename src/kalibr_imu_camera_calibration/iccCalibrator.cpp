@@ -83,6 +83,25 @@ void IccCalibrator::buildProblem(size_t splineOrder,
 								 double accelNoiseScale,
 								 double timeOffsetPadding,
 								 bool verbose) {
+
+  auto bool2string = [](bool val) {
+    return (val ? "true" : "false");
+  };
+
+  std::cout << "\tSpline order: " << splineOrder << std::endl;
+  std::cout << "\tPose knots per second: " << poseKnotsPerSecond  << std::endl;
+  std::cout << "\tDo pose motion regularization: " << bool2string(doPoseMotionError) << std::endl;
+  std::cout << "\t\txddot translation variance: " << mrTranslationVariance << std::endl;
+  std::cout << "\t\txddot rotation variance: " << mrRotationVariance << std::endl;
+  std::cout << "\tBias knots per second: " << biasKnotsPerSecond << std::endl;
+  std::cout << "\tDo bias motion regularization: " << bool2string(doBiasMotionError) << std::endl;
+  std::cout << "\tBlake-Zisserman on reprojection errors " << blakeZisserCam << std::endl;
+  std::cout << "\tAcceleration Huber width (sigma): " << huberAccel << std::endl;
+  std::cout << "\tGyroscope Huber width (sigma): " << huberGyro << std::endl;
+  std::cout << "\tDo time calibration: " << bool2string(!noTimeCalibration) << std::endl;
+  std::cout << "\tMax iterations: " << maxIterations << std::endl;
+  std::cout << "\tTime offset padding: " << timeOffsetPadding << std::endl;
+
   // ############################################
   // ## initialize camera chain
   // ############################################
@@ -171,6 +190,8 @@ void IccCalibrator::optimize(boost::shared_ptr<aslam::backend::Optimizer2Options
   if (optimizationFailed) {
 	throw std::runtime_error("Optimization failed");
   }
+
+  // TODO(radam): would be good to print reprojection errors at least just like kalibr does it
 
   std::cout << "Transformation T_cam_imu:\n" << iccCamera->getTransformation().T() << std::endl;
 

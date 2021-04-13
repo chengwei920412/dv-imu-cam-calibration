@@ -160,9 +160,9 @@ void Calibrator::calibrate()  {
 
 
   const size_t maxIter = 30; // TODO(radam): param
-  iccCalibrator->buildProblem(4,
-							 100,
-							 50,
+  iccCalibrator->buildProblem(6,
+							 70,
+							 70,
 							 false,
 							 1e6,
 							 1e5,
@@ -175,7 +175,7 @@ void Calibrator::calibrate()  {
 							 maxIter,
 							 1.0,
 							 1.0,
-							 30.e-3,
+							 0.02,
 							 false);
   iccCalibrator->optimize(nullptr, maxIter, false);
 }
