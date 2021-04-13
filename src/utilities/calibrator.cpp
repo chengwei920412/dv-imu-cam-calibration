@@ -156,8 +156,10 @@ void Calibrator::calibrate()  {
 
   // TODO(radam): del block below
   if (targetObservations->size() > 400) {
-	targetObservations = boost::make_shared<std::vector<aslam::cameras::GridCalibrationTargetObservation>>
-		(targetObservations->begin()+100, targetObservations->end()-250);
+    targetObservations->erase(targetObservations->begin(), targetObservations->begin() + 100);
+    targetObservations->erase(targetObservations->end()-250, targetObservations->end());
+
+	std::cout << "Size after deleting: " << targetObservations->size() << std::endl; // TODO(radam): del
   }
 
 
