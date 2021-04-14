@@ -35,7 +35,7 @@ TEST(CalibratorTestSuite, smokeTest) {
     std::sort(imgPaths.begin(), imgPaths.end());
 
     // We don't need many images for testing
-    bool useAll = false;
+    bool useAll = true;
     if (!useAll) {
 	  const size_t startIdx = 40;
 	  const size_t nIdx = 20;

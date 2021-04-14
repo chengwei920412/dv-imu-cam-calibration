@@ -25,7 +25,7 @@ Calibrator::StampedImage previewImageWithText(const std::string &text, const int
 
 Calibrator::Calibrator() {
   state = INITIALIZED;
-  targetObservations = boost::make_shared<std::vector<aslam::cameras::GridCalibrationTargetObservation>>();
+  targetObservations = boost::make_shared<std::map<int64_t, aslam::cameras::GridCalibrationTargetObservation>>();
   iccImu = boost::make_shared<IccImu>(imuParameters);
   iccCamera = boost::make_shared<IccCamera>(targetObservations);
   iccCalibrator = boost::make_shared<IccCalibrator>(iccCamera, iccImu);
@@ -114,35 +114,31 @@ Calibrator::StampedImage Calibrator::getPreviewImage() {
   case COLLECTING: {
 	std::stringstream ss;
 
+	// Get the latest image
+	StampedImage stampedImage;
+	{
+	  std::lock_guard<std::mutex> lock(latestImageMutex);
+	  if (latestStampedImage == nullptr) {
+		return StampedImage(previewImageWithText("Waiting for the first image to arrive"));
+	  }
+	  stampedImage = latestStampedImage->clone();
+	  if (stampedImage.image.channels() == 1) {
+		cv::cvtColor(stampedImage.image, stampedImage.image, cv::COLOR_GRAY2BGR);
+	  }
+	}
+
     // Get the latest observation
 	boost::shared_ptr<aslam::cameras::GridCalibrationTargetObservation> observation = nullptr;
 	{
 	  std::lock_guard<std::mutex> lock(targetObservationsMutex);
 	  ss << "Collected " << targetObservations->size() << " images";
-	  if (!targetObservations->empty()) {
-		sortTargetObs();
-		observation = boost::make_shared<aslam::cameras::GridCalibrationTargetObservation>(targetObservations->back());
+	  auto it = targetObservations->find(stampedImage.timestamp);
+	  if (it != targetObservations->end()) {
+		observation = boost::make_shared<aslam::cameras::GridCalibrationTargetObservation>(it->second);
 	  }
 	}
 
-	// Get the latest image
-	boost::shared_ptr<StampedImage> stampedImage = nullptr;
-	{
-	  std::lock_guard<std::mutex> lock(latestImageMutex);
-	  if (latestStampedImage != nullptr) {
-		stampedImage = boost::make_shared<StampedImage>(latestStampedImage->clone());
-	  }
-	}
-
-	if (stampedImage == nullptr) {
-	  return StampedImage(previewImageWithText("Waiting for the first image to arrive"));
-	}
-
-	if (stampedImage->image.channels() == 1) {
-	  cv::cvtColor(stampedImage->image, stampedImage->image, cv::COLOR_GRAY2BGR);
-	}
-
-	cv::putText(stampedImage->image,
+	cv::putText(stampedImage.image,
 				ss.str(),
 				cv::Point(20, 40),
 				cv::FONT_HERSHEY_DUPLEX,
@@ -150,7 +146,7 @@ Calibrator::StampedImage Calibrator::getPreviewImage() {
 				cv::Scalar(255, 0, 0),
 				2);
 
-	if (observation != nullptr && observation->time().toDvTime() == stampedImage->timestamp) {
+	if (observation != nullptr && observation->time().toDvTime() == stampedImage.timestamp) {
 	  cv::Point prevPoint(-1, -1);
 	  for (size_t y = 0; y < grid->rows(); ++y) {
 		const auto color = colors[y % colors.size()];
@@ -159,9 +155,9 @@ Calibrator::StampedImage Calibrator::getPreviewImage() {
 		  Eigen::Vector2d point;
 		  if (observation->imagePoint(idx, point)) {
 			const cv::Point cvPoint(point.x(), point.y());
-			cv::circle(stampedImage->image, cvPoint, 8, color, 2);
+			cv::circle(stampedImage.image, cvPoint, 8, color, 2);
 			if (prevPoint != cv::Point(-1, -1)) {
-			  cv::line(stampedImage->image, prevPoint, cvPoint, color, 2);
+			  cv::line(stampedImage.image, prevPoint, cvPoint, color, 2);
 			}
 			prevPoint = cvPoint;
 		  }
@@ -169,7 +165,7 @@ Calibrator::StampedImage Calibrator::getPreviewImage() {
 	  }
 	}
 
-	return *stampedImage;
+	return stampedImage;
   }
   case CALIBRATING:
     // TODO(radam):
@@ -201,17 +197,6 @@ void Calibrator::calibrate()  {
 
   std::lock_guard<std::mutex> lock(targetObservationsMutex);
   std::cout << "Calibrating using " << targetObservations->size() << " detections." << std::endl;
-
-  sortTargetObs();
-
-
-  // TODO(radam): del block below
-  if (targetObservations->size() > 400) {
-    targetObservations->erase(targetObservations->begin(), targetObservations->begin() + 100);
-    targetObservations->erase(targetObservations->end()-250, targetObservations->end());
-	std::cout << "Size after deleting: " << targetObservations->size() << std::endl; // TODO(radam): del
-  }
-
 
   const size_t maxIter = 30; // TODO(radam): param
   iccCalibrator->buildProblem(6,
@@ -252,7 +237,7 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
   if (success) {
 	if (observation.hasSuccessfulObservation()) {
 		std::lock_guard<std::mutex> lock(targetObservationsMutex);
-		targetObservations->push_back(observation);
+		targetObservations->emplace(stampedImage.timestamp, observation);
 	}
   }
 

@@ -18,7 +18,7 @@ double toSec(const int64_t time ) {
   return static_cast<double>(time) / 1e6;
 }
 
-IccCamera::IccCamera(boost::shared_ptr<std::vector<aslam::cameras::GridCalibrationTargetObservation>> observations,
+IccCamera::IccCamera(boost::shared_ptr<std::map<int64_t, aslam::cameras::GridCalibrationTargetObservation>> observations,
 	 			     const double reprojectionSigma,
 					 const bool showCorners,
 					 const bool showReproj,
@@ -147,8 +147,7 @@ boost::shared_ptr<bsplines::BSplinePose> IccCamera::initPoseSplineFromCamera(con
   timesVec.reserve(targetObservations->size());
   std::vector<Eigen::VectorXd> curveVec;
   curveVec.reserve(targetObservations->size());
-  for (int idx = 0 ; idx < targetObservations->size() ; ++idx) {
-	const auto targetObs = (*targetObservations)[static_cast<size_t>(idx)];
+  for (const auto& [ts, targetObs] : *targetObservations) {
 	timesVec.push_back(targetObs.time().toSec() + timeshiftCamToImuPrior);
 	const auto trans = targetObs.T_t_c().T() * T_c_b;
 	const auto column = pose->transformationToCurveValue(trans);
@@ -238,7 +237,7 @@ void IccCamera::addCameraErrorTerms(boost::shared_ptr<aslam::calibration::Optimi
 
   const auto T_cN_b = T_c_b_Dv->toExpression();
 
-  for (const auto& obs : *targetObservations) {
+  for (const auto& [ts, obs] : *targetObservations) {
 	const auto frameTime = cameraTimeToImuTimeDv->toExpression() + obs.time().toSec() + timeshiftCamToImuPrior;
 	const auto frameTimeScalar = frameTime.toScalar();
 

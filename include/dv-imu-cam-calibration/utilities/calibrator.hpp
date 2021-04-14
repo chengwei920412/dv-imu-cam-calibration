@@ -81,7 +81,7 @@ protected:
   // Calibration target grid detector
   aslam::cameras::GridDetector::GridDetectorOptions detectorOptions;
   boost::shared_ptr<aslam::cameras::GridCalibrationTargetBase> grid = nullptr;
-  boost::shared_ptr<std::vector<aslam::cameras::GridCalibrationTargetObservation>> targetObservations = nullptr;
+  boost::shared_ptr<std::map<int64_t, aslam::cameras::GridCalibrationTargetObservation>> targetObservations = nullptr;
   std::mutex targetObservationsMutex;
 
   // Latest image used for visualization
@@ -157,15 +157,6 @@ public:
 
 protected:
 
-  // TODO(radam): del
-  void sortTargetObs() {
-
-	const auto sortFun =[](const aslam::cameras::GridCalibrationTargetObservation & a,
-						   const aslam::cameras::GridCalibrationTargetObservation & b) -> bool {
-	  return a.time() < b.time();
-	};
-	std::sort(targetObservations->begin(), targetObservations->end(),sortFun); // TODO(radam): use map instead of sorting
-  }
 
   /**
    * Detect the calibration pattern on the given stamped image.

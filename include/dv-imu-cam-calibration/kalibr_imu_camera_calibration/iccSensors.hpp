@@ -60,11 +60,11 @@ protected:
   boost::shared_ptr<aslam::backend::Scalar> cameraTimeToImuTimeDv = nullptr;
 
   // Observations of the calibration target
-  boost::shared_ptr<std::vector<aslam::cameras::GridCalibrationTargetObservation>> targetObservations = nullptr;
+  boost::shared_ptr<std::map<int64_t, aslam::cameras::GridCalibrationTargetObservation>> targetObservations = nullptr;
 
 
 public:
-  IccCamera(boost::shared_ptr<std::vector<aslam::cameras::GridCalibrationTargetObservation>> observations,
+  IccCamera(boost::shared_ptr<std::map<int64_t, aslam::cameras::GridCalibrationTargetObservation>> observations,
   		    const double reprojectionSigma=1.0,
 			const bool showCorners=true,
 			const bool showReproj = true,
