@@ -156,7 +156,7 @@ public:
   void calibrate();
 
 protected:
-
+  
 
   /**
    * Detect the calibration pattern on the given stamped image.
