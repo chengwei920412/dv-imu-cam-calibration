@@ -24,7 +24,7 @@ Calibrator::StampedImage previewImageWithText(const std::string &text, const int
 }
 
 Calibrator::Calibrator() {
-  state = INITIALIZED;
+
   targetObservations = boost::make_shared<std::map<int64_t, aslam::cameras::GridCalibrationTargetObservation>>();
   imuData = boost::make_shared<std::vector<ImuMeasurement>>();
 
@@ -57,6 +57,7 @@ Calibrator::Calibrator() {
   detectorOptions.plotCornerReprojection = false;
   detectorOptions.filterCornerOutliers = true;
 
+  state = INITIALIZED;
 }
 
 void Calibrator::addImu(const int64_t timestamp,
@@ -66,11 +67,7 @@ void Calibrator::addImu(const int64_t timestamp,
 						const double accelX,
 						const double accelY,
 						const double accelZ) {
-  if (state == INITIALIZED) {
-    state = COLLECTING; // TODO(radam): this has to be triggered by DV and data vectors need to be cleaned
-  }
-
-  if (state != COLLECTING) {
+  if (state > COLLECTING) {
     return;
   }
 
@@ -80,6 +77,8 @@ void Calibrator::addImu(const int64_t timestamp,
   const Eigen::Vector3d omega(gyroX, gyroY, gyroZ);
   const Eigen::Vector3d alpha(accelX, accelY, accelZ);
   ImuMeasurement imuMeas(tsS, omega, alpha, Rgyro, Raccel);
+
+  std::lock_guard<std::mutex> lock(imuDataMutex);
   imuData->push_back(imuMeas);
 }
 
@@ -87,11 +86,7 @@ void Calibrator::addImu(const int64_t timestamp,
 
 
 void Calibrator::addImage(const StampedImage& stampedImage) {
-  if (state == INITIALIZED) {
-	state = COLLECTING;
-  }
-
-  if (state != COLLECTING) {
+  if (state > COLLECTING) {
     return;
   }
 
@@ -108,8 +103,7 @@ Calibrator::StampedImage Calibrator::getPreviewImage() {
 
   switch (state) {
   case INITIALIZED:
-	return StampedImage(previewImageWithText("Waiting for the first image to arrive"));
-    break;
+	return StampedImage(previewImageWithText("No image arrived yet"));
   case COLLECTING: {
 	std::stringstream ss;
 
@@ -118,7 +112,7 @@ Calibrator::StampedImage Calibrator::getPreviewImage() {
 	{
 	  std::lock_guard<std::mutex> lock(latestImageMutex);
 	  if (latestStampedImage == nullptr) {
-		return StampedImage(previewImageWithText("Waiting for the first image to arrive"));
+		return StampedImage(previewImageWithText("No image arrived yet"));
 	  }
 	  stampedImage = latestStampedImage->clone();
 	  if (stampedImage.image.channels() == 1) {
@@ -194,7 +188,15 @@ void Calibrator::calibrate()  {
   detectionsQueue.waitForEmptyQueue();
   detectionsQueue.join();
 
-  std::lock_guard<std::mutex> lock(targetObservationsMutex);
+  // Block all the threads
+  std::lock_guard<std::mutex> lock1(targetObservationsMutex);
+  std::lock_guard<std::mutex> lock2(imuDataMutex);
+
+  if (targetObservations->empty()) {
+    std::cout << "No observations collected" << std::endl; // TODO(radam): del
+    return;
+  }
+  
   std::cout << "Calibrating using " << targetObservations->size() << " detections." << std::endl;
 
   const size_t maxIter = 30; // TODO(radam): param
@@ -251,4 +253,20 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
   if (replace) {
 	latestStampedImage = boost::make_shared<StampedImage>(stampedImage.clone());
   }
+}
+
+void Calibrator::startCollecting() {
+  {
+	std::lock_guard<std::mutex> lock(targetObservationsMutex);
+	targetObservations->clear();
+  }
+
+  {
+	std::lock_guard<std::mutex> lock(imuDataMutex);
+	imuData->clear();
+  }
+
+  detectionsQueue.stop();
+  detectionsQueue.start(std::max(1u, std::thread::hardware_concurrency()-1));
+  state = COLLECTING;
 }

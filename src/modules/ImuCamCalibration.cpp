@@ -21,6 +21,30 @@ public:
   }
 
   static void initConfigOptions(dv::RuntimeConfig &config) {
+    // Calibration pattern
+	config.add("boardHeight", dv::ConfigOption::intOption("Number of rows in the calibration pattern", 11, 1, 50));
+	config.add("boardWidth", dv::ConfigOption::intOption("Number of cols in the calibration pattern", 4, 1, 50));
+	config.add("boardSquareSize", dv::ConfigOption::doubleOption("Size of a calibration pattern element in meters", 0.05, 0.0, 1.0));
+    config.add("calibrationPattern", dv::ConfigOption::listOption("Calibration pattern to use", "assCircleGrid", {"checkerboard", "assCircleGrid", "aprilTag"}, false));
+
+    // Module control buttons
+    config.add("startCollecting", dv::ConfigOption::buttonOption("Begin collecting calibration images", "startCollecting"));
+    config.add("calibrate", dv::ConfigOption::buttonOption("Start calibration algorithm", "calibrate"));
+  }
+
+  void configUpdate() {
+
+    // Start collecting button was clicked
+    if (config.getBool("startCollecting")) {
+      calibrator.startCollecting();
+	  config.setBool("startCollecting", false);
+    }
+
+    // Calibrate button was clicked
+    if (config.getBool("calibrate")) {
+      calibrator.calibrate();
+      config.setBool("calibrate", false);
+    }
   }
 
   ImuCamCalibration() {
@@ -35,9 +59,9 @@ public:
 	if (auto imuData = imuInput.data()) {
 	  for (const auto &singleImu : imuData) {
 		calibrator.addImu(singleImu.timestamp,
-					static_cast<double>(singleImu.gyroscopeX) * M_PI / 180,
-						static_cast<double>(singleImu.gyroscopeY) * M_PI / 180,
-							static_cast<double>(singleImu.gyroscopeZ) * M_PI / 180,
+					static_cast<double>(singleImu.gyroscopeX) * M_PI / 180.0,
+						static_cast<double>(singleImu.gyroscopeY) * M_PI / 180.0,
+							static_cast<double>(singleImu.gyroscopeZ) * M_PI / 180.0,
 								static_cast<double>(singleImu.accelerometerX) * 9.81,
 									static_cast<double>(singleImu.accelerometerY) * 9.81,
 										static_cast<double>(singleImu.accelerometerZ) * 9.81);
@@ -56,11 +80,6 @@ public:
 	  outputs.getFrameOutput("preview") << preview.timestamp << preview.image << dv::commit;
 	}
 
-	// TODO(radam): param
-	if (calibrator.getNumDetections() > 900) {
-	  calibrator.calibrate();
-	  throw std::runtime_error("END"); // TODO(radam): delete
-	}
   }
 };
 

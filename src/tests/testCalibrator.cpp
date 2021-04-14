@@ -14,6 +14,7 @@ int64_t str2int(std::string str) {
 TEST(CalibratorTestSuite, smokeTest) {
 
   	Calibrator calibrator;
+  	calibrator.startCollecting();
 
   	////
   	/// Useful paths
@@ -66,13 +67,13 @@ TEST(CalibratorTestSuite, smokeTest) {
 	int64_t ts = str2int(line);
 
 	std::getline(infile, line);
-	double gX = std::stod(line)* M_PI / 180;
+	double gX = std::stod(line)* M_PI / 180.0;
 
 	std::getline(infile, line);
-	double gY = std::stod(line)* M_PI / 180;
+	double gY = std::stod(line)* M_PI / 180.0;
 
 	std::getline(infile, line);
-	double gZ = std::stod(line)* M_PI / 180;
+	double gZ = std::stod(line)* M_PI / 180.0;
 
 	std::getline(infile, line);
 	double aX = std::stod(line)* 9.81;

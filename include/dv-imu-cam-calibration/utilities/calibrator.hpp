@@ -54,7 +54,10 @@ public:
   };
 
   enum State {
-    INITIALIZED, COLLECTING, CALIBRATING, CALIBRATED
+    INITIALIZED=0,
+    COLLECTING=1,
+    CALIBRATING=2,
+    CALIBRATED=3
   };
 
 protected:
@@ -72,6 +75,7 @@ protected:
   // IMU data
   boost::shared_ptr<std::vector<ImuMeasurement>> imuData = nullptr;
   ImuParameters imuParameters; // TODO(radam): take them as input
+  std::mutex imuDataMutex;
 
   // IccCalibrator
   boost::shared_ptr<IccCalibrator> iccCalibrator = nullptr;
@@ -154,6 +158,9 @@ public:
 
   // TODO(radam): doc
   void calibrate();
+
+  // TODO(radam): doc
+  void startCollecting();
 
 protected:
 
