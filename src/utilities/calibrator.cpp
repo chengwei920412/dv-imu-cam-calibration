@@ -198,7 +198,7 @@ void Calibrator::calibrate()  {
   std::lock_guard<std::mutex> lock(targetObservationsMutex);
   std::cout << "Calibrating using " << targetObservations->size() << " detections." << std::endl;
 
-  const size_t maxIter = 30; // TODO(radam): param
+  const size_t maxIter = 300; // TODO(radam): param
   iccCalibrator->buildProblem(6,
 							 70,
 							 70,

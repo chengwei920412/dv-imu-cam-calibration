@@ -30,9 +30,11 @@ IccCamera::IccCamera(boost::shared_ptr<std::map<int64_t, aslam::cameras::GridCal
 }
 
 sm::kinematics::Transformation IccCamera::getTransformation() {
+  assert(T_c_b_Dv_q != nullptr);
+  assert(T_c_b_Dv_t != nullptr);
   assert(T_c_b_Dv != nullptr);
 
-  return sm::kinematics::Transformation(T_c_b_Dv->toTransformationMatrix());
+  return sm::kinematics::Transformation(T_c_b_Dv_q->getQuaternion(), T_c_b_Dv_t->toEuclidean());
 }
 
 void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu) {
@@ -212,7 +214,7 @@ void IccCamera::addDesignVariables(boost::shared_ptr<aslam::calibration::Optimiz
 								   bool noExtrinsics,
 								   bool noTimeCalibration,
 								   size_t baselinedv_group_id) {
-  const bool active = !noExtrinsics;
+  const bool active = noExtrinsics; // TODO(radam): undestand what went wrong here
 
   T_c_b_Dv_q = boost::make_shared<aslam::backend::RotationQuaternion>(T_extrinsic.q());
   T_c_b_Dv_q->setActive(active);

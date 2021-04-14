@@ -35,10 +35,10 @@ TEST(CalibratorTestSuite, smokeTest) {
     std::sort(imgPaths.begin(), imgPaths.end());
 
     // We don't need many images for testing
-    bool useAll = true;
+    bool useAll = false;
     if (!useAll) {
-	  const size_t startIdx = 40;
-	  const size_t nIdx = 20;
+	  const size_t startIdx = 100;
+	  const size_t nIdx = 100;
 	  imgPaths = std::vector<fs::path>(imgPaths.begin()+startIdx, imgPaths.begin() + startIdx + nIdx);
     }
 
