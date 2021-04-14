@@ -69,12 +69,6 @@ protected:
   // Queue scheduling pattern detection jobs
   sm::JobQueue detectionsQueue;
 
-  // TODO(radam): del the block below and render preview only on request
-  // Preview image
-  std::mutex previewMutex;
-  cv::Mat previewImage;
-  int64_t previewTimestamp = 0LL;
-
   // IMU data
   boost::shared_ptr<std::vector<ImuMeasurement>> imuData = nullptr;
   ImuParameters imuParameters; // TODO(radam): take them as input
@@ -89,6 +83,10 @@ protected:
   boost::shared_ptr<aslam::cameras::GridCalibrationTargetBase> grid = nullptr;
   boost::shared_ptr<std::vector<aslam::cameras::GridCalibrationTargetObservation>> targetObservations = nullptr;
   std::mutex targetObservationsMutex;
+
+  // Latest image used for visualization
+  boost::shared_ptr<StampedImage> latestStampedImage = nullptr;
+  std::mutex latestImageMutex;
 
   // Colors used in visualization of detected calibtion pattern
   const std::vector<cv::Scalar> colors{
@@ -159,12 +157,15 @@ public:
 
 protected:
 
-  /**
-   * Set the preview image to the given stamped image.
-   *
-   * @param stampedImage
-   */
-  void setPreviewImage(const StampedImage& stampedImage);
+  // TODO(radam): del
+  void sortTargetObs() {
+
+	const auto sortFun =[](const aslam::cameras::GridCalibrationTargetObservation & a,
+						   const aslam::cameras::GridCalibrationTargetObservation & b) -> bool {
+	  return a.time() < b.time();
+	};
+	std::sort(targetObservations->begin(), targetObservations->end(),sortFun); // TODO(radam): use map instead of sorting
+  }
 
   /**
    * Detect the calibration pattern on the given stamped image.

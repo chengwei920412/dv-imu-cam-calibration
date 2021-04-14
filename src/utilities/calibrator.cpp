@@ -31,8 +31,6 @@ Calibrator::Calibrator() {
   iccCalibrator = boost::make_shared<IccCalibrator>(iccCamera, iccImu);
   imuData = boost::make_shared<std::vector<ImuMeasurement>>();
 
-  setPreviewImage(previewImageWithText("No image arrived yet", previewTimestamp));
-
   detectionsQueue.start(std::max(1u, std::thread::hardware_concurrency()-1));
 
 
@@ -107,21 +105,84 @@ void Calibrator::addImage(const cv::Mat &img, int64_t timestamp) {
 }
 
 Calibrator::StampedImage Calibrator::getPreviewImage() {
+
+
   switch (state) {
   case INITIALIZED:
+	return StampedImage(previewImageWithText("Waiting for the first image to arrive"));
     break;
-  case COLLECTING:
-    break;
+  case COLLECTING: {
+	std::stringstream ss;
+
+    // Get the latest observation
+	boost::shared_ptr<aslam::cameras::GridCalibrationTargetObservation> observation = nullptr;
+	{
+	  std::lock_guard<std::mutex> lock(targetObservationsMutex);
+	  ss << "Collected " << targetObservations->size() << " images";
+	  if (!targetObservations->empty()) {
+		sortTargetObs();
+		observation = boost::make_shared<aslam::cameras::GridCalibrationTargetObservation>(targetObservations->back());
+	  }
+	}
+
+	// Get the latest image
+	boost::shared_ptr<StampedImage> stampedImage = nullptr;
+	{
+	  std::lock_guard<std::mutex> lock(latestImageMutex);
+	  if (latestStampedImage != nullptr) {
+		stampedImage = boost::make_shared<StampedImage>(latestStampedImage->clone());
+	  }
+	}
+
+	if (stampedImage == nullptr) {
+	  return StampedImage(previewImageWithText("Waiting for the first image to arrive"));
+	}
+
+	if (stampedImage->image.channels() == 1) {
+	  cv::cvtColor(stampedImage->image, stampedImage->image, cv::COLOR_GRAY2BGR);
+	}
+
+	cv::putText(stampedImage->image,
+				ss.str(),
+				cv::Point(20, 40),
+				cv::FONT_HERSHEY_DUPLEX,
+				1.0,
+				cv::Scalar(255, 0, 0),
+				2);
+
+	if (observation != nullptr && observation->time().toDvTime() == stampedImage->timestamp) {
+	  cv::Point prevPoint(-1, -1);
+	  for (size_t y = 0; y < grid->rows(); ++y) {
+		const auto color = colors[y % colors.size()];
+		for (size_t x = 0; x < grid->cols(); ++x) {
+		  const auto idx = y * grid->cols() + x;
+		  Eigen::Vector2d point;
+		  if (observation->imagePoint(idx, point)) {
+			const cv::Point cvPoint(point.x(), point.y());
+			cv::circle(stampedImage->image, cvPoint, 8, color, 2);
+			if (prevPoint != cv::Point(-1, -1)) {
+			  cv::line(stampedImage->image, prevPoint, cvPoint, color, 2);
+			}
+			prevPoint = cvPoint;
+		  }
+		}
+	  }
+	}
+
+	return *stampedImage;
+  }
   case CALIBRATING:
+    // TODO(radam):
     break;
   case CALIBRATED:
+    // TODO(radam):
     break;
   default:
     throw std::runtime_error("Unknown state");
   }
 
-	std::lock_guard<std::mutex> lock(previewMutex);
-	return StampedImage(previewImage, previewTimestamp).clone();
+  // TODO(radam): del
+  return StampedImage(previewImageWithText("This should never happen"));
 }
 
 size_t Calibrator::getNumDetections() {
@@ -141,14 +202,7 @@ void Calibrator::calibrate()  {
   std::lock_guard<std::mutex> lock(targetObservationsMutex);
   std::cout << "Calibrating using " << targetObservations->size() << " detections." << std::endl;
 
-  setPreviewImage(previewImageWithText("Calibrating...", previewTimestamp));
-
-
-  const auto sortFun =[](const aslam::cameras::GridCalibrationTargetObservation & a,
-						 const aslam::cameras::GridCalibrationTargetObservation & b) -> bool {
-	return a.time() < b.time();
-  };
-  std::sort(targetObservations->begin(), targetObservations->end(),sortFun);
+  sortTargetObs();
 
 
   // TODO(radam): del block below
@@ -180,14 +234,8 @@ void Calibrator::calibrate()  {
   iccCalibrator->optimize(nullptr, maxIter, false);
 }
 
-void Calibrator::setPreviewImage(const StampedImage &stampedImage) {
-  std::lock_guard<std::mutex> lock(previewMutex);
-  previewImage = stampedImage.image.clone();
-  previewTimestamp = stampedImage.timestamp;
-}
 
 void Calibrator::detectPattern(const StampedImage &stampedImage) {
-  // TODO(radam): this thread never throws. Fix it!
 
 // TODO(radam): read input image and undistort points before passing to kalibr
 
@@ -199,33 +247,24 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
   // Search for pattern and draw it on the image frame
   aslam::cameras::GridCalibrationTargetObservation observation;
   bool success = detector->findTarget(stampedImage.image, aslam::Time(toSec(stampedImage.timestamp)), observation);
-  auto preview = stampedImage;
 
+  // If pattern detected add it to observation
   if (success) {
 	if (observation.hasSuccessfulObservation()) {
-	  if (preview.image.channels() == 1) {
-		cv::cvtColor(preview.image, preview.image, cv::COLOR_GRAY2BGR);
-	  }
-	  cv::Point prevPoint(-1, -1);
-	  for (size_t y = 0; y < grid->rows(); ++y) {
-		const auto color = colors[y % colors.size()];
-		for (size_t x = 0; x < grid->cols(); ++x) {
-		  const auto idx = y * grid->cols() + x;
-		  Eigen::Vector2d point;
-		  if (observation.imagePoint(idx, point)) {
-			const cv::Point cvPoint(point.x(), point.y());
-			cv::circle(preview.image, cvPoint, 8, color, 2);
-			if (prevPoint != cv::Point(-1, -1)) {
-			  cv::line(preview.image, prevPoint, cvPoint, color, 2);
-			}
-			prevPoint = cvPoint;
-		  }
-		}
-	  }
-	  std::lock_guard<std::mutex> lock(targetObservationsMutex);
-	  targetObservations->push_back(observation);
+		std::lock_guard<std::mutex> lock(targetObservationsMutex);
+		targetObservations->push_back(observation);
 	}
   }
 
-  setPreviewImage(preview);
+  // Replace the most recent image even if no pattern detected
+  std::lock_guard<std::mutex> lock(latestImageMutex);
+  bool replace = true;
+  if (latestStampedImage != nullptr) {
+	if (stampedImage.timestamp < latestStampedImage->timestamp) {
+	  replace = false;
+	}
+  }
+  if (replace) {
+	latestStampedImage = boost::make_shared<StampedImage>(stampedImage.clone());
+  }
 }

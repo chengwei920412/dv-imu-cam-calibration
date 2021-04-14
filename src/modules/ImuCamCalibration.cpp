@@ -49,6 +49,11 @@ public:
 	if (auto frame = frameInput.data()) {
 	  cv::Mat img = *frame.getMatPointer();
 	  calibrator.addImage(img, frame.timestamp());
+
+
+	  // Output preview image
+	  auto preview = calibrator.getPreviewImage();
+	  outputs.getFrameOutput("preview") << preview.timestamp << preview.image << dv::commit;
 	}
 
 	// TODO(radam): param
@@ -56,10 +61,6 @@ public:
 	  calibrator.calibrate();
 	  throw std::runtime_error("END"); // TODO(radam): delete
 	}
-
-	// Output preview image
-	auto preview = calibrator.getPreviewImage();
-	outputs.getFrameOutput("preview") << preview.timestamp << preview.image << dv::commit;
   }
 };
 

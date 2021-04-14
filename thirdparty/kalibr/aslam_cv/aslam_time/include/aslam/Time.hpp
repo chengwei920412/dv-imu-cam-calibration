@@ -158,6 +158,10 @@ class TimeBase {
     return *static_cast<T*>(this);
   }
 
+  int64_t toDvTime() const {
+    return (int64_t) sec * 1000000ll + (int64_t)nsec / 1000;
+  }
+
   uint64_t toNSec() const {
     return (uint64_t) sec * 1000000000ull + (uint64_t) nsec;
   }
