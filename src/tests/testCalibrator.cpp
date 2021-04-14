@@ -39,7 +39,7 @@ TEST(CalibratorTestSuite, smokeTest) {
     bool useAll = false;
     if (!useAll) {
 	  const size_t startIdx = 100;
-	  const size_t nIdx = 100;
+	  const size_t nIdx = 10;
 	  imgPaths = std::vector<fs::path>(imgPaths.begin()+startIdx, imgPaths.begin() + startIdx + nIdx);
     }
 

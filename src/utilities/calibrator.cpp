@@ -67,10 +67,6 @@ void Calibrator::addImu(const int64_t timestamp,
 						const double accelX,
 						const double accelY,
 						const double accelZ) {
-  if (state > COLLECTING) {
-    return;
-  }
-
   const double tsS = static_cast<double>(timestamp) / 1e6;
   const auto Rgyro = Eigen::Matrix3d::Identity() * iccImu->getGyroUncertaintyDiscrete();
   const auto Raccel = Eigen::Matrix3d::Identity() * iccImu->getAccelUncertaintyDiscrete();
@@ -86,10 +82,6 @@ void Calibrator::addImu(const int64_t timestamp,
 
 
 void Calibrator::addImage(const StampedImage& stampedImage) {
-  if (state > COLLECTING) {
-    return;
-  }
-
   boost::unique_future<void> job;
   detectionsQueue.scheduleFuture<void>(boost::bind(&Calibrator::detectPattern, this, stampedImage.clone()), job);
 }
@@ -100,27 +92,33 @@ void Calibrator::addImage(const cv::Mat &img, int64_t timestamp) {
 
 Calibrator::StampedImage Calibrator::getPreviewImage() {
 
+  // Get the latest image
+  StampedImage stampedImage;
+  {
+	std::lock_guard<std::mutex> lock(latestImageMutex);
+	if (latestStampedImage == nullptr) {
+	  return StampedImage(previewImageWithText("No image arrived yet"));
+	}
+	stampedImage = latestStampedImage->clone();
+	if (stampedImage.image.channels() == 1) {
+	  cv::cvtColor(stampedImage.image, stampedImage.image, cv::COLOR_GRAY2BGR);
+	}
+  }
 
   switch (state) {
-  case INITIALIZED:
-	return StampedImage(previewImageWithText("No image arrived yet"));
+  case INITIALIZED: {
+	cv::putText(stampedImage.image,
+				"Ready to collect",
+				cv::Point(20, 40),
+				cv::FONT_HERSHEY_DUPLEX,
+				1.0,
+				cv::Scalar(255, 0, 0),
+				2);
+	break;
+  }
   case COLLECTING: {
+	// Get the latest observation
 	std::stringstream ss;
-
-	// Get the latest image
-	StampedImage stampedImage;
-	{
-	  std::lock_guard<std::mutex> lock(latestImageMutex);
-	  if (latestStampedImage == nullptr) {
-		return StampedImage(previewImageWithText("No image arrived yet"));
-	  }
-	  stampedImage = latestStampedImage->clone();
-	  if (stampedImage.image.channels() == 1) {
-		cv::cvtColor(stampedImage.image, stampedImage.image, cv::COLOR_GRAY2BGR);
-	  }
-	}
-
-    // Get the latest observation
 	boost::shared_ptr<aslam::cameras::GridCalibrationTargetObservation> observation = nullptr;
 	{
 	  std::lock_guard<std::mutex> lock(targetObservationsMutex);
@@ -157,21 +155,32 @@ Calibrator::StampedImage Calibrator::getPreviewImage() {
 		}
 	  }
 	}
-
-	return stampedImage;
+	break;
   }
-  case CALIBRATING:
-    // TODO(radam):
-    break;
+  case CALIBRATING: {
+	cv::putText(stampedImage.image,
+				"Calibrating...",
+				cv::Point(20, 40),
+				cv::FONT_HERSHEY_DUPLEX,
+				1.0,
+				cv::Scalar(255, 0, 0),
+				2);
+	break;
+  }
   case CALIBRATED:
-    // TODO(radam):
+	cv::putText(stampedImage.image,
+				"Calibrated!",
+				cv::Point(20, 40),
+				cv::FONT_HERSHEY_DUPLEX,
+				1.0,
+				cv::Scalar(255, 0, 0),
+				2);
     break;
   default:
     throw std::runtime_error("Unknown state");
   }
 
-  // TODO(radam): del
-  return StampedImage(previewImageWithText("This should never happen"));
+  return stampedImage;
 }
 
 size_t Calibrator::getNumDetections() {
@@ -218,6 +227,9 @@ void Calibrator::calibrate()  {
 							 0.02,
 							 false);
   iccCalibrator->optimize(nullptr, maxIter, false);
+
+  state = CALIBRATED;
+  // TODO(radam): after it's calibrated it still crashes
 }
 
 
@@ -256,17 +268,17 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
 }
 
 void Calibrator::startCollecting() {
+  detectionsQueue.waitForEmptyQueue();
+
   {
-	std::lock_guard<std::mutex> lock(targetObservationsMutex);
+	std::lock_guard<std::mutex> lock1(targetObservationsMutex);
 	targetObservations->clear();
   }
 
   {
-	std::lock_guard<std::mutex> lock(imuDataMutex);
+	std::lock_guard<std::mutex> lock2(imuDataMutex);
 	imuData->clear();
   }
 
-  detectionsQueue.stop();
-  detectionsQueue.start(std::max(1u, std::thread::hardware_concurrency()-1));
   state = COLLECTING;
 }
