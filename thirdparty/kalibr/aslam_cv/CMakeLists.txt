@@ -1,4 +1,5 @@
 add_subdirectory(aslam_cameras)
+add_subdirectory(aslam_cameras_april)
 add_subdirectory(aslam_cv_backend)
 add_subdirectory(aslam_cv_error_terms)
 add_subdirectory(aslam_time)

@@ -14,6 +14,7 @@ target_link_libraries(calibrator
         ${Boost_LIBRARIES}
         aslam_backend
         aslam_cameras
+        aslam_cameras_april
         aslam_cv_backend
         aslam_splines
         bsplines

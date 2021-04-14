@@ -63,6 +63,7 @@ TARGET_LINK_LIBRARIES(imu-cam-calibration PRIVATE
         ${Boost_LIBRARIES}
         aslam_backend
         aslam_cameras
+        aslam_cameras_april
         aslam_splines
         bsplines
         calibrator

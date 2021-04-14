@@ -12,8 +12,7 @@ int64_t str2int(std::string str) {
 }
 
 TEST(CalibratorTestSuite, smokeTest) {
-
-  	Calibrator calibrator;
+  	Calibrator calibrator(Calibrator::Options{});
   	calibrator.startCollecting();
 
   	////

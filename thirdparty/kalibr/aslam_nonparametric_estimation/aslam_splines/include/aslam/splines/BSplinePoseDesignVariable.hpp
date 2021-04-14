@@ -51,10 +51,6 @@ namespace aslam {
             size_t numDesignVariables();
             aslam::backend::DesignVariableMappedVector<6> * designVariable(size_t i);
 
-            // TODO(radam): del?
-//		    boost::shared_ptr<aslam::backend::DesignVariableMappedVector<6>> designVariableSP(size_t i);
-
-
             // Luc:
             Eigen::VectorXi getActiveDesignVariableIndices(double tk);
             // Fabio:

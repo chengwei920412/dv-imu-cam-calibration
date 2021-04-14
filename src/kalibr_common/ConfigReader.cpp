@@ -26,9 +26,6 @@ PinholeEquidistantCamera::PinholeEquidistantCamera(const std::vector<double> &in
 
   geometry =  boost::make_shared<aslam::cameras::EquidistantDistortedPinholeCameraGeometry>(proj);
 
-  // TODO(radam): finish
-
-
 
 }
 

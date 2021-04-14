@@ -7,7 +7,7 @@
 #include <kalibr_imu_camera_calibration/iccCalibrator.hpp>
 #include <kalibr_imu_camera_calibration/iccSensors.hpp>
 
-#include <aslam/cameras/GridCalibrationTargetCirclegrid.hpp>
+
 #include <aslam/cameras/GridDetector.hpp>
 
 #include <opencv2/opencv.hpp>
@@ -60,14 +60,21 @@ public:
     CALIBRATED=3
   };
 
+  struct Options{
+	size_t rows = 11;
+	size_t cols = 4;
+	double spacingMeters = 0.05;
+	double tagSpacing = 0.3;
+	CalibrationPattern pattern = CalibrationPattern::ASYMMETRIC_CIRCLES_GRID;
+  };
+
 protected:
 
   // Internal state
   std::atomic<State> state;
 
-  // Calibration settings
-  cv::Size boardSize;
-  CalibrationPattern calibrationPattern;
+  // Calibration options
+  const Options calibratorOptions;
 
   // Queue scheduling pattern detection jobs
   sm::JobQueue detectionsQueue;
@@ -122,7 +129,7 @@ public:
   /**
    * Constructor.
    */
-  Calibrator();
+  Calibrator(const Options& opts);
 
   /**
    * Destructor
@@ -161,10 +168,14 @@ public:
    */
   size_t getNumDetections();
 
-  // TODO(radam): doc
+  /**
+   * Begin calibration procedure on the collected data.
+   */
   void calibrate();
 
-  // TODO(radam): doc
+  /**
+   * Start collecting data from the camera and IMU.
+   */
   void startCollecting();
 
 protected:

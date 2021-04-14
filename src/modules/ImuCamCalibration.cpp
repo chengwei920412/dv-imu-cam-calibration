@@ -4,7 +4,7 @@
 
 class ImuCamCalibration : public dv::ModuleBase {
 private:
-  Calibrator calibrator;
+  std::unique_ptr<Calibrator> calibrator = nullptr;
 
 public:
   static void initInputs(dv::InputDefinitionList &in) {
@@ -25,7 +25,8 @@ public:
 	config.add("boardHeight", dv::ConfigOption::intOption("Number of rows in the calibration pattern", 11, 1, 50));
 	config.add("boardWidth", dv::ConfigOption::intOption("Number of cols in the calibration pattern", 4, 1, 50));
 	config.add("boardSquareSize", dv::ConfigOption::doubleOption("Size of a calibration pattern element in meters", 0.05, 0.0, 1.0));
-    config.add("calibrationPattern", dv::ConfigOption::listOption("Calibration pattern to use", "assCircleGrid", {"checkerboard", "assCircleGrid", "aprilTag"}, false));
+	config.add("tagSpacing", dv::ConfigOption::doubleOption("Ratio of space between tags to tagSize (AprilTag)", 0.05, 0.0, 1.0));
+    config.add("calibrationPattern", dv::ConfigOption::listOption("Calibration pattern to use", "assCircleGrid", {"chessboard", "assCircleGrid", "aprilTag"}, false));
 
     // Module control buttons
     config.add("startCollecting", dv::ConfigOption::buttonOption("Begin collecting calibration images", "startCollecting"));
@@ -36,21 +37,45 @@ public:
 
     // Start collecting button was clicked
     if (config.getBool("startCollecting")) {
-      calibrator.startCollecting();
+      calibrator->startCollecting();
 	  config.setBool("startCollecting", false);
     }
 
     // Calibrate button was clicked
     if (config.getBool("calibrate")) {
-      calibrator.calibrate();
+      calibrator->calibrate();
       config.setBool("calibrate", false);
     }
   }
 
   ImuCamCalibration() {
+    // Input output
 	const auto inputSize = inputs.getFrameInput("frames").size();
 	const auto description = inputs.getFrameInput("frames").getOriginDescription();
 	outputs.getFrameOutput("preview").setup(inputSize.width, inputSize.height, description);
+
+	// Calibrator options
+	Calibrator::Options options;
+
+	const auto pattern = config.getString("calibrationPattern");
+	if (pattern == "chessboard") {
+	  options.pattern = Calibrator::CalibrationPattern::CHESSBOARD;
+	} else if (pattern == "assCircleGrid"){
+	  options.pattern = Calibrator::CalibrationPattern::ASYMMETRIC_CIRCLES_GRID;
+	} else if (pattern == "aprilTag") {
+	  options.pattern = Calibrator::CalibrationPattern::APRIL_GRID;
+	} else {
+	  std::stringstream  ss;
+	  ss << "Unknown calibration pattern: " << pattern;
+	  throw std::runtime_error(ss.str());
+	}
+
+	options.rows = static_cast<size_t>(config.getInt("boardHeight"));
+	options.cols = static_cast<size_t>(config.getInt("boardWidth"));
+	options.spacingMeters = config.getDouble("boardSquareSize");
+	options.tagSpacing = config.getDouble("tagSpacing");
+
+	calibrator = std::make_unique<Calibrator>(options);
   }
 
   void run() override {
@@ -58,7 +83,7 @@ public:
 	auto imuInput = inputs.getIMUInput("imu");
 	if (auto imuData = imuInput.data()) {
 	  for (const auto &singleImu : imuData) {
-		calibrator.addImu(singleImu.timestamp,
+		calibrator->addImu(singleImu.timestamp,
 					static_cast<double>(singleImu.gyroscopeX) * M_PI / 180.0,
 						static_cast<double>(singleImu.gyroscopeY) * M_PI / 180.0,
 							static_cast<double>(singleImu.gyroscopeZ) * M_PI / 180.0,
@@ -72,11 +97,11 @@ public:
 	auto frameInput = inputs.getFrameInput("frames");
 	if (auto frame = frameInput.data()) {
 	  cv::Mat img = *frame.getMatPointer();
-	  calibrator.addImage(img, frame.timestamp());
+	  calibrator->addImage(img, frame.timestamp());
 
 
 	  // Output preview image
-	  auto preview = calibrator.getPreviewImage();
+	  auto preview = calibrator->getPreviewImage();
 	  outputs.getFrameOutput("preview") << preview.timestamp << preview.image << dv::commit;
 	}
 

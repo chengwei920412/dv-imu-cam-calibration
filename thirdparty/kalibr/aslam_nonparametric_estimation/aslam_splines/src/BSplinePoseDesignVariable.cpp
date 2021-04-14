@@ -40,16 +40,6 @@ namespace aslam {
             return &_designVariables[i];
         }
 
-//        // TODO(radam): del?
-//		boost::shared_ptr<aslam::backend::DesignVariableMappedVector<6>> BSplinePoseDesignVariable::designVariableSP(size_t i)
-//		{
-//		  SM_ASSERT_LT(aslam::Exception, i, _designVariables.size(), "Index out of bounds");
-//		  //boost::shared_ptr<aslam::backend::DesignVariableMappedVector<6>> element = _designVariables[i];
-//		  boost::shared_ptr<aslam::backend::DesignVariableMappedVector<6>> element = &_designVariables[i];
-//
-//		  return element;
-//		}
-
         Eigen::VectorXi BSplinePoseDesignVariable::getActiveDesignVariableIndices(double tk)
         {
             return _bsplinePose.localVvCoefficientVectorIndices(tk);

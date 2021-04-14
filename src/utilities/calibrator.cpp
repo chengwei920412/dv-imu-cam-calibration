@@ -2,6 +2,9 @@
 // Created by radam on 2021-03-23.
 //
 
+#include <aslam/cameras/GridCalibrationTargetCirclegrid.hpp>
+#include <aslam/cameras/GridCalibrationTargetCheckerboard.hpp>
+#include <aslam/cameras/GridCalibrationTargetAprilgrid.hpp>
 
 #include <utilities/calibrator.hpp>
 
@@ -23,7 +26,7 @@ Calibrator::StampedImage previewImageWithText(const std::string &text, const int
   return Calibrator::StampedImage(img, timestamp);
 }
 
-Calibrator::Calibrator() {
+Calibrator::Calibrator(const Options& opts) : calibratorOptions(opts) {
 
   targetObservations = boost::make_shared<std::map<int64_t, aslam::cameras::GridCalibrationTargetObservation>>();
   imuData = boost::make_shared<std::vector<ImuMeasurement>>();
@@ -34,19 +37,46 @@ Calibrator::Calibrator() {
 
   detectionsQueue.start(std::max(1u, std::thread::hardware_concurrency()-1));
 
-  size_t rows = 11; // TODO(radam): param
-  size_t cols = 4; // TODO(radam): param
-  double spacingMeters = 0.05; // TODO(radam): param
-  calibrationPattern = CalibrationPattern::ASYMMETRIC_CIRCLES_GRID; // TODO(radam): param
 
+  switch (calibratorOptions.pattern) {
+  case CalibrationPattern::CHESSBOARD: {
+	aslam::cameras::GridCalibrationTargetCheckerboard::CheckerboardOptions options;
+	options.filterQuads = true;
+	options.normalizeImage = true;
+	options.useAdaptiveThreshold = true;
+	options.performFastCheck = false;
+	options.windowWidth = 5;
+	options.showExtractionVideo = false;
 
-
-  switch (calibrationPattern) {
+	grid = boost::make_shared<aslam::cameras::GridCalibrationTargetCheckerboard>(calibratorOptions.rows,
+																				 calibratorOptions.cols,
+																				 calibratorOptions.spacingMeters,
+																				 calibratorOptions.spacingMeters,
+																				 options);
+	break;
+  }
   case CalibrationPattern::ASYMMETRIC_CIRCLES_GRID: {
-	auto options = aslam::cameras::GridCalibrationTargetCirclegrid::CirclegridOptions();
+	aslam::cameras::GridCalibrationTargetCirclegrid::CirclegridOptions options;
 	options.showExtractionVideo = false;
 	options.useAsymmetricCirclegrid = true;
-	grid = boost::make_shared<aslam::cameras::GridCalibrationTargetCirclegrid>(rows, cols, spacingMeters, options);
+
+	grid = boost::make_shared<aslam::cameras::GridCalibrationTargetCirclegrid>(calibratorOptions.rows,
+																			   calibratorOptions.cols,
+																			   calibratorOptions.spacingMeters,
+																			   options);
+    break;
+  }
+  case CalibrationPattern::APRIL_GRID: {
+	aslam::cameras::GridCalibrationTargetAprilgrid::AprilgridOptions options;
+    // enforce more than one row --> pnp solution can be bad if all points are almost on a line...
+	options.minTagsForValidObs = std::max(calibratorOptions.rows, calibratorOptions.cols) + 1;
+	options.showExtractionVideo = false;
+
+	grid = boost::make_shared<aslam::cameras::GridCalibrationTargetAprilgrid>(calibratorOptions.rows,
+																			  calibratorOptions.cols,
+																			  calibratorOptions.spacingMeters,
+																			  calibratorOptions.tagSpacing,
+																			  options);
     break;
   }
   default:
@@ -208,7 +238,7 @@ void Calibrator::calibrate()  {
   std::lock_guard<std::mutex> lock2(imuDataMutex);
 
   if (targetObservations->empty()) {
-    std::cout << "No observations collected" << std::endl; // TODO(radam): del
+    std::cout << "No observations collected" << std::endl;
     return;
   }
   
@@ -235,7 +265,6 @@ void Calibrator::calibrate()  {
   iccCalibrator->optimize(nullptr, maxIter, false);
 
   state = CALIBRATED;
-  // TODO(radam): after it's calibrated it still crashes
 }
 
 
