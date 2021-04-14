@@ -56,7 +56,7 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
   // Initialize a pose spline using the camera poses
   auto poseSpline = initPoseSplineFromCamera(6, 100, 0.0);
   
-  for (const auto& im : *(iccImu->getImuData())) {
+  for (const auto& im : iccImu->getImuData()) {
     const auto tk = im.stamp;
     if (tk > poseSpline->t_min() && tk < poseSpline->t_max()) {
       // DV expressions
@@ -103,7 +103,7 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
 
   // estimate gravity in the world coordinate frame as the mean specific force
   std::vector<Eigen::Vector3d> a_w;
-  for (const auto& im : *(iccImu->getImuData())) {
+  for (const auto& im : iccImu->getImuData()) {
 	const auto tk = im.stamp;
 	if (tk > poseSpline->t_min() && tk < poseSpline->t_max()) {
 	  const auto val = poseSpline->orientation(tk) * R_i_c * im.alpha;
@@ -214,14 +214,12 @@ void IccCamera::addDesignVariables(boost::shared_ptr<aslam::calibration::Optimiz
 								   bool noExtrinsics,
 								   bool noTimeCalibration,
 								   size_t baselinedv_group_id) {
-  const bool active = noExtrinsics; // TODO(radam): undestand what went wrong here
-
   T_c_b_Dv_q = boost::make_shared<aslam::backend::RotationQuaternion>(T_extrinsic.q());
-  T_c_b_Dv_q->setActive(active);
+  T_c_b_Dv_q->setActive(true);
   problem->addDesignVariable(T_c_b_Dv_q, baselinedv_group_id);
 
   T_c_b_Dv_t = boost::make_shared<aslam::backend::EuclideanPoint>(T_extrinsic.t());
-  T_c_b_Dv_t->setActive(active);
+  T_c_b_Dv_t->setActive(true);
   problem->addDesignVariable(T_c_b_Dv_t, baselinedv_group_id);
 
   T_c_b_Dv = boost::make_shared<aslam::backend::TransformationBasic>(T_c_b_Dv_q->toExpression(), T_c_b_Dv_t->toExpression());
@@ -330,8 +328,8 @@ double IccImu::getGyroUncertaintyDiscrete() {
   return gyroUncertaintyDiscrete;
 }
 
-IccImu::IccImu(const ImuParameters &imuParams)  :imuParameters(imuParams) {
-  imuData = boost::make_shared<std::vector<ImuMeasurement>>();
+IccImu::IccImu(const ImuParameters &imuParams, boost::shared_ptr<std::vector<ImuMeasurement>> data)  :imuParameters(imuParams) {
+  imuData = data;
 
   const auto [aud, 	arw, 	au ] = imuParams.getAccelerometerStatistics();
   const auto [gud, 	grw, 	gu ] = imuParams.getGyroStatistics();
@@ -349,6 +347,10 @@ IccImu::IccImu(const ImuParameters &imuParams)  :imuParameters(imuParams) {
 
 }
 
+std::vector<ImuMeasurement>& IccImu::getImuData() {
+  return *imuData;
+}
+
 void IccImu::addDesignVariables(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem) {
   gyroBiasDv = boost::make_shared<aslam::splines::EuclideanBSplineDesignVariable>(*gyroBias);
   accelBiasDv = boost::make_shared<aslam::splines::EuclideanBSplineDesignVariable>(*accelBias);
@@ -358,10 +360,10 @@ void IccImu::addDesignVariables(boost::shared_ptr<aslam::calibration::Optimizati
 
   q_i_b_Dv = boost::make_shared<aslam::backend::RotationQuaternion>(q_i_b_prior);
   problem->addDesignVariable(q_i_b_Dv, HELPER_GROUP_ID);
-  q_i_b_Dv->setActive(false);
+  q_i_b_Dv->setActive(true);
   r_b_Dv = boost::make_shared<aslam::backend::EuclideanPoint>(Eigen::Vector3d(0.0, 0.0, 0.0));
   problem->addDesignVariable(r_b_Dv, HELPER_GROUP_ID);
-  r_b_Dv->setActive(false);
+  r_b_Dv->setActive(true);
 }
 
 void IccImu::addAccelerometerErrorTerms(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,

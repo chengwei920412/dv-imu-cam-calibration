@@ -12,7 +12,7 @@ void addSplineDesignVariables(boost::shared_ptr<aslam::calibration::Optimization
   for (size_t i = 0 ; i < dvc->numDesignVariables() ; ++i) {
 	auto dv = dvc->designVariable(i);
 	dv->setActive(setActive);
-	auto boostDv = boost::shared_ptr<aslam::backend::DesignVariable>(dv); // TODO(radam): this is super nasty
+	auto boostDv = boost::shared_ptr<aslam::backend::DesignVariable>(dv);
 	problem->addDesignVariable(boostDv, groupId);
   }
 }
@@ -24,7 +24,7 @@ void addSplineDesignVariables(boost::shared_ptr<aslam::calibration::Optimization
   for (size_t i = 0 ; i < dvc->numDesignVariables() ; ++i) {
 	auto dv = dvc->designVariable(i);
 	dv->setActive(setActive);
-	auto boostDv = boost::shared_ptr<aslam::backend::DesignVariable>(dv); // TODO(radam): this is super nasty
+	auto boostDv = boost::shared_ptr<aslam::backend::DesignVariable>(dv);
 	problem->addDesignVariable(boostDv, groupId);
   }
 }

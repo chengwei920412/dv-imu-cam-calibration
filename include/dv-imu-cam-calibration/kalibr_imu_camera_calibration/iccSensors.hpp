@@ -130,12 +130,6 @@ public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 public:
-  // TODO(radam): ImuParameters?
-
-  // TODO(radam): get imu config
-
-  // TODO(radam): update imu config
-
   Eigen::Vector3d gyroBiasPrior;
   size_t gyroBiasPriorCount = 0;
 
@@ -168,7 +162,7 @@ protected:
   boost::shared_ptr<bsplines::BSpline> gyroBias = nullptr;
   boost::shared_ptr<bsplines::BSpline> accelBias = nullptr;
 
-  // TODO(radam): this is ugly
+  // Imu measurement data
   boost::shared_ptr<std::vector<ImuMeasurement>> imuData = nullptr;
 
 public:
@@ -178,17 +172,10 @@ public:
   double getGyroUncertaintyDiscrete();
 
 
-  IccImu(const ImuParameters& imuParams);
+  IccImu(const ImuParameters& imuParams, boost::shared_ptr<std::vector<ImuMeasurement>> data);
 
-  // TODO(radam): this is nasty
-  void registerImuData(boost::shared_ptr<std::vector<ImuMeasurement>> data) {
-    imuData = data;
-  } // TODO(radam): move to cpp
 
-  // TODO(radam): nasty
-  boost::shared_ptr<std::vector<ImuMeasurement>> getImuData() {
-    return imuData;
-  } // TODO(radam): move to cpp
+  std::vector<ImuMeasurement>& getImuData();
 
 
 
@@ -212,14 +199,6 @@ public:
 					   size_t biasKnotsPerSecond);
 
   void addBiasMotionTerms(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem) ;
-
-  void getTransformationFromBodyToImu() {
-	// TODO(radam): finish
-  } // TODO(radam): move to cpp
-
-  void findOrientationPrior() {
-    // TODO(radam): finish
-  } // TODO(radam): move to cpp
 
 };
 

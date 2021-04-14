@@ -78,5 +78,3 @@ struct AsymmetricCircleGridParameters {
   double spacingMeters = 0.05;
 
 };
-
-// TODO(radam): camera chain skipped as we only want one camera

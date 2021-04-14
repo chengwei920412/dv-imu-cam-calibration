@@ -26,13 +26,13 @@ Calibrator::StampedImage previewImageWithText(const std::string &text, const int
 Calibrator::Calibrator() {
   state = INITIALIZED;
   targetObservations = boost::make_shared<std::map<int64_t, aslam::cameras::GridCalibrationTargetObservation>>();
-  iccImu = boost::make_shared<IccImu>(imuParameters);
-  iccCamera = boost::make_shared<IccCamera>(targetObservations);
-  iccCalibrator = boost::make_shared<IccCalibrator>(iccCamera, iccImu);
   imuData = boost::make_shared<std::vector<ImuMeasurement>>();
 
-  detectionsQueue.start(std::max(1u, std::thread::hardware_concurrency()-1));
+  iccImu = boost::make_shared<IccImu>(imuParameters, imuData);
+  iccCamera = boost::make_shared<IccCamera>(targetObservations);
+  iccCalibrator = boost::make_shared<IccCalibrator>(iccCamera, iccImu);
 
+  detectionsQueue.start(std::max(1u, std::thread::hardware_concurrency()-1));
 
   size_t rows = 11; // TODO(radam): param
   size_t cols = 4; // TODO(radam): param
@@ -57,7 +57,6 @@ Calibrator::Calibrator() {
   detectorOptions.plotCornerReprojection = false;
   detectorOptions.filterCornerOutliers = true;
 
-  iccImu->registerImuData(imuData);
 }
 
 void Calibrator::addImu(const int64_t timestamp,
@@ -198,7 +197,7 @@ void Calibrator::calibrate()  {
   std::lock_guard<std::mutex> lock(targetObservationsMutex);
   std::cout << "Calibrating using " << targetObservations->size() << " detections." << std::endl;
 
-  const size_t maxIter = 300; // TODO(radam): param
+  const size_t maxIter = 30; // TODO(radam): param
   iccCalibrator->buildProblem(6,
 							 70,
 							 70,

@@ -16,7 +16,6 @@
 static constexpr size_t CALIBRATION_GROUP_ID = 0;
 static constexpr size_t HELPER_GROUP_ID = 1;
 
-// TODO(radam): it's ugly that it's not using some parent class but the bspline takes a template...
 
 void addSplineDesignVariables(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,
 							  boost::shared_ptr<aslam::splines::BSplinePoseDesignVariable> dvc,
