@@ -125,6 +125,11 @@ public:
   Calibrator();
 
   /**
+   * Destructor
+   */
+  ~Calibrator();
+
+  /**
    * Add IMU measurement to the calibration buffer.
    */
   void addImu(int64_t timestamp,

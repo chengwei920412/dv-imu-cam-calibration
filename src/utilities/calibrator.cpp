@@ -60,6 +60,10 @@ Calibrator::Calibrator() {
   state = INITIALIZED;
 }
 
+Calibrator::~Calibrator() {
+  detectionsQueue.join();
+}
+
 void Calibrator::addImu(const int64_t timestamp,
 						const double gyroX,
 						const double gyroY,
@@ -74,8 +78,11 @@ void Calibrator::addImu(const int64_t timestamp,
   const Eigen::Vector3d alpha(accelX, accelY, accelZ);
   ImuMeasurement imuMeas(tsS, omega, alpha, Rgyro, Raccel);
 
-  std::lock_guard<std::mutex> lock(imuDataMutex);
-  imuData->push_back(imuMeas);
+  if (state == COLLECTING) {
+	std::lock_guard<std::mutex> lock(imuDataMutex);
+	imuData->push_back(imuMeas);
+  }
+
 }
 
 
@@ -195,7 +202,6 @@ void Calibrator::calibrate()  {
 
   std::cout << "Waiting for the detector to finish..." << std::endl;
   detectionsQueue.waitForEmptyQueue();
-  detectionsQueue.join();
 
   // Block all the threads
   std::lock_guard<std::mutex> lock1(targetObservationsMutex);
@@ -247,11 +253,9 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
   bool success = detector->findTarget(stampedImage.image, aslam::Time(toSec(stampedImage.timestamp)), observation);
 
   // If pattern detected add it to observation
-  if (success) {
-	if (observation.hasSuccessfulObservation()) {
-		std::lock_guard<std::mutex> lock(targetObservationsMutex);
-		targetObservations->emplace(stampedImage.timestamp, observation);
-	}
+  if (state == COLLECTING && success && observation.hasSuccessfulObservation()) {
+	std::lock_guard<std::mutex> lock(targetObservationsMutex);
+	targetObservations->emplace(stampedImage.timestamp, observation);
   }
 
   // Replace the most recent image even if no pattern detected
