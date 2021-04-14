@@ -244,7 +244,7 @@ void Calibrator::calibrate()  {
   
   std::cout << "Calibrating using " << targetObservations->size() << " detections." << std::endl;
 
-  const size_t maxIter = 30; // TODO(radam): param
+
   iccCalibrator->buildProblem(6,
 							 70,
 							 70,
@@ -257,12 +257,12 @@ void Calibrator::calibrate()  {
 							 -1,
 							 true,
 							 true,
-							 maxIter,
+							  calibratorOptions.maxIter,
 							 1.0,
 							 1.0,
 							 0.02,
 							 false);
-  iccCalibrator->optimize(nullptr, maxIter, false);
+  iccCalibrator->optimize(nullptr, calibratorOptions.maxIter, false);
 
   state = CALIBRATED;
 }

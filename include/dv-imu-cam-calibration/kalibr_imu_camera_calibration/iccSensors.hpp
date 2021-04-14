@@ -68,7 +68,7 @@ public:
   		    const double reprojectionSigma=1.0,
 			const bool showCorners=true,
 			const bool showReproj = true,
-			const bool showOneStep=false); // TODO(radam): params do not work, just remove them
+			const bool showOneStep=false);
 
 
   sm::kinematics::Transformation getTransformation();

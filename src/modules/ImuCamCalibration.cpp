@@ -31,6 +31,9 @@ public:
     // Module control buttons
     config.add("startCollecting", dv::ConfigOption::buttonOption("Begin collecting calibration images", "startCollecting"));
     config.add("calibrate", dv::ConfigOption::buttonOption("Start calibration algorithm", "calibrate"));
+
+    // Optimization options
+    config.add("maxIter", dv::ConfigOption::intOption("Maximum number of iteration of calibration optimization problem", 20, 1, 100));
   }
 
   void configUpdate() {
@@ -74,6 +77,8 @@ public:
 	options.cols = static_cast<size_t>(config.getInt("boardWidth"));
 	options.spacingMeters = config.getDouble("boardSquareSize");
 	options.tagSpacing = config.getDouble("tagSpacing");
+
+	options.maxIter = static_cast<size_t>(config.getInt("maxIter"));
 
 	calibrator = std::make_unique<Calibrator>(options);
   }

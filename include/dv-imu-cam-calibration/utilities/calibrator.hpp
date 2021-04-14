@@ -61,11 +61,15 @@ public:
   };
 
   struct Options{
+    // Calibration pattern
 	size_t rows = 11;
 	size_t cols = 4;
 	double spacingMeters = 0.05;
 	double tagSpacing = 0.3;
 	CalibrationPattern pattern = CalibrationPattern::ASYMMETRIC_CIRCLES_GRID;
+
+	// Optimization problem
+	size_t maxIter = 20;
   };
 
 protected:
