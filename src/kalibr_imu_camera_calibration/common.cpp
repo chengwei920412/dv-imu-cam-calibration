@@ -33,6 +33,7 @@ void addSplineDesignVariables(boost::shared_ptr<aslam::calibration::Optimization
   for (size_t i = 0 ; i < dvc->numDesignVariables() ; ++i) {
 	auto dv = dvc->designVariable(i);
 	dv->setActive(setActive);
+	// TODO(radam): try to make a copy of design variable and see if it changes anything
 	auto boostDv = boost::shared_ptr<aslam::backend::DesignVariable>(dv, &Deallocate<aslam::backend::DesignVariable>);
 	problem->addDesignVariable(boostDv, groupId);
   }
