@@ -45,7 +45,7 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
   std::cout << std::endl << "Estimating imu-camera rotation prior" << std::endl;
 
   // Build the problem
-  auto problem = boost::make_shared<aslam::backend::OptimizationProblem>();
+  auto problem = boost::make_shared<aslam::backend::OptimizationProblem>(); // TODO(radam): backend or calibration?
   
   // Add the rotation as design variable
   auto q_i_c_Dv = boost::make_shared<aslam::backend::RotationQuaternion>(T_extrinsic.q());
@@ -59,16 +59,27 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
   
   // Initialize a pose spline using the camera poses
   auto poseSpline = initPoseSplineFromCamera(6, 100, 0.0);
-  
+
+  double tmin = std::numeric_limits<double>::max(); // TODO(radam): del
+  double tmax = std::numeric_limits<double>::min(); // TODO(radam): del
+
   for (const auto& im : iccImu->getImuData()) {
     const auto tk = im.stamp;
+
     if (tk > poseSpline->t_min() && tk < poseSpline->t_max()) {
+      if (tk > tmax) {
+        tmax = tk; // TODO(radam): del
+      }
+      if (tk < tmin) {
+        tmin = tk; // TODO(radam): del
+      }
+
       // DV expressions
 	  const auto R_i_c = q_i_c_Dv->toExpression();
 	  const auto bias = gyroBiasDv->toExpression();
 
       // get the vision predicted omega and measured omega (IMU)
-	  const auto omega_predicted = R_i_c * aslam::backend::EuclideanExpression(poseSpline->angularVelocityBodyFrame(tk).transpose());
+	  const auto omega_predicted = R_i_c * aslam::backend::EuclideanExpression((poseSpline->angularVelocityBodyFrame(tk)).transpose());
 	  const auto omega_measured = im.omega;
 
       // error term
@@ -76,7 +87,13 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
 	  problem->addErrorTerm(gerr);
     }
   }
-  
+
+  std::cout << "tmin " << tmin - 1.61841e+09 - 85100 << std::endl; // TODO(radam): delete
+  std::cout << "tmax " << tmax - 1.61841e+09 - 85100 << std::endl; // TODO(radam): delete
+
+  std::cout << "Num of design variables: " << problem->numDesignVariables() << std::endl; // TODO(radam): del
+  std::cout << "Num of error terms:: " << problem->numErrorTerms() << std::endl; // TODO(radam): del
+
   if (problem->numErrorTerms() == 0) {
     throw std::runtime_error("Failed to obtain orientation prior."
 							 "Please make sure that your sensors are synchronized correctly.");
@@ -85,8 +102,7 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
   // Define the optimization
   aslam::backend::Optimizer2Options options;
   options.verbose = false;
-  //options.linearSystemSolver = boost::make_shared<aslam::backend::SparseCholeskyLinearSystemSolver>(); // TODO(radam): maybe uncomment
-  options.linearSystemSolver = boost::make_shared<aslam::backend::BlockCholeskyLinearSystemSolver>(); // TODO(radam): maybe uncomment
+  options.linearSystemSolver = boost::make_shared<aslam::backend::BlockCholeskyLinearSystemSolver>();
   options.nThreads = 2;
   options.convergenceDeltaX = 1e-4;
   options.convergenceDeltaJ = 1;
@@ -97,10 +113,14 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
   optimizer.setProblem(problem);
 
   try {
-    optimizer.optimize();
+    auto retval = optimizer.optimize();
+	std::cout << "Retval fail is: " << retval.linearSolverFailure << std::endl; // TODO(radam): del
+	std::cout << "Retval niter is " << retval.iterations << std::endl; // TODO(radam): del
   } catch (...) {
     throw std::runtime_error("Failed to obtain orientation prior!");
   }
+
+
 
   // overwrite the external rotation prior (keep the external translation prior)
   const auto R_i_c = q_i_c_Dv->toRotationMatrix().transpose();
@@ -132,6 +152,8 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
   std::cout << T_extrinsic.T() << std::endl;
   std::cout << "  Gyro bias prior found as: (b_gyro)" << std::endl;
   std::cout << b_gyro.transpose() << std::endl;
+
+  throw std::runtime_error("BUMP"); // TODO(radam): delete
 }
 
 Eigen::Vector3d IccCamera::getEstimatedGravity() {
@@ -165,7 +187,7 @@ boost::shared_ptr<bsplines::BSplinePose> IccCamera::initPoseSplineFromCamera(con
   times.setZero();
   Eigen::Matrix<double, 6, Eigen::Dynamic> curve(6, targetObservations->size()+2);
   curve.setZero();
-  
+
   auto isNan = [](const Eigen::MatrixXd& mat) {
 	return !(mat.array() == mat.array()).all();
   };
@@ -179,6 +201,9 @@ boost::shared_ptr<bsplines::BSplinePose> IccCamera::initPoseSplineFromCamera(con
 	times[idx+1] = timesVec[static_cast<size_t>(idx)];
 	curve.block(0, idx+1, 6,1) = curveVec[static_cast<size_t>(idx)];
   }
+
+  std::cout << "times.size() " << times.size() << std::endl; // TODO(radam): delete
+  std::cout << "curve.size() " << curve.rows() << " " << curve.cols() << std::endl; // TODO(radam): delete
 
   if (isNan(curve)) {
 	throw std::runtime_error("NaNs in curve values");
@@ -352,7 +377,7 @@ IccImu::IccImu(const ImuParameters &imuParams, boost::shared_ptr<std::vector<Imu
 
   std::cout << "Initializing IMU:" << std::endl;
   std::cout << "  Update rate: " << imuParameters.updateRate << std::endl;
-  std::cout << "  Acceletometer: " << std::endl;
+  std::cout << "  Accelerometer: " << std::endl;
   std::cout << "    Noise density: " << accelUncertainty << std::endl;
   std::cout << "    Noise density (discrete): " << accelUncertaintyDiscrete << std::endl;
   std::cout << "    Random walk: " << accelRandomWalk << std::endl;

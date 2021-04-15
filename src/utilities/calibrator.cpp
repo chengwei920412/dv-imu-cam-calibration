@@ -274,7 +274,7 @@ void Calibrator::calibrate()  {
 
   std::cout << "Building the problem" << std::endl;
   iccCalibrator->buildProblem(6,
-							 70,
+							 100,
 							 50,
 							 false,
 							 1e6,
@@ -288,7 +288,7 @@ void Calibrator::calibrate()  {
 							  calibratorOptions.maxIter,
 							 1.0,
 							 1.0,
-							 0.02,
+							 0.03,
 							 false);
   iccCalibrator->optimize(nullptr, calibratorOptions.maxIter, false);
 
@@ -312,16 +312,6 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
 //  std::cout << grid->rows() << std::endl; // TODO(radam): del
 //  std::cout << grid->cols() << std::endl; // TODO(radam): del
 
-//  // TODO(radam): del
-  if (success) {
-    std::cout << "SUCCESS!" << std::endl;
-  } else {
-    std::cout << "No luck" << std::endl;
-  }
-
-		std::stringstream ss;
-		ss << "/tmp/" << stampedImage.timestamp << ".png";
-		cv::imwrite(ss.str(), stampedImage.image);
   
   // If pattern detected add it to observation
   if (state == COLLECTING && success && observation.hasSuccessfulObservation()) {

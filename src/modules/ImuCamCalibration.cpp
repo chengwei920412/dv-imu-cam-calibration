@@ -92,18 +92,18 @@ public:
 	  for (const auto &singleImu : imuData) {
 
 //			// TODO(radam): del
-//					std::stringstream ss;
-//				ss << "/tmp/imu_" << singleImu.timestamp << ".txt";
-//				std::ofstream myfile(ss.str());
-//				myfile << singleImu.timestamp << std::endl;
-//				myfile << singleImu.gyroscopeX << std::endl;
-//				myfile <<  singleImu.gyroscopeY<< std::endl;
-//				myfile <<  singleImu.gyroscopeZ<< std::endl;
-//				myfile <<  singleImu.accelerometerX<< std::endl;
-//				myfile <<  singleImu.accelerometerY<< std::endl;
-//				myfile <<  singleImu.accelerometerZ << std::endl;
-//
-//
+					std::stringstream ss;
+				ss << "/tmp/imu_" << singleImu.timestamp << ".txt";
+				std::ofstream myfile(ss.str());
+				myfile << singleImu.timestamp << std::endl;
+				myfile << singleImu.gyroscopeX << std::endl;
+				myfile <<  singleImu.gyroscopeY<< std::endl;
+				myfile <<  singleImu.gyroscopeZ<< std::endl;
+				myfile <<  singleImu.accelerometerX<< std::endl;
+				myfile <<  singleImu.accelerometerY<< std::endl;
+				myfile <<  singleImu.accelerometerZ << std::endl;
+
+
 
 
 		calibrator->addImu(singleImu.timestamp,
@@ -123,10 +123,10 @@ public:
 	  calibrator->addImage(img, frame.timestamp());
 
 //	  	  // TODO(radam): del
-//
-//			  	  std::stringstream ss;
-//	  	  ss << "/tmp/" << frame.timestamp() << ".png";
-//	  	  cv::imwrite(ss.str(), img);
+
+			  	  std::stringstream ss;
+	  	  ss << "/tmp/" << frame.timestamp() << ".png";
+	  	  cv::imwrite(ss.str(), img);
 
 	  // Output preview image
 	  auto preview = calibrator->getPreviewImage();
