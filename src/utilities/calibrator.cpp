@@ -226,12 +226,14 @@ size_t Calibrator::getNumDetections() {
 }
 
 void Calibrator::calibrate()  {
-  state = CALIBRATING;
+
 
   // TODO(radam): everything below should happen in a separate thread
 
   std::cout << "Waiting for the detector to finish..." << std::endl;
   detectionsQueue.waitForEmptyQueue();
+
+  state = CALIBRATING;
 
   // Block all the threads
   std::lock_guard<std::mutex> lock1(targetObservationsMutex);
@@ -281,7 +283,7 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
   // Search for pattern and draw it on the image frame
   aslam::cameras::GridCalibrationTargetObservation observation;
   bool success = detector->findTarget(stampedImage.image, aslam::Time(toSec(stampedImage.timestamp)), observation);
-
+  
   // If pattern detected add it to observation
   if (state == COLLECTING && success && observation.hasSuccessfulObservation()) {
 	std::lock_guard<std::mutex> lock(targetObservationsMutex);

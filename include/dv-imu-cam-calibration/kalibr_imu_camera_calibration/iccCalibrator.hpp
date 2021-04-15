@@ -12,6 +12,7 @@
 #include <aslam/backend/Optimizer2.hpp>
 #include <aslam/backend/Optimizer2Options.hpp>
 #include <aslam/backend/BlockCholeskyLinearSystemSolver.hpp>
+#include <aslam/backend/SparseCholeskyLinearSystemSolver.hpp>
 #include <aslam/backend/BSplineMotionErrorFactory.hpp>
 #include <aslam/backend/LevenbergMarquardtTrustRegionPolicy.hpp>
 

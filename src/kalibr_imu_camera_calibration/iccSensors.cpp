@@ -5,6 +5,7 @@
 #include <aslam/backend/Optimizer2Options.hpp>
 #include <aslam/backend/Optimizer2.hpp>
 #include <aslam/backend/BlockCholeskyLinearSystemSolver.hpp>
+#include <aslam/backend/SparseCholeskyLinearSystemSolver.hpp>
 #include <aslam/backend/ReprojectionError.hpp>
 #include <aslam/backend/SimpleReprojectionError.hpp>
 #include <aslam/Keypoint.hpp>
@@ -81,7 +82,7 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
   // Define the optimization
   aslam::backend::Optimizer2Options options;
   options.verbose = false;
-  //options.linearSystemSolver = boost::make_shared<aslam::backend::BlockCholeskyLinearSystemSolver>(); // TODO(radam): maybe uncomment
+  options.linearSystemSolver = boost::make_shared<aslam::backend::SparseCholeskyLinearSystemSolver>(); // TODO(radam): maybe uncomment
   options.nThreads = 2;
   options.convergenceDeltaX = 1e-4;
   options.convergenceDeltaJ = 1;

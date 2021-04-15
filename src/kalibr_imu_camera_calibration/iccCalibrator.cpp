@@ -169,7 +169,7 @@ void IccCalibrator::optimize(boost::shared_ptr<aslam::backend::Optimizer2Options
 	options->convergenceDeltaJ = 1e-2;
 	options->maxIterations = maxIterations;
 	options->trustRegionPolicy = boost::make_shared<aslam::backend::LevenbergMarquardtTrustRegionPolicy>(levenbergMarquardtLambdaInit);
-	//options->linearSystemSolver = boost::make_shared<aslam::backend::BlockCholeskyLinearSystemSolver>(); // TODO(radam): maybe uncomment
+	options->linearSystemSolver = boost::make_shared<aslam::backend::SparseCholeskyLinearSystemSolver>(); // TODO(radam): maybe uncomment
 
   }
 
