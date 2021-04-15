@@ -135,17 +135,14 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
 	}
   }
 
-  // TODO(radam): del below
-
-
-  // TODO(radam): del above
-
   assert(!a_w.empty());
-  const auto mean_a_w = std::accumulate(a_w.begin(), a_w.end(), Eigen::Vector3d(0.,0.,0.)) / a_w.size();
+  Eigen::Vector3d sum(0.,0.,0.);
+  for (const auto& a : a_w) {
+    sum += a;
+  }
+  const auto mean_a_w = sum / static_cast<double>(a_w.size());
   gravity_w = mean_a_w / mean_a_w.norm() * 9.80655;
   std::cout << "Gravity was intialized to " <<  gravity_w.transpose() <<  " [m/s^2]" << std::endl;
-
-  // TODO(radam): this is still wrong
 
   // set the gyro bias prior (if we have more than 1 cameras use recursive average)
   const auto b_gyro = gyroBiasDv->toExpression().toEuclidean();
@@ -158,8 +155,6 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
   std::cout << T_extrinsic.T() << std::endl;
   std::cout << "  Gyro bias prior found as: (b_gyro)" << std::endl;
   std::cout << b_gyro.transpose() << std::endl;
-
-  throw std::runtime_error("BUMP"); // TODO(radam): delete
 }
 
 Eigen::Vector3d IccCamera::getEstimatedGravity() {
