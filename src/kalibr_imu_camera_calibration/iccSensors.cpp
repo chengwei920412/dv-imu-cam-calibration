@@ -141,6 +141,8 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
   gravity_w = mean_a_w / mean_a_w.norm() * 9.80655;
   std::cout << "Gravity was intialized to " <<  gravity_w.transpose() <<  " [m/s^2]" << std::endl;
 
+  // TODO(radam): this is still wrong
+
   // set the gyro bias prior (if we have more than 1 cameras use recursive average)
   const auto b_gyro = gyroBiasDv->toExpression().toEuclidean();
   iccImu->gyroBiasPriorCount++;
@@ -153,7 +155,7 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
   std::cout << "  Gyro bias prior found as: (b_gyro)" << std::endl;
   std::cout << b_gyro.transpose() << std::endl;
 
-  throw std::runtime_error("BUMP"); // TODO(radam): delete
+  //throw std::runtime_error("BUMP"); // TODO(radam): delete
 }
 
 Eigen::Vector3d IccCamera::getEstimatedGravity() {
@@ -208,30 +210,42 @@ boost::shared_ptr<bsplines::BSplinePose> IccCamera::initPoseSplineFromCamera(con
   if (isNan(curve)) {
 	throw std::runtime_error("NaNs in curve values");
   }
+
+  auto ones = times;
+  ones.setOnes();
+  ones *= (- 1.61841e+09 - 85100);
+//  std::cout << "times before " << (times + ones).transpose()  << std::endl; // TODO(radam): delete
+//  std::cout << "curve before " << curve << std::endl; // TODO(radam): delete
   
   // Make sure the rotation vector doesn't flip
   for (int i = 1 ; i < curve.cols() ; ++i) {
-	const auto previousRotationVector = curve.block(3,i-1, 3,1);
-	const auto r = curve.block(3,i, 3,1);
+	const Eigen::MatrixXd previousRotationVector = curve.block(3,i-1, 3,1);
+	const Eigen::MatrixXd r = curve.block(3,i, 3,1);
 	const auto angle = r.norm();
 	const auto axis = r / angle;
 
 	auto best_r = r;
 	auto best_dist = (best_r - previousRotationVector).norm();
-	for (int s = -3 ; s <= 3 ; ++ s) {
+	for (int s = -3 ; s < 4 ; ++ s) {
 	  const auto aa = axis * (angle + M_PI * 2.0 * s);
 	  const auto dist = (aa - previousRotationVector).norm();
 	  if (dist < best_dist) {
+	    std::cout << "Better dist! " << s << " dist=" << dist << " best_dist=" << best_dist << " r=" << r.transpose() << " best_r=" << best_r.transpose() << std::endl; // TODO(radam): del
 		best_r = aa;
 		best_dist = dist;
 	  }
 	}
+	std::cout << i << " Replacing " << curve.block(3,i,3,1).transpose() << " with " << best_r.transpose() << " diff norm " << (curve.block(3,i,3,1) - best_r).norm() << std::endl; // TODO(radam): del
 	curve.block(3,i,3,1) = best_r;
   }
   
 
   const auto seconds = timesVec.back() - timesVec.front();
   const auto knots = static_cast<int>(std::round(seconds * poseKnotsPerSecond));
+
+
+  std::cout << "times " << (times + ones).transpose()  << std::endl; // TODO(radam): delete
+  std::cout << "curve " << curve << std::endl; // TODO(radam): delete
 
   std::cout << "Initializing a pose spline with " << knots
 			<< " knots (" << poseKnotsPerSecond
