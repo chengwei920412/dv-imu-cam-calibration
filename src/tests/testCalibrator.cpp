@@ -12,7 +12,16 @@ int64_t str2int(std::string str) {
 }
 
 TEST(CalibratorTestSuite, smokeTest) {
+
+    ////
+    /// Prepare the calibrator
+    ////
   	Calibrator::Options options;
+  	options.cols = 6;
+  	options.rows = 6;
+    options.spacingMeters = 0.018;
+    options.tagSpacing = 0.3;
+    options.pattern = Calibrator::CalibrationPattern::APRIL_GRID;
   	Calibrator calibrator(options);
   	calibrator.startCollecting();
 
@@ -36,15 +45,17 @@ TEST(CalibratorTestSuite, smokeTest) {
     std::sort(imgPaths.begin(), imgPaths.end());
 
     // We don't need many images for testing
-    bool useAll = true;
+    bool useAll = false;
     if (!useAll) {
-	  const size_t startIdx = 100;
-	  const size_t nIdx = 10;
+	  const size_t startIdx = 1000;
+	  const size_t nIdx = 25;
 	  imgPaths = std::vector<fs::path>(imgPaths.begin()+startIdx, imgPaths.begin() + startIdx + nIdx);
     }
 
+    std::cout << "Testing using " << imgPaths.size() << " images" << std::endl;
+
     for (const auto& path : imgPaths){
-      cv::Mat img = cv::imread(path.string());
+      cv::Mat img = cv::imread(path.string(), cv::IMREAD_GRAYSCALE);
       int64_t ts = str2int(path.stem().string());
       calibrator.addImage(img, ts);
     }
@@ -58,6 +69,8 @@ TEST(CalibratorTestSuite, smokeTest) {
 	imuPaths.push_back(itr->path());
   }
   std::sort(imuPaths.begin(), imuPaths.end());
+
+  std::cout << "Testing using " << imuPaths.size() << " IMU measurements" << std::endl;
 
   for (const auto& path : imuPaths){
     std::ifstream infile(path.string());

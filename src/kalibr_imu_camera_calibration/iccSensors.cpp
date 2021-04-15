@@ -28,6 +28,9 @@ IccCamera::IccCamera(boost::shared_ptr<std::map<int64_t, aslam::cameras::GridCal
   targetObservations = observations;
   gravity_w = Eigen::Vector3d(9.80655, 0., 0.);
   T_extrinsic = sm::kinematics::Transformation();
+
+  std::cout << "Initializing camera:" << std::endl;
+  // TODO(radam): print all of the details once camera models are correctly implemented
 }
 
 sm::kinematics::Transformation IccCamera::getTransformation() {
@@ -333,8 +336,8 @@ double IccImu::getGyroUncertaintyDiscrete() {
 IccImu::IccImu(const ImuParameters &imuParams, boost::shared_ptr<std::vector<ImuMeasurement>> data)  :imuParameters(imuParams) {
   imuData = data;
 
-  const auto [aud, 	arw, 	au ] = imuParams.getAccelerometerStatistics();
-  const auto [gud, 	grw, 	gu ] = imuParams.getGyroStatistics();
+  const auto [aud, 	arw, 	au ] = imuParameters.getAccelerometerStatistics();
+  const auto [gud, 	grw, 	gu ] = imuParameters.getGyroStatistics();
 
   accelUncertaintyDiscrete = aud;
   accelRandomWalk = arw;
@@ -346,6 +349,17 @@ IccImu::IccImu(const ImuParameters &imuParams, boost::shared_ptr<std::vector<Imu
   gyroBiasPrior.setZero();
 
   q_i_b_prior = Eigen::Vector4d(0.,0.,0.,1.);
+
+  std::cout << "Initializing IMU:" << std::endl;
+  std::cout << "  Update rate: " << imuParameters.updateRate << std::endl;
+  std::cout << "  Acceletometer: " << std::endl;
+  std::cout << "    Noise density: " << accelUncertainty << std::endl;
+  std::cout << "    Noise density (discrete): " << accelUncertaintyDiscrete << std::endl;
+  std::cout << "    Random walk: " << accelRandomWalk << std::endl;
+  std::cout << "  Gyroscope: " << std::endl;
+  std::cout << "    Noise density: " << gyroUncertainty << std::endl;
+  std::cout << "    Noise density (discrete): " << gyroUncertaintyDiscrete << std::endl;
+  std::cout << "    Random walk: " << gyroRandomWalk << std::endl;
 
 }
 

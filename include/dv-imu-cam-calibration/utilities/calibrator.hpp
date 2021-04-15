@@ -70,6 +70,9 @@ public:
 
 	// Optimization problem
 	size_t maxIter = 20;
+
+	// IMU
+	ImuParameters imuParameters;
   };
 
 protected:
@@ -85,7 +88,6 @@ protected:
 
   // IMU data
   boost::shared_ptr<std::vector<ImuMeasurement>> imuData = nullptr;
-  ImuParameters imuParameters; // TODO(radam): take them as input
   std::mutex imuDataMutex;
 
   // IccCalibrator

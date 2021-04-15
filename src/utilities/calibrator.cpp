@@ -31,15 +31,24 @@ Calibrator::Calibrator(const Options& opts) : calibratorOptions(opts) {
   targetObservations = boost::make_shared<std::map<int64_t, aslam::cameras::GridCalibrationTargetObservation>>();
   imuData = boost::make_shared<std::vector<ImuMeasurement>>();
 
-  iccImu = boost::make_shared<IccImu>(imuParameters, imuData);
+  iccImu = boost::make_shared<IccImu>(calibratorOptions.imuParameters, imuData);
   iccCamera = boost::make_shared<IccCamera>(targetObservations);
   iccCalibrator = boost::make_shared<IccCalibrator>(iccCamera, iccImu);
 
-  detectionsQueue.start(std::max(1u, std::thread::hardware_concurrency()-1));
+  detectionsQueue.start(std::max(1u, std::thread::hardware_concurrency()-1)); // TODO(radam): fix
 
+  std::cout << "Initializing calibration target:" << std::endl;
 
   switch (calibratorOptions.pattern) {
   case CalibrationPattern::CHESSBOARD: {
+    std::cout << "  Type: CHESSBOARD" << std::endl;
+    std::cout << "  Rows:" << std::endl;
+    std::cout << "    Count: " << calibratorOptions.rows << std::endl;
+    std::cout << "    Distance: " << calibratorOptions.spacingMeters << " [m]" << std::endl;
+	std::cout << "  Cols:" << std::endl;
+	std::cout << "    Count: " << calibratorOptions.cols << std::endl;
+	std::cout << "    Distance: " << calibratorOptions.spacingMeters << " [m]" << std::endl;
+
 	aslam::cameras::GridCalibrationTargetCheckerboard::CheckerboardOptions options;
 	options.filterQuads = true;
 	options.normalizeImage = true;
@@ -56,6 +65,13 @@ Calibrator::Calibrator(const Options& opts) : calibratorOptions(opts) {
 	break;
   }
   case CalibrationPattern::ASYMMETRIC_CIRCLES_GRID: {
+	std::cout << "  Type: ASYMMETRIC_CIRCLES_GRID" << std::endl;
+	std::cout << "  Rows:" << std::endl;
+	std::cout << "    Count: " << calibratorOptions.rows << std::endl;
+	std::cout << "  Cols:" << std::endl;
+	std::cout << "    Count: " << calibratorOptions.cols << std::endl;
+	std::cout << "  Spacing: " << calibratorOptions.spacingMeters << " [m]" <<  std::endl;
+
 	aslam::cameras::GridCalibrationTargetCirclegrid::CirclegridOptions options;
 	options.showExtractionVideo = false;
 	options.useAsymmetricCirclegrid = true;
@@ -67,6 +83,13 @@ Calibrator::Calibrator(const Options& opts) : calibratorOptions(opts) {
     break;
   }
   case CalibrationPattern::APRIL_GRID: {
+	std::cout << "  Type: APRIL_GRID" << std::endl;
+	std::cout << "  Tags:" << std::endl;
+	std::cout << "    Cols: " << calibratorOptions.cols << std::endl;
+	std::cout << "    Rows: " << calibratorOptions.rows << std::endl;
+	std::cout << "    Size: " << calibratorOptions.spacingMeters << " [m]" << std::endl;
+	std::cout << "    Spacing : "  << calibratorOptions.spacingMeters * calibratorOptions.tagSpacing << " [m]" << std::endl;
+
 	aslam::cameras::GridCalibrationTargetAprilgrid::AprilgridOptions options;
     // enforce more than one row --> pnp solution can be bad if all points are almost on a line...
 	options.minTagsForValidObs = std::max(calibratorOptions.rows, calibratorOptions.cols) + 1;
@@ -119,6 +142,8 @@ void Calibrator::addImu(const int64_t timestamp,
 
 
 void Calibrator::addImage(const StampedImage& stampedImage) {
+  assert(stampedImage.image.channels() == 1 && "calibrator expect a grayscale image");
+
   boost::unique_future<void> job;
   detectionsQueue.scheduleFuture<void>(boost::bind(&Calibrator::detectPattern, this, stampedImage.clone()), job);
 }
@@ -273,7 +298,7 @@ void Calibrator::calibrate()  {
 
 void Calibrator::detectPattern(const StampedImage &stampedImage) {
 
-// TODO(radam): read input image and undistort points before passing to kalibr
+  // TODO(radam): read input image and undistort points before passing to kalibr ???
 
   std::vector<cv::Point2f> pointBuf;
 
@@ -283,6 +308,20 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
   // Search for pattern and draw it on the image frame
   aslam::cameras::GridCalibrationTargetObservation observation;
   bool success = detector->findTarget(stampedImage.image, aslam::Time(toSec(stampedImage.timestamp)), observation);
+
+//  std::cout << grid->rows() << std::endl; // TODO(radam): del
+//  std::cout << grid->cols() << std::endl; // TODO(radam): del
+
+//  // TODO(radam): del
+  if (success) {
+    std::cout << "SUCCESS!" << std::endl;
+  } else {
+    std::cout << "No luck" << std::endl;
+  }
+
+		std::stringstream ss;
+		ss << "/tmp/" << stampedImage.timestamp << ".png";
+		cv::imwrite(ss.str(), stampedImage.image);
   
   // If pattern detected add it to observation
   if (state == COLLECTING && success && observation.hasSuccessfulObservation()) {
