@@ -120,21 +120,25 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
     throw std::runtime_error("Failed to obtain orientation prior!");
   }
 
-
-
   // overwrite the external rotation prior (keep the external translation prior)
   const auto R_i_c = q_i_c_Dv->toRotationMatrix().transpose();
   T_extrinsic = sm::kinematics::Transformation( sm::kinematics::rt2Transform( R_i_c, T_extrinsic.t() ) );
 
   // estimate gravity in the world coordinate frame as the mean specific force
   std::vector<Eigen::Vector3d> a_w;
+  a_w.reserve(iccImu->getImuData().size());
   for (const auto& im : iccImu->getImuData()) {
 	const auto tk = im.stamp;
 	if (tk > poseSpline->t_min() && tk < poseSpline->t_max()) {
-	  const auto val = poseSpline->orientation(tk) * R_i_c * im.alpha;
+	  const auto val = poseSpline->orientation(tk) * R_i_c * (-im.alpha);
 	  a_w.emplace_back(val);
 	}
   }
+
+  // TODO(radam): del below
+
+
+  // TODO(radam): del above
 
   assert(!a_w.empty());
   const auto mean_a_w = std::accumulate(a_w.begin(), a_w.end(), Eigen::Vector3d(0.,0.,0.)) / a_w.size();
@@ -155,7 +159,7 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
   std::cout << "  Gyro bias prior found as: (b_gyro)" << std::endl;
   std::cout << b_gyro.transpose() << std::endl;
 
-  //throw std::runtime_error("BUMP"); // TODO(radam): delete
+  throw std::runtime_error("BUMP"); // TODO(radam): delete
 }
 
 Eigen::Vector3d IccCamera::getEstimatedGravity() {
@@ -204,18 +208,9 @@ boost::shared_ptr<bsplines::BSplinePose> IccCamera::initPoseSplineFromCamera(con
 	curve.block(0, idx+1, 6,1) = curveVec[static_cast<size_t>(idx)];
   }
 
-  std::cout << "times.size() " << times.size() << std::endl; // TODO(radam): delete
-  std::cout << "curve.size() " << curve.rows() << " " << curve.cols() << std::endl; // TODO(radam): delete
-
   if (isNan(curve)) {
 	throw std::runtime_error("NaNs in curve values");
   }
-
-  auto ones = times;
-  ones.setOnes();
-  ones *= (- 1.61841e+09 - 85100);
-//  std::cout << "times before " << (times + ones).transpose()  << std::endl; // TODO(radam): delete
-//  std::cout << "curve before " << curve << std::endl; // TODO(radam): delete
   
   // Make sure the rotation vector doesn't flip
   for (int i = 1 ; i < curve.cols() ; ++i) {
@@ -230,22 +225,16 @@ boost::shared_ptr<bsplines::BSplinePose> IccCamera::initPoseSplineFromCamera(con
 	  const auto aa = axis * (angle + M_PI * 2.0 * s);
 	  const auto dist = (aa - previousRotationVector).norm();
 	  if (dist < best_dist) {
-	    std::cout << "Better dist! " << s << " dist=" << dist << " best_dist=" << best_dist << " r=" << r.transpose() << " best_r=" << best_r.transpose() << std::endl; // TODO(radam): del
 		best_r = aa;
 		best_dist = dist;
 	  }
 	}
-	std::cout << i << " Replacing " << curve.block(3,i,3,1).transpose() << " with " << best_r.transpose() << " diff norm " << (curve.block(3,i,3,1) - best_r).norm() << std::endl; // TODO(radam): del
 	curve.block(3,i,3,1) = best_r;
   }
   
 
   const auto seconds = timesVec.back() - timesVec.front();
   const auto knots = static_cast<int>(std::round(seconds * poseKnotsPerSecond));
-
-
-  std::cout << "times " << (times + ones).transpose()  << std::endl; // TODO(radam): delete
-  std::cout << "curve " << curve << std::endl; // TODO(radam): delete
 
   std::cout << "Initializing a pose spline with " << knots
 			<< " knots (" << poseKnotsPerSecond
