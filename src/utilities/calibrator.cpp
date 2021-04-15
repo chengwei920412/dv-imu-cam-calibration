@@ -245,9 +245,10 @@ void Calibrator::calibrate()  {
   std::cout << "Calibrating using " << targetObservations->size() << " detections." << std::endl;
 
 
+  std::cout << "Building the problem" << std::endl;
   iccCalibrator->buildProblem(6,
 							 70,
-							 70,
+							 50,
 							 false,
 							 1e6,
 							 1e5,

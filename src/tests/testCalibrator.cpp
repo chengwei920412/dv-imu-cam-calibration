@@ -12,7 +12,8 @@ int64_t str2int(std::string str) {
 }
 
 TEST(CalibratorTestSuite, smokeTest) {
-  	Calibrator calibrator(Calibrator::Options{});
+  	Calibrator::Options options;
+  	Calibrator calibrator(options);
   	calibrator.startCollecting();
 
   	////
@@ -35,7 +36,7 @@ TEST(CalibratorTestSuite, smokeTest) {
     std::sort(imgPaths.begin(), imgPaths.end());
 
     // We don't need many images for testing
-    bool useAll = false;
+    bool useAll = true;
     if (!useAll) {
 	  const size_t startIdx = 100;
 	  const size_t nIdx = 10;
