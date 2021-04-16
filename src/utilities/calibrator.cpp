@@ -283,7 +283,7 @@ void Calibrator::calibrate()  {
 							 -1,
 							 -1,
 							 -1,
-							 true,
+							 !calibratorOptions.timeCalibration,
 							 true,
 							  calibratorOptions.maxIter,
 							 1.0,

@@ -70,6 +70,7 @@ public:
 
 	// Optimization problem
 	size_t maxIter = 20;
+	bool timeCalibration = true;
 
 	// IMU
 	ImuParameters imuParameters;

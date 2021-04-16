@@ -82,6 +82,8 @@ public:
 
   Eigen::Vector3d getEstimatedGravity();
 
+  void findTimeshiftCameraImuPrior(boost::shared_ptr<IccImu> iccImu, bool verbose);
+
 
   boost::shared_ptr<bsplines::BSplinePose> initPoseSplineFromCamera(const size_t splineOrder = 6,
 																	const size_t poseKnotsPerSecond = 100,

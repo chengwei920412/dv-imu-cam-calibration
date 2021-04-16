@@ -15,15 +15,17 @@
 
 #include <sm/kinematics/transformations.hpp>
 
-double toSec(const int64_t time ) {
+
+double toSec(const int64_t time) {
   return static_cast<double>(time) / 1e6;
 }
 
-IccCamera::IccCamera(boost::shared_ptr<std::map<int64_t, aslam::cameras::GridCalibrationTargetObservation>> observations,
-	 			     const double reprojectionSigma,
+IccCamera::IccCamera(boost::shared_ptr<std::map<int64_t,
+												aslam::cameras::GridCalibrationTargetObservation>> observations,
+					 const double reprojectionSigma,
 					 const bool showCorners,
 					 const bool showReproj,
-					 const bool showOneStep) : cornerUncertainty(reprojectionSigma){
+					 const bool showOneStep) : cornerUncertainty(reprojectionSigma) {
 
   targetObservations = observations;
   gravity_w = Eigen::Vector3d(9.80655, 0., 0.);
@@ -42,11 +44,11 @@ sm::kinematics::Transformation IccCamera::getTransformation() {
 }
 
 void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu) {
-  std::cout << std::endl << "Estimating imu-camera rotation prior" <<std::endl << std::endl;
+  std::cout << std::endl << "Estimating imu-camera rotation prior" << std::endl << std::endl;
 
   // Build the problem
   auto problem = boost::make_shared<aslam::backend::OptimizationProblem>(); // TODO(radam): backend or calibration?
-  
+
   // Add the rotation as design variable
   auto q_i_c_Dv = boost::make_shared<aslam::backend::RotationQuaternion>(T_extrinsic.q());
   q_i_c_Dv->setActive(true);
@@ -56,36 +58,38 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
   auto gyroBiasDv = boost::make_shared<aslam::backend::EuclideanPoint>(Eigen::Vector3d(0.0, 0.0, 0.0));
   gyroBiasDv->setActive(true);
   problem->addDesignVariable(gyroBiasDv);
-  
+
   // Initialize a pose spline using the camera poses
   auto poseSpline = initPoseSplineFromCamera(6, 100, 0.0);
 
   double tmin = std::numeric_limits<double>::max(); // TODO(radam): del
   double tmax = std::numeric_limits<double>::min(); // TODO(radam): del
 
-  for (const auto& im : iccImu->getImuData()) {
-    const auto tk = im.stamp;
+  for (const auto &im : iccImu->getImuData()) {
+	const auto tk = im.stamp;
 
-    if (tk > poseSpline->t_min() && tk < poseSpline->t_max()) {
-      if (tk > tmax) {
-        tmax = tk; // TODO(radam): del
-      }
-      if (tk < tmin) {
-        tmin = tk; // TODO(radam): del
-      }
+	if (tk > poseSpline->t_min() && tk < poseSpline->t_max()) {
+	  if (tk > tmax) {
+		tmax = tk; // TODO(radam): del
+	  }
+	  if (tk < tmin) {
+		tmin = tk; // TODO(radam): del
+	  }
 
-      // DV expressions
+	  // DV expressions
 	  const auto R_i_c = q_i_c_Dv->toExpression();
 	  const auto bias = gyroBiasDv->toExpression();
 
-      // get the vision predicted omega and measured omega (IMU)
-	  const auto omega_predicted = R_i_c * aslam::backend::EuclideanExpression((poseSpline->angularVelocityBodyFrame(tk)).transpose());
+	  // get the vision predicted omega and measured omega (IMU)
+	  const auto omega_predicted =
+		  R_i_c * aslam::backend::EuclideanExpression((poseSpline->angularVelocityBodyFrame(tk)).transpose());
 	  const auto omega_measured = im.omega;
 
-      // error term
-      auto gerr = boost::make_shared<kalibr_errorterms::GyroscopeError>(omega_measured, im.omegaInvR, omega_predicted, bias);
+	  // error term
+	  auto gerr =
+		  boost::make_shared<kalibr_errorterms::GyroscopeError>(omega_measured, im.omegaInvR, omega_predicted, bias);
 	  problem->addErrorTerm(gerr);
-    }
+	}
   }
 
   std::cout << "tmin " << tmin - 1.61841e+09 - 85100 << std::endl; // TODO(radam): delete
@@ -95,10 +99,10 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
   std::cout << "Num of error terms:: " << problem->numErrorTerms() << std::endl; // TODO(radam): del
 
   if (problem->numErrorTerms() == 0) {
-    throw std::runtime_error("Failed to obtain orientation prior."
+	throw std::runtime_error("Failed to obtain orientation prior."
 							 "Please make sure that your sensors are synchronized correctly.");
   }
-  
+
   // Define the optimization
   aslam::backend::Optimizer2Options options;
   options.verbose = false;
@@ -113,21 +117,21 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
   optimizer.setProblem(problem);
 
   try {
-    auto retval = optimizer.optimize();
+	auto retval = optimizer.optimize();
 	std::cout << "Retval fail is: " << retval.linearSolverFailure << std::endl; // TODO(radam): del
 	std::cout << "Retval niter is " << retval.iterations << std::endl; // TODO(radam): del
   } catch (...) {
-    throw std::runtime_error("Failed to obtain orientation prior!");
+	throw std::runtime_error("Failed to obtain orientation prior!");
   }
 
   // overwrite the external rotation prior (keep the external translation prior)
   const auto R_i_c = q_i_c_Dv->toRotationMatrix().transpose();
-  T_extrinsic = sm::kinematics::Transformation( sm::kinematics::rt2Transform( R_i_c, T_extrinsic.t() ) );
+  T_extrinsic = sm::kinematics::Transformation(sm::kinematics::rt2Transform(R_i_c, T_extrinsic.t()));
 
   // estimate gravity in the world coordinate frame as the mean specific force
   std::vector<Eigen::Vector3d> a_w;
   a_w.reserve(iccImu->getImuData().size());
-  for (const auto& im : iccImu->getImuData()) {
+  for (const auto &im : iccImu->getImuData()) {
 	const auto tk = im.stamp;
 	if (tk > poseSpline->t_min() && tk < poseSpline->t_max()) {
 	  const auto val = poseSpline->orientation(tk) * R_i_c * (-im.alpha);
@@ -136,19 +140,19 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
   }
 
   assert(!a_w.empty());
-  Eigen::Vector3d sum(0.,0.,0.);
-  for (const auto& a : a_w) {
-    sum += a;
+  Eigen::Vector3d sum(0., 0., 0.);
+  for (const auto &a : a_w) {
+	sum += a;
   }
   const auto mean_a_w = sum / static_cast<double>(a_w.size());
   gravity_w = mean_a_w / mean_a_w.norm() * 9.80655;
-  std::cout << "Gravity was intialized to " <<  gravity_w.transpose() <<  " [m/s^2]" << std::endl;
+  std::cout << "Gravity was intialized to " << gravity_w.transpose() << " [m/s^2]" << std::endl;
 
   // set the gyro bias prior (if we have more than 1 cameras use recursive average)
   const auto b_gyro = gyroBiasDv->toExpression().toEuclidean();
   iccImu->gyroBiasPriorCount++;
-  iccImu->gyroBiasPrior = (iccImu->gyroBiasPriorCount-1.0) /
-  	iccImu->gyroBiasPriorCount * iccImu->gyroBiasPrior + 1.0/iccImu->gyroBiasPriorCount*b_gyro;
+  iccImu->gyroBiasPrior = (iccImu->gyroBiasPriorCount - 1.0) /
+	  iccImu->gyroBiasPriorCount * iccImu->gyroBiasPrior + 1.0 / iccImu->gyroBiasPriorCount * b_gyro;
 
   // print result
   std::cout << " Transformation prior camera-imu found as: (T_extrinsic)" << std::endl;
@@ -161,12 +165,95 @@ Eigen::Vector3d IccCamera::getEstimatedGravity() {
   return gravity_w;
 }
 
+void IccCamera::findTimeshiftCameraImuPrior(boost::shared_ptr<IccImu> iccImu, bool verbose) {
+
+  auto poseSpline = initPoseSplineFromCamera(6, 100, 0.0);
+
+  std::vector<double> t, omega_measured_norm, omega_predicted_norm;
+  t.reserve(iccImu->getImuData().size());
+  omega_measured_norm.reserve(iccImu->getImuData().size());
+  omega_predicted_norm.reserve(iccImu->getImuData().size());
+  for (const auto &im : iccImu->getImuData()) {
+	const auto tk = im.stamp;
+	if (tk > poseSpline->t_min() && tk < poseSpline->t_max()) {
+	  const auto omega_measured = im.omega;
+	  const auto
+		  omega_predicted = aslam::backend::EuclideanExpression(poseSpline->angularVelocityBodyFrame(tk).transpose());
+
+	  t.push_back(tk);
+	  omega_measured_norm.push_back(omega_measured.norm());
+	  omega_predicted_norm.push_back(omega_predicted.toEuclidean().norm());
+	}
+  }
+
+  if (omega_measured_norm.empty() || omega_predicted_norm.empty()) {
+	throw std::runtime_error("The time ranges of the camera and IMU do not overlap. "
+							 "Please make sure that your sensors are synchronized correctly.");
+  }
+
+  // Get the time shift
+  Eigen::VectorXd measured(omega_measured_norm.size());
+  Eigen::VectorXd predicted(omega_predicted_norm.size());
+  for (size_t i = 0; i < omega_measured_norm.size(); ++i) {
+	measured[i] = omega_measured_norm[i];
+  }
+  for (size_t i = 0; i < omega_predicted_norm.size(); ++i) {
+	predicted[i] = omega_predicted_norm[i];
+  }
+
+  double maxVal = -1;
+  size_t maxIdx = 0;
+
+
+
+  const auto corrSize = measured.size() + 2 * (predicted.size() / 2);
+  for (size_t i = 0 ; i < corrSize ; ++i) {
+    Eigen::VectorXd measuredSlice(predicted.size());
+    measuredSlice.setZero();
+
+    int startIdxUnbound = static_cast<int>(i) - static_cast<int>(predicted.size()/2);
+    int endIdxUnbound = startIdxUnbound + static_cast<int>(predicted.size()) - 1;
+
+    size_t sliceStart, sliceSize, mSliceStart;
+
+    if (startIdxUnbound < 0) {
+
+    } else {
+
+	}
+
+    measuredSlice.segment(sliceStart, sliceSize) = measured.segment(mSliceStart, sliceSize);
+
+
+    double val = measuredSlice.transpose() * predicted;
+    if (val > maxVal) {
+      maxVal = val;
+      maxIdx = i;
+    }
+  }
+  const auto discrete_shift = maxIdx - omega_measured_norm.size() - 1;
+
+  std::cout << "maxVal " << maxVal << std::endl; // TODO(radam): delete
+  std::cout << "maxIdx " << maxIdx << std::endl; // TODO(radam): delete
+  std::cout << "discrete_shift " << discrete_shift << std::endl; // TODO(radam): delete
+
+
+//  const auto discrete_shift = std::distance(corr.begin(), std::max_element(corr.begin(), corr.end())) - omega_measured_norm.size() - 1;
+//  std::cout << "discrete_shift " << discrete_shift << std::endl; // TODO(radam): delete
+
+//
+//  std::cout << measured.transpose() << std::endl; // TODO(radam): del
+//  std::cout << "aaa" << std::endl; // TODO(radam): del
+//  std::cout << predicted.transpose() << std::endl; // TODO(radam): del
+
+  throw std::runtime_error("BUMP!!!!!!!"); // TODO(radam): delete
+
+
+
+}
 boost::shared_ptr<bsplines::BSplinePose> IccCamera::initPoseSplineFromCamera(const size_t splineOrder,
 																			 const size_t poseKnotsPerSecond,
 																			 const double timeOffsetPadding) {
-  
-  std::cout << "timeOffsetPadding " << timeOffsetPadding << std::endl; // TODO(radam): delete
-
 
   assert(!targetObservations->empty());
 
@@ -179,46 +266,46 @@ boost::shared_ptr<bsplines::BSplinePose> IccCamera::initPoseSplineFromCamera(con
   timesVec.reserve(targetObservations->size());
   std::vector<Eigen::VectorXd> curveVec;
   curveVec.reserve(targetObservations->size());
-  for (const auto& [ts, targetObs] : *targetObservations) {
+  for (const auto&[ts, targetObs] : *targetObservations) {
 	timesVec.push_back(targetObs.time().toSec() + timeshiftCamToImuPrior);
 	const auto trans = targetObs.T_t_c().T() * T_c_b;
 	const auto column = pose->transformationToCurveValue(trans);
 	curveVec.push_back(column);
   }
 
-  Eigen::VectorXd times(targetObservations->size()+2);
+  Eigen::VectorXd times(targetObservations->size() + 2);
   times.setZero();
-  Eigen::Matrix<double, 6, Eigen::Dynamic> curve(6, targetObservations->size()+2);
+  Eigen::Matrix<double, 6, Eigen::Dynamic> curve(6, targetObservations->size() + 2);
   curve.setZero();
 
-  auto isNan = [](const Eigen::MatrixXd& mat) {
+  auto isNan = [](const Eigen::MatrixXd &mat) {
 	return !(mat.array() == mat.array()).all();
   };
 
   // Add 2 seconds on either end to allow the spline to slide during optimization
   times[0] = timesVec.front() - (timeOffsetPadding * 2.0);
-  curve.block(0,0,6,1) = curveVec.front();
-  times[static_cast<int>(targetObservations->size()+1)]  =timesVec.back() + (timeOffsetPadding*2.0);
-  curve.block(0,static_cast<int>(targetObservations->size()+1), 6,1) = curveVec.back();
-  for (int idx = 0 ; idx < targetObservations->size() ; ++idx) {
-	times[idx+1] = timesVec[static_cast<size_t>(idx)];
-	curve.block(0, idx+1, 6,1) = curveVec[static_cast<size_t>(idx)];
+  curve.block(0, 0, 6, 1) = curveVec.front();
+  times[static_cast<int>(targetObservations->size() + 1)] = timesVec.back() + (timeOffsetPadding * 2.0);
+  curve.block(0, static_cast<int>(targetObservations->size() + 1), 6, 1) = curveVec.back();
+  for (int idx = 0; idx < targetObservations->size(); ++idx) {
+	times[idx + 1] = timesVec[static_cast<size_t>(idx)];
+	curve.block(0, idx + 1, 6, 1) = curveVec[static_cast<size_t>(idx)];
   }
 
   if (isNan(curve)) {
 	throw std::runtime_error("NaNs in curve values");
   }
-  
+
   // Make sure the rotation vector doesn't flip
-  for (int i = 1 ; i < curve.cols() ; ++i) {
-	const Eigen::MatrixXd previousRotationVector = curve.block(3,i-1, 3,1);
-	const Eigen::MatrixXd r = curve.block(3,i, 3,1);
+  for (int i = 1; i < curve.cols(); ++i) {
+	const Eigen::MatrixXd previousRotationVector = curve.block(3, i - 1, 3, 1);
+	const Eigen::MatrixXd r = curve.block(3, i, 3, 1);
 	const auto angle = r.norm();
 	const auto axis = r / angle;
 
 	auto best_r = r;
 	auto best_dist = (best_r - previousRotationVector).norm();
-	for (int s = -3 ; s < 4 ; ++ s) {
+	for (int s = -3; s < 4; ++s) {
 	  const auto aa = axis * (angle + M_PI * 2.0 * s);
 	  const auto dist = (aa - previousRotationVector).norm();
 	  if (dist < best_dist) {
@@ -226,10 +313,10 @@ boost::shared_ptr<bsplines::BSplinePose> IccCamera::initPoseSplineFromCamera(con
 		best_dist = dist;
 	  }
 	}
-	curve.block(3,i,3,1) = best_r;
+	curve.block(3, i, 3, 1) = best_r;
   }
 
-  const auto seconds = static_cast<double>(times[times.size()-1] -  times[0]);
+  const auto seconds = static_cast<double>(times[times.size() - 1] - times[0]);
   const auto knots = static_cast<int>(std::round(seconds * poseKnotsPerSecond));
 
   std::cout << "Initializing a pose spline with " << knots
@@ -251,7 +338,8 @@ void IccCamera::addDesignVariables(boost::shared_ptr<aslam::calibration::Optimiz
   T_c_b_Dv_t->setActive(true);
   problem->addDesignVariable(T_c_b_Dv_t, baselinedv_group_id);
 
-  T_c_b_Dv = boost::make_shared<aslam::backend::TransformationBasic>(T_c_b_Dv_q->toExpression(), T_c_b_Dv_t->toExpression());
+  T_c_b_Dv =
+	  boost::make_shared<aslam::backend::TransformationBasic>(T_c_b_Dv_q->toExpression(), T_c_b_Dv_t->toExpression());
 
   cameraTimeToImuTimeDv = boost::make_shared<aslam::backend::Scalar>(0.0);
   cameraTimeToImuTimeDv->setActive(false); // TODO(radam): time calib
@@ -266,7 +354,7 @@ void IccCamera::addCameraErrorTerms(boost::shared_ptr<aslam::calibration::Optimi
 
   const auto T_cN_b = T_c_b_Dv->toExpression();
 
-  for (const auto& [ts, obs] : *targetObservations) {
+  for (const auto&[ts, obs] : *targetObservations) {
 	const auto frameTime = cameraTimeToImuTimeDv->toExpression() + obs.time().toSec() + timeshiftCamToImuPrior;
 	const auto frameTimeScalar = frameTime.toScalar();
 
@@ -293,59 +381,61 @@ void IccCamera::addCameraErrorTerms(boost::shared_ptr<aslam::calibration::Optimi
 
 
 
-	  // #setup an aslam frame (handles the distortion)
-	  auto frame = camera.frame();
-	  frame->setGeometry(camera.getGeometry());
+	// #setup an aslam frame (handles the distortion)
+	auto frame = camera.frame();
+	frame->setGeometry(camera.getGeometry());
 
 
-	  // #corner uncertainty
-	  const auto cornerUncVal = cornerUncertainty * cornerUncertainty;
-	  Eigen::Matrix2d R;
-	  R.setZero();
-	  R(0,0) = cornerUncVal;
-	  R(1,1) = cornerUncVal;
-	  const auto invR = R.inverse();
+	// #corner uncertainty
+	const auto cornerUncVal = cornerUncertainty * cornerUncertainty;
+	Eigen::Matrix2d R;
+	R.setZero();
+	R(0, 0) = cornerUncVal;
+	R(1, 1) = cornerUncVal;
+	const auto invR = R.inverse();
 
+	for (size_t idx = 0; idx < imageCornerPoints.size(); ++idx) {
+	  const auto &imageCornerPoint = imageCornerPoints[idx];
 
-	  for (size_t idx = 0 ; idx < imageCornerPoints.size() ; ++idx) {
-		const auto &imageCornerPoint = imageCornerPoints[idx];
+	  // Image points
+	  aslam::Keypoint<2> k;
+	  Eigen::Matrix<double, 2, 1> mat;
+	  mat.setZero();
+	  mat(0, 0) = imageCornerPoint.x;
+	  mat(1, 0) = imageCornerPoint.y;
+	  k.setMeasurement(mat);
+	  k.setInverseMeasurementCovariance(invR);
+	  frame->addKeypoint(k);
+	}
 
-		// Image points
-		aslam::Keypoint<2> k;
-		Eigen::Matrix<double, 2, 1> mat;
-		mat.setZero();
-		mat(0, 0) = imageCornerPoint.x;
-		mat(1, 0) = imageCornerPoint.y;
-		k.setMeasurement(mat);
-		k.setInverseMeasurementCovariance(invR);
-		frame->addKeypoint(k);
+	for (size_t idx = 0; idx < imageCornerPoints.size(); ++idx) {
+	  const auto &imageCornerPoint = imageCornerPoints[idx];
+	  const auto &targetPoint = targetCornerPoints[idx];
+
+	  // Target points
+	  const Eigen::Vector3d eigenPoint
+		  (static_cast<double>(targetPoint.x), static_cast<double>(targetPoint.y), static_cast<double>(targetPoint.z));
+	  const auto p = T_c_w * aslam::backend::HomogeneousExpression(eigenPoint);
+
+	  // #build and append the error term
+	  auto rerr =
+		  boost::make_shared<aslam::backend::SimpleReprojectionError<aslam::Frame<aslam::cameras::EquidistantDistortedPinholeCameraGeometry>>>(
+			  frame.get(),
+			  idx,
+			  p);
+
+	  // #add blake-zisserman m-estimator
+	  if (blakeZissermanDf > 0.0) {
+		throw std::runtime_error("Not implemented blake-zisserman");
+		// mest = aopt.BlakeZissermanMEstimator( blakeZissermanDf )
+		// rerr.setMEstimatorPolicy(mest)
 	  }
 
-
-	  for (size_t idx = 0 ; idx < imageCornerPoints.size() ; ++idx) {
-	    const auto& imageCornerPoint = imageCornerPoints[idx];
-	    const auto& targetPoint = targetCornerPoints[idx];
-
-	    // Target points
-	    const Eigen::Vector3d eigenPoint(static_cast<double>(targetPoint.x), static_cast<double>(targetPoint.y), static_cast<double>(targetPoint.z));
-		const auto p = T_c_w *  aslam::backend::HomogeneousExpression(eigenPoint);
-
-		// #build and append the error term
-		auto rerr = boost::make_shared<aslam::backend::SimpleReprojectionError<aslam::Frame<aslam::cameras::EquidistantDistortedPinholeCameraGeometry>>>(frame.get(), idx, p);
-		
-		// #add blake-zisserman m-estimator
-		if (blakeZissermanDf > 0.0) {
-       	  throw std::runtime_error("Not implemented blake-zisserman");
-		  // mest = aopt.BlakeZissermanMEstimator( blakeZissermanDf )
-		  // rerr.setMEstimatorPolicy(mest)
-		}
-
-		problem->addErrorTerm(rerr);
-	  }
+	  problem->addErrorTerm(rerr);
+	}
   }
 
   std::cout << "  Added " << targetObservations->size() << " camera error tems" << std::endl;
-
 
 }
 
@@ -357,11 +447,12 @@ double IccImu::getGyroUncertaintyDiscrete() {
   return gyroUncertaintyDiscrete;
 }
 
-IccImu::IccImu(const ImuParameters &imuParams, boost::shared_ptr<std::vector<ImuMeasurement>> data)  :imuParameters(imuParams) {
+IccImu::IccImu(const ImuParameters &imuParams, boost::shared_ptr<std::vector<ImuMeasurement>> data) : imuParameters(
+	imuParams) {
   imuData = data;
 
-  const auto [aud, 	arw, 	au ] = imuParameters.getAccelerometerStatistics();
-  const auto [gud, 	grw, 	gu ] = imuParameters.getGyroStatistics();
+  const auto[aud, arw, au] = imuParameters.getAccelerometerStatistics();
+  const auto[gud, grw, gu] = imuParameters.getGyroStatistics();
 
   accelUncertaintyDiscrete = aud;
   accelRandomWalk = arw;
@@ -372,7 +463,7 @@ IccImu::IccImu(const ImuParameters &imuParams, boost::shared_ptr<std::vector<Imu
 
   gyroBiasPrior.setZero();
 
-  q_i_b_prior = Eigen::Vector4d(0.,0.,0.,1.);
+  q_i_b_prior = Eigen::Vector4d(0., 0., 0., 1.);
 
   std::cout << "Initializing IMU:" << std::endl;
   std::cout << "  Update rate: " << imuParameters.updateRate << std::endl;
@@ -387,7 +478,7 @@ IccImu::IccImu(const ImuParameters &imuParams, boost::shared_ptr<std::vector<Imu
 
 }
 
-std::vector<ImuMeasurement>& IccImu::getImuData() {
+std::vector<ImuMeasurement> &IccImu::getImuData() {
   return *imuData;
 }
 
@@ -413,14 +504,13 @@ void IccImu::addAccelerometerErrorTerms(boost::shared_ptr<aslam::calibration::Op
 										double accelNoiseScale) {
   std::cout << std::endl << "Adding accelerometer error terms (" << imuData->size() << ") ..." << std::endl;
 
-
   const double weight = 1.0 / accelNoiseScale;
 
   size_t numSkipped = 0;
 
   boost::shared_ptr<aslam::backend::MEstimator> mest;
   if (mSigma > 0.0) {
-	mest =  std::make_unique<aslam::backend::HuberMEstimator>(mSigma);
+	mest = std::make_unique<aslam::backend::HuberMEstimator>(mSigma);
   } else {
 	mest = std::make_unique<aslam::backend::NoMEstimator>();
   }
@@ -429,7 +519,7 @@ void IccImu::addAccelerometerErrorTerms(boost::shared_ptr<aslam::calibration::Op
   double tmax = std::numeric_limits<double>::min(); // TODO(radam): del
 
 
-  for (const auto& im : *imuData) {
+  for (const auto &im : *imuData) {
 	const auto tk = im.stamp + timeOffset;
 	if (tk > poseSplineDv->spline().t_min() && tk < poseSplineDv->spline().t_max()) {
 
@@ -442,7 +532,7 @@ void IccImu::addAccelerometerErrorTerms(boost::shared_ptr<aslam::calibration::Op
 
 	  const auto C_b_w = poseSplineDv->orientation(tk).inverse();
 	  const auto a_w = poseSplineDv->linearAcceleration(tk);
-	  const auto b_i = accelBiasDv->toEuclideanExpression(tk,0);
+	  const auto b_i = accelBiasDv->toEuclideanExpression(tk, 0);
 	  const auto w_b = poseSplineDv->angularVelocityBodyFrame(tk);
 	  const auto w_dot_b = poseSplineDv->angularAccelerationBodyFrame(tk);
 	  const auto C_i_b = q_i_b_Dv->toExpression();
@@ -478,17 +568,17 @@ void IccImu::addGyroscopeErrorTerms(boost::shared_ptr<aslam::calibration::Optimi
 
   boost::shared_ptr<aslam::backend::MEstimator> mest;
   if (mSigma > 0.0) {
-	mest =  std::make_unique<aslam::backend::HuberMEstimator>(mSigma);
+	mest = std::make_unique<aslam::backend::HuberMEstimator>(mSigma);
   } else {
 	mest = std::make_unique<aslam::backend::NoMEstimator>();
   }
 
-  for (const auto& im : *imuData) {
+  for (const auto &im : *imuData) {
 	const auto tk = im.stamp + timeOffset;
 	if (tk > poseSplineDv->spline().t_min() && tk < poseSplineDv->spline().t_max()) {
 	  const auto w_b = poseSplineDv->angularVelocityBodyFrame(tk);
-	  const auto b_i = gyroBiasDv->toEuclideanExpression(tk,0);
-	  const auto C_i_b =q_i_b_Dv->toExpression();
+	  const auto b_i = gyroBiasDv->toEuclideanExpression(tk, 0);
+	  const auto C_i_b = q_i_b_Dv->toExpression();
 	  const auto w = C_i_b * w_b;
 	  auto gerr = boost::make_shared<kalibr_errorterms::EuclideanError>(im.omega, im.omegaInvR * weight, w + b_i);
 	  gerr->setMEstimatorPolicy(mest);
@@ -517,17 +607,23 @@ void IccImu::initBiasSplines(boost::shared_ptr<bsplines::BSplinePose> poseSpline
 
   // initialize the bias splines
   gyroBias = boost::make_shared<bsplines::BSpline>(splineOrder);
-  gyroBias->initConstantSpline(start,end,knots, gyroBiasPrior);
+  gyroBias->initConstantSpline(start, end, knots, gyroBiasPrior);
 
   accelBias = boost::make_shared<bsplines::BSpline>(splineOrder);
-  accelBias->initConstantSpline(start,end,knots, Eigen::Vector3d(0.,0.,0.));
+  accelBias->initConstantSpline(start, end, knots, Eigen::Vector3d(0., 0., 0.));
 }
 
 void IccImu::addBiasMotionTerms(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem) {
   const auto Wgyro = Eigen::Matrix3d::Identity() / (gyroRandomWalk * gyroRandomWalk);
   const auto Waccel = Eigen::Matrix3d::Identity() / (accelRandomWalk * accelRandomWalk);
-  const auto gyroBiasMotionErr = boost::make_shared<aslam::backend::BSplineMotionError<aslam::splines::EuclideanBSplineDesignVariable>>(gyroBiasDv.get(), Wgyro,1);
+  const auto gyroBiasMotionErr =
+	  boost::make_shared<aslam::backend::BSplineMotionError<aslam::splines::EuclideanBSplineDesignVariable>>(gyroBiasDv.get(),
+																											 Wgyro,
+																											 1);
   problem->addErrorTerm(gyroBiasMotionErr);
-  const auto accelBiasMotionErr = boost::make_shared<aslam::backend::BSplineMotionError<aslam::splines::EuclideanBSplineDesignVariable>>(accelBiasDv.get(), Waccel,1);
+  const auto accelBiasMotionErr =
+	  boost::make_shared<aslam::backend::BSplineMotionError<aslam::splines::EuclideanBSplineDesignVariable>>(accelBiasDv.get(),
+																											 Waccel,
+																											 1);
   problem->addErrorTerm(accelBiasMotionErr);
 }

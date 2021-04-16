@@ -107,7 +107,7 @@ void IccCalibrator::buildProblem(size_t splineOrder,
   // ############################################
   // #estimate the timeshift for all cameras to the main imu
   if (!noTimeCalibration) {
-	throw std::runtime_error("Time shift calibration is not implemented.");
+    iccCamera->findTimeshiftCameraImuPrior(iccImu, true); // TODO(radam): unverbose
   }
 
   assert(iccCamera);

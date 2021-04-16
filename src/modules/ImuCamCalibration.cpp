@@ -34,6 +34,7 @@ public:
 
     // Optimization options
     config.add("maxIter", dv::ConfigOption::intOption("Maximum number of iteration of calibration optimization problem", 20, 1, 100));
+    config.add("timeCalibration", dv::ConfigOption::boolOption("If true, time offset between the sensors will be calibrated", true));
   }
 
   void configUpdate() {
@@ -79,6 +80,7 @@ public:
 	options.tagSpacing = config.getDouble("tagSpacing");
 
 	options.maxIter = static_cast<size_t>(config.getInt("maxIter"));
+    options.timeCalibration = config.getBool("timeCalibration");
 
 	// TODO(radam): IMU parameters
 
