@@ -45,7 +45,7 @@ public:
     config.add("calibrate", dv::ConfigOption::buttonOption("Start calibration algorithm", "calibrate"));
 
     // Optimization options
-    config.add("maxIter", dv::ConfigOption::intOption("Maximum number of iteration of calibration optimization problem", 20, 1, 100));
+    config.add("maxIter", dv::ConfigOption::intOption("Maximum number of iteration of calibration optimization problem", 50, 1, 100));
     config.add("timeCalibration", dv::ConfigOption::boolOption("If true, time offset between the sensors will be calibrated", true));
 
 	config.setPriorityOptions({"calibrationFile", "boardHeight", "boardWidth", "boardSquareSize", "calibrationPattern", "startCollecting", "calibrate" });

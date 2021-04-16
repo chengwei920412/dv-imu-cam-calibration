@@ -255,9 +255,6 @@ size_t Calibrator::getNumDetections() {
 
 void Calibrator::calibrate()  {
 
-
-  // TODO(radam): everything below should happen in a separate thread
-
   std::cout << "Waiting for the detector to finish..." << std::endl;
   detectionsQueue.waitForEmptyQueue();
 

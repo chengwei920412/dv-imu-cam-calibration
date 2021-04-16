@@ -196,7 +196,7 @@ void IccCamera::findTimeshiftCameraImuPrior(boost::shared_ptr<IccImu> iccImu, bo
   Eigen::VectorXd zeroPaddedMeasurement(paddedSize);
   zeroPaddedMeasurement.setZero();
   zeroPaddedMeasurement.segment(predicted.size()/2, measured.size()) = measured;
-
+  
   double maxVal = -1;
   size_t maxIdx = 0;
   for (size_t i = 0 ; i < paddedSize - predicted.size() ; ++i) {
@@ -208,8 +208,8 @@ void IccCamera::findTimeshiftCameraImuPrior(boost::shared_ptr<IccImu> iccImu, bo
     }
   }
 
-  const auto discrete_shift = maxIdx - predicted.size()/2;
-
+  const auto discrete_shift = static_cast<int>(maxIdx) - predicted.size()/2;
+  
   double dt = 0;
   for (size_t i = 0 ; i < times.size() - 1 ; ++i) {
     dt += times[i+1] - times[i];
