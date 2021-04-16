@@ -152,6 +152,10 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
   std::cout << b_gyro.transpose() << std::endl << std::endl;
 }
 
+boost::shared_ptr<aslam::cameras::CameraGeometryBase> IccCamera::getCameraGeometry() {
+  return camera.getGeometry();
+}
+
 Eigen::Vector3d IccCamera::getEstimatedGravity() {
   return gravity_w;
 }

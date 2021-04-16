@@ -81,9 +81,7 @@ public:
 
   void findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu);
 
-  boost::shared_ptr<aslam::cameras::CameraGeometryBase> getCameraGeometry() {
-    return camera.getGeometry();
-  }
+  boost::shared_ptr<aslam::cameras::CameraGeometryBase> getCameraGeometry();
 
   Eigen::Vector3d getEstimatedGravity();
 
