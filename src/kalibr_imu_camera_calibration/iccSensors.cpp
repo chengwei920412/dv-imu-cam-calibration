@@ -5,7 +5,6 @@
 #include <aslam/backend/Optimizer2Options.hpp>
 #include <aslam/backend/Optimizer2.hpp>
 #include <aslam/backend/BlockCholeskyLinearSystemSolver.hpp>
-#include <aslam/backend/SparseCholeskyLinearSystemSolver.hpp>
 #include <aslam/backend/ReprojectionError.hpp>
 #include <aslam/backend/SimpleReprojectionError.hpp>
 #include <aslam/Keypoint.hpp>
@@ -66,20 +65,10 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
   // Initialize a pose spline using the camera poses
   auto poseSpline = initPoseSplineFromCamera(6, 100, 0.0);
 
-  double tmin = std::numeric_limits<double>::max(); // TODO(radam): del
-  double tmax = std::numeric_limits<double>::min(); // TODO(radam): del
-
   for (const auto &im : iccImu->getImuData()) {
 	const auto tk = im.stamp;
 
 	if (tk > poseSpline->t_min() && tk < poseSpline->t_max()) {
-	  if (tk > tmax) {
-		tmax = tk; // TODO(radam): del
-	  }
-	  if (tk < tmin) {
-		tmin = tk; // TODO(radam): del
-	  }
-
 	  // DV expressions
 	  const auto R_i_c = q_i_c_Dv->toExpression();
 	  const auto bias = gyroBiasDv->toExpression();
@@ -95,12 +84,6 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
 	  problem->addErrorTerm(gerr);
 	}
   }
-
-  std::cout << "tmin " << tmin - 1.61841e+09 - 85100 << std::endl; // TODO(radam): delete
-  std::cout << "tmax " << tmax - 1.61841e+09 - 85100 << std::endl; // TODO(radam): delete
-
-  std::cout << "Num of design variables: " << problem->numDesignVariables() << std::endl; // TODO(radam): del
-  std::cout << "Num of error terms:: " << problem->numErrorTerms() << std::endl; // TODO(radam): del
 
   if (problem->numErrorTerms() == 0) {
 	throw std::runtime_error("Failed to obtain orientation prior."
@@ -122,8 +105,9 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
 
   try {
 	auto retval = optimizer.optimize();
-	std::cout << "Retval fail is: " << retval.linearSolverFailure << std::endl; // TODO(radam): del
-	std::cout << "Retval niter is " << retval.iterations << std::endl; // TODO(radam): del
+	if (retval.iterations == options.maxIterations) {
+	  std::cout << "WARNING: Failed to find orientation prior" << std::endl;
+	}
   } catch (...) {
 	throw std::runtime_error("Failed to obtain orientation prior!");
   }
@@ -233,7 +217,7 @@ void IccCamera::findTimeshiftCameraImuPrior(boost::shared_ptr<IccImu> iccImu, bo
   timeshiftCamToImuPrior = shift;
 
   std::cout << "  Time shift camera to imu (t_imu = t_cam + shift): " << std::endl;
-  std::cout << timeshiftCamToImuPrior << std::endl;
+  std::cout << "  " << timeshiftCamToImuPrior << std::endl;
 }
 
 
@@ -501,21 +485,10 @@ void IccImu::addAccelerometerErrorTerms(boost::shared_ptr<aslam::calibration::Op
 	mest = std::make_unique<aslam::backend::NoMEstimator>();
   }
 
-  double tmin = std::numeric_limits<double>::max(); // TODO(radam): del
-  double tmax = std::numeric_limits<double>::min(); // TODO(radam): del
-
 
   for (const auto &im : *imuData) {
 	const auto tk = im.stamp + timeOffset;
 	if (tk > poseSplineDv->spline().t_min() && tk < poseSplineDv->spline().t_max()) {
-
-	  if (tk > tmax) {
-		tmax = tk; // TODO(radam): del
-	  }
-	  if (tk < tmin) {
-		tmin = tk; // TODO(radam): del
-	  }
-
 	  const auto C_b_w = poseSplineDv->orientation(tk).inverse();
 	  const auto a_w = poseSplineDv->linearAcceleration(tk);
 	  const auto b_i = accelBiasDv->toEuclideanExpression(tk, 0);
@@ -533,9 +506,6 @@ void IccImu::addAccelerometerErrorTerms(boost::shared_ptr<aslam::calibration::Op
 	  ++numSkipped;
 	}
   }
-
-  std::cout << "tmin accel " << tmin - 1.61841e+09 - 85100 << std::endl; // TODO(radam): delete
-  std::cout << "tmax accel " << tmax - 1.61841e+09 - 85100 << std::endl; // TODO(radam): delete
 
   std::cout << "  Added " << imuData->size() - numSkipped << " of " << imuData->size() << " accelerometer error terms "
 			<< "(skipped " << numSkipped << " out-of-bounds measurements)" << std::endl;

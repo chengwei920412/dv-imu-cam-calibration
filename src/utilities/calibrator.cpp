@@ -35,7 +35,7 @@ Calibrator::Calibrator(const Options& opts) : calibratorOptions(opts) {
   iccCamera = boost::make_shared<IccCamera>(targetObservations);
   iccCalibrator = boost::make_shared<IccCalibrator>(iccCamera, iccImu);
 
-  detectionsQueue.start(std::max(1u, std::thread::hardware_concurrency()-1)); // TODO(radam): fix
+  detectionsQueue.start(std::max(1u, std::thread::hardware_concurrency()-1));
 
   std::cout << "Initializing calibration target:" << std::endl;
 
@@ -291,14 +291,18 @@ void Calibrator::calibrate()  {
 							 0.03,
 							 false);
 
-  std::cout << std::endl << "Before Optimization" << std::endl << "###################" << std::endl;
-
+  //  // Printing reprojection errors is quite difficult, not doing it
+  //  std::cout << std::endl << "Before Optimization" << std::endl << "###################" << std::endl;
+  //  iccCalibrator->printErrorStatistics();
 
   std::cout << std::endl << "Optimizing..." << std::endl;
   iccCalibrator->optimize(nullptr, calibratorOptions.maxIter, false);
 
-  std::cout << std::endl << "After Optimization (Results)" << std::endl << "###################" << std::endl;
-
+  //  // Printing reprojection errors is quite difficult, not doing it
+  //  std::cout << std::endl << "After Optimization" << std::endl << "###################" << std::endl;
+  //  iccCalibrator->printErrorStatistics();
+  
+  std::cout << std::endl << "Results" << std::endl << "#######" << std::endl;
   iccCalibrator->printResult();
 
   state = CALIBRATED;
@@ -306,8 +310,6 @@ void Calibrator::calibrate()  {
 
 
 void Calibrator::detectPattern(const StampedImage &stampedImage) {
-
-  // TODO(radam): read input image and undistort points before passing to kalibr ???
 
   std::vector<cv::Point2f> pointBuf;
 
@@ -318,10 +320,7 @@ void Calibrator::detectPattern(const StampedImage &stampedImage) {
   aslam::cameras::GridCalibrationTargetObservation observation;
   bool success = detector->findTarget(stampedImage.image, aslam::Time(toSec(stampedImage.timestamp)), observation);
 
-//  std::cout << grid->rows() << std::endl; // TODO(radam): del
-//  std::cout << grid->cols() << std::endl; // TODO(radam): del
 
-  
   // If pattern detected add it to observation
   if (state == COLLECTING && success && observation.hasSuccessfulObservation()) {
 	std::lock_guard<std::mutex> lock(targetObservationsMutex);
