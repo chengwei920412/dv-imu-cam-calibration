@@ -125,6 +125,9 @@ void IccCalibrator::buildProblem(size_t splineOrder,
   // #initialize a pose spline using the camera poses in the camera chain
   const auto poseSpline = iccCamera->initPoseSplineFromCamera(splineOrder, poseKnotsPerSecond, timeOffsetPadding);
 
+  std::cout << "Pose spline min max " << poseSpline->t_min() - 1.61841e+09 - 85100
+  << " " << poseSpline->t_max() - 1.61841e+09 - 85100  << std::endl; // TODO(radam): del
+
   // Initialize bias splines for all IMUs
   iccImu->initBiasSplines(poseSpline, splineOrder, biasKnotsPerSecond);
 
@@ -134,25 +137,36 @@ void IccCalibrator::buildProblem(size_t splineOrder,
   // Initialize all design variables
   initDesignVariables(problem, poseSpline, noTimeCalibration, noChainExtrinsics, false, estimatedGravity);
 
+  std::cout << "num dv1 " << problem->numDesignVariables() << std::endl; // TODO(radam): del
+
   // ############################################
   // ## add error terms
   // ############################################
   // #Add calibration target reprojection error terms for all camera in chain
   iccCamera->addCameraErrorTerms(problem, poseDv, blakeZisserCam, timeOffsetPadding);
+
+
+  std::cout << "num dv2 " << problem->numDesignVariables() << std::endl; // TODO(radam): del
   
   // # Initialize IMU error terms.
   iccImu->addAccelerometerErrorTerms(problem, poseDv, gravityExpression->toValue(), huberAccel, accelNoiseScale=accelNoiseScale);
   iccImu->addGyroscopeErrorTerms(problem, poseDv, gravityExpression->toValue(), huberGyro, gyroNoiseScale);
+
+  std::cout << "num dv3 " << problem->numDesignVariables() << std::endl; // TODO(radam): del
 
   // # Add the bias motion terms.
   if (doBiasMotionError) {
 	iccImu->addBiasMotionTerms(problem);
   }
 
+  std::cout << "num dv4 " << problem->numDesignVariables() << std::endl; // TODO(radam): del
+
   // # Add the pose motion terms.
   if (doPoseMotionError) {
 	addPoseMotionTerms(problem, mrTranslationVariance, mrRotationVariance);
   }
+
+  std::cout << "num dv5 " << problem->numDesignVariables() << std::endl; // TODO(radam): del
 }
 
 
@@ -173,6 +187,8 @@ void IccCalibrator::optimize(boost::shared_ptr<aslam::backend::Optimizer2Options
 	options->linearSystemSolver = boost::make_shared<aslam::backend::BlockCholeskyLinearSystemSolver>(); // TODO(radam): maybe uncomment
 
   }
+
+  std::cout << "num dv6 " << problem->numDesignVariables() << std::endl; // TODO(radam): del
 
 
   auto optimizer = aslam::backend::Optimizer2(*options);

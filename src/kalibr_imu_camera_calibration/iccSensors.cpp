@@ -42,7 +42,7 @@ sm::kinematics::Transformation IccCamera::getTransformation() {
 }
 
 void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu) {
-  std::cout << std::endl << "Estimating imu-camera rotation prior" << std::endl;
+  std::cout << std::endl << "Estimating imu-camera rotation prior" <<std::endl << std::endl;
 
   // Build the problem
   auto problem = boost::make_shared<aslam::backend::OptimizationProblem>(); // TODO(radam): backend or calibration?
@@ -154,7 +154,7 @@ void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu
   std::cout << " Transformation prior camera-imu found as: (T_extrinsic)" << std::endl;
   std::cout << T_extrinsic.T() << std::endl;
   std::cout << "  Gyro bias prior found as: (b_gyro)" << std::endl;
-  std::cout << b_gyro.transpose() << std::endl;
+  std::cout << b_gyro.transpose() << std::endl << std::endl;
 }
 
 Eigen::Vector3d IccCamera::getEstimatedGravity() {
@@ -164,6 +164,8 @@ Eigen::Vector3d IccCamera::getEstimatedGravity() {
 boost::shared_ptr<bsplines::BSplinePose> IccCamera::initPoseSplineFromCamera(const size_t splineOrder,
 																			 const size_t poseKnotsPerSecond,
 																			 const double timeOffsetPadding) {
+  
+  std::cout << "timeOffsetPadding " << timeOffsetPadding << std::endl; // TODO(radam): delete
 
 
   assert(!targetObservations->empty());
@@ -226,9 +228,8 @@ boost::shared_ptr<bsplines::BSplinePose> IccCamera::initPoseSplineFromCamera(con
 	}
 	curve.block(3,i,3,1) = best_r;
   }
-  
 
-  const auto seconds = timesVec.back() - timesVec.front();
+  const auto seconds = static_cast<double>(times[times.size()-1] -  times[0]);
   const auto knots = static_cast<int>(std::round(seconds * poseKnotsPerSecond));
 
   std::cout << "Initializing a pose spline with " << knots
@@ -253,7 +254,7 @@ void IccCamera::addDesignVariables(boost::shared_ptr<aslam::calibration::Optimiz
   T_c_b_Dv = boost::make_shared<aslam::backend::TransformationBasic>(T_c_b_Dv_q->toExpression(), T_c_b_Dv_t->toExpression());
 
   cameraTimeToImuTimeDv = boost::make_shared<aslam::backend::Scalar>(0.0);
-  cameraTimeToImuTimeDv->setActive(!noTimeCalibration);
+  cameraTimeToImuTimeDv->setActive(false); // TODO(radam): time calib
   problem->addDesignVariable(cameraTimeToImuTimeDv, CALIBRATION_GROUP_ID);
 }
 
@@ -261,7 +262,7 @@ void IccCamera::addCameraErrorTerms(boost::shared_ptr<aslam::calibration::Optimi
 									boost::shared_ptr<aslam::splines::BSplinePoseDesignVariable> poseSplineDv,
 									double blakeZissermanDf,
 									double timeOffsetPadding) {
-  std::cout << "Adding camera error terms (" << targetObservations->size() << ") ..." << std::endl;
+  std::cout << std::endl << "Adding camera error terms (" << targetObservations->size() << ") ..." << std::endl;
 
   const auto T_cN_b = T_c_b_Dv->toExpression();
 
@@ -399,10 +400,10 @@ void IccImu::addDesignVariables(boost::shared_ptr<aslam::calibration::Optimizati
 
   q_i_b_Dv = boost::make_shared<aslam::backend::RotationQuaternion>(q_i_b_prior);
   problem->addDesignVariable(q_i_b_Dv, HELPER_GROUP_ID);
-  q_i_b_Dv->setActive(true);
+  q_i_b_Dv->setActive(false);
   r_b_Dv = boost::make_shared<aslam::backend::EuclideanPoint>(Eigen::Vector3d(0.0, 0.0, 0.0));
   problem->addDesignVariable(r_b_Dv, HELPER_GROUP_ID);
-  r_b_Dv->setActive(true);
+  r_b_Dv->setActive(false);
 }
 
 void IccImu::addAccelerometerErrorTerms(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,
@@ -410,7 +411,7 @@ void IccImu::addAccelerometerErrorTerms(boost::shared_ptr<aslam::calibration::Op
 										const Eigen::Vector3d &g_w,
 										double mSigma,
 										double accelNoiseScale) {
-  std::cout << "Adding accelerometer error terms (" << imuData->size() << ") ..." << std::endl;
+  std::cout << std::endl << "Adding accelerometer error terms (" << imuData->size() << ") ..." << std::endl;
 
 
   const double weight = 1.0 / accelNoiseScale;
@@ -424,9 +425,21 @@ void IccImu::addAccelerometerErrorTerms(boost::shared_ptr<aslam::calibration::Op
 	mest = std::make_unique<aslam::backend::NoMEstimator>();
   }
 
+  double tmin = std::numeric_limits<double>::max(); // TODO(radam): del
+  double tmax = std::numeric_limits<double>::min(); // TODO(radam): del
+
+
   for (const auto& im : *imuData) {
 	const auto tk = im.stamp + timeOffset;
 	if (tk > poseSplineDv->spline().t_min() && tk < poseSplineDv->spline().t_max()) {
+
+	  if (tk > tmax) {
+		tmax = tk; // TODO(radam): del
+	  }
+	  if (tk < tmin) {
+		tmin = tk; // TODO(radam): del
+	  }
+
 	  const auto C_b_w = poseSplineDv->orientation(tk).inverse();
 	  const auto a_w = poseSplineDv->linearAcceleration(tk);
 	  const auto b_i = accelBiasDv->toEuclideanExpression(tk,0);
@@ -445,6 +458,9 @@ void IccImu::addAccelerometerErrorTerms(boost::shared_ptr<aslam::calibration::Op
 	}
   }
 
+  std::cout << "tmin accel " << tmin - 1.61841e+09 - 85100 << std::endl; // TODO(radam): delete
+  std::cout << "tmax accel " << tmax - 1.61841e+09 - 85100 << std::endl; // TODO(radam): delete
+
   std::cout << "  Added " << imuData->size() - numSkipped << " of " << imuData->size() << " accelerometer error terms "
 			<< "(skipped " << numSkipped << " out-of-bounds measurements)" << std::endl;
 }
@@ -454,7 +470,7 @@ void IccImu::addGyroscopeErrorTerms(boost::shared_ptr<aslam::calibration::Optimi
 									const Eigen::Vector3d &g_w,
 									double mSigma,
 									double gyroNoiseScale) {
-  std::cout << "Adding gyroscope error terms (" << imuData->size() << ") ..." << std::endl;
+  std::cout << std::endl << "Adding gyroscope error terms (" << imuData->size() << ") ..." << std::endl;
 
   const double weight = 1.0 / gyroNoiseScale;
 
@@ -497,7 +513,7 @@ void IccImu::initBiasSplines(boost::shared_ptr<bsplines::BSplinePose> poseSpline
   const auto seconds = end - start;
   const auto knots = static_cast<size_t>(round(seconds * static_cast<double>(biasKnotsPerSecond)));
 
-  std::cout << "Initializing the bias splines with " << knots << " knots" << std::endl;
+  std::cout << std::endl << "Initializing the bias splines with " << knots << " knots" << std::endl;
 
   // initialize the bias splines
   gyroBias = boost::make_shared<bsplines::BSpline>(splineOrder);
