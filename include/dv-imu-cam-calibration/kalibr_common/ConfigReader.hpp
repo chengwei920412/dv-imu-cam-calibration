@@ -18,25 +18,6 @@
 
 #include <vector>
 
-class PinholeEquidistantCamera {
-
-protected:
-
-  boost::shared_ptr<aslam::cameras::EquidistantDistortedPinholeCameraGeometry> geometry = nullptr;
-
-public:
-
-  PinholeEquidistantCamera(const std::vector<double>& intrinsics,
-						   const std::vector<double>& distCoeff,
-						   const cv::Size& resolution);
-
-
-  boost::shared_ptr<aslam::cameras::EquidistantDistortedPinholeCameraGeometry> getGeometry();
-
-  boost::shared_ptr<aslam::Frame<aslam::cameras::EquidistantDistortedPinholeCameraGeometry>> frame() ;
-
-
-};
 
 class PinholeRadialTangentialCamera {
 

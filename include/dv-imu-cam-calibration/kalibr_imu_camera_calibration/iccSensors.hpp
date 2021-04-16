@@ -48,9 +48,11 @@ protected:
   const double cornerUncertainty;
   sm::kinematics::Transformation T_extrinsic;
   double timeshiftCamToImuPrior = 0.0;
-  PinholeEquidistantCamera camera{std::vector<double>{604.5911733980397, 604.2336278279186, 282.3605083440955, 250.5144138417647},
-      std::vector<double>{-0.05965984963878861, 0.11156790983914057, -0.397476602431665,
-						  0.4856393825761525},
+  PinholeRadialTangentialCamera camera{
+    std::vector<double>{6.3007006020163419e+02, 6.3066578517514370e+02, 2.9440730698720517e+02, 2.5090606048734924e+02},
+      std::vector<double>{-3.9458674051766940e-01, 4.2159874612649451e-01,
+	  2.3858518861790620e-03, -2.9775941904103447e-03,
+	  -3.2459783818568150e-01},
       cv::Size(640, 480)}; // TODO(radam): pass these ALL in constructor
 
   Eigen::Vector3d gravity_w;

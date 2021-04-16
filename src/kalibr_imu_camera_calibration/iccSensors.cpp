@@ -389,7 +389,7 @@ void IccCamera::addCameraErrorTerms(boost::shared_ptr<aslam::calibration::Optimi
 
 	  // #build and append the error term
 	  auto rerr =
-		  boost::make_shared<aslam::backend::SimpleReprojectionError<aslam::Frame<aslam::cameras::EquidistantDistortedPinholeCameraGeometry>>>(
+		  boost::make_shared<aslam::backend::SimpleReprojectionError<aslam::Frame<aslam::cameras::DistortedPinholeCameraGeometry>>>(
 			  frame.get(),
 			  idx,
 			  p);
