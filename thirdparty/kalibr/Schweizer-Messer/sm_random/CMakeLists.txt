@@ -5,7 +5,9 @@ project(sm_random)
 ## Building ##
 ##############
 
-add_library(${PROJECT_NAME}
+add_definitions(-fPIC)
+
+add_library(${PROJECT_NAME} SHARED
   src/random.cpp
 )
 target_include_directories(${PROJECT_NAME} PUBLIC

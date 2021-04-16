@@ -1,6 +1,9 @@
 #ifndef ASLAM_BACKEND_OPTIMIZER_2_OPTIONS_HPP
 #define ASLAM_BACKEND_OPTIMIZER_2_OPTIONS_HPP
 
+#include <boost/make_shared.hpp>
+#include <iostream>
+
 namespace aslam {
   namespace backend {
   class LinearSystemSolver;

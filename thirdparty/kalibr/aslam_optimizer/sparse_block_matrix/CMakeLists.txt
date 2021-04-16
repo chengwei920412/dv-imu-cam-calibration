@@ -9,7 +9,9 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 find_package(SuiteSparse REQUIRED)
 include_directories(SYSTEM ${SUITESPARSE_INCLUDE_DIRS})
 
-add_library(${PROJECT_NAME}
+add_definitions(-fPIC)
+
+add_library(${PROJECT_NAME} SHARED
   src/matrix_structure.cpp
   src/sparse_helper.cpp
   src/marginal_covariance_cholesky.cpp

@@ -11,7 +11,7 @@ add_definitions(-fPIC)
 ## Building ##
 ##############
 
-add_library(${PROJECT_NAME}
+add_library(${PROJECT_NAME} SHARED
   src/JobQueue.cpp
   src/portable_binary_iarchive.cpp
   src/portable_binary_oarchive.cpp
