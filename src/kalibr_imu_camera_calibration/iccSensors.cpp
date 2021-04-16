@@ -43,11 +43,15 @@ sm::kinematics::Transformation IccCamera::getTransformation() {
   return sm::kinematics::Transformation(T_c_b_Dv_q->getQuaternion(), T_c_b_Dv_t->toEuclidean());
 }
 
+double IccCamera::getResultTimeShift() {
+  return cameraTimeToImuTimeDv->toScalar();
+}
+
 void IccCamera::findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu) {
   std::cout << std::endl << "Estimating imu-camera rotation prior" << std::endl << std::endl;
 
   // Build the problem
-  auto problem = boost::make_shared<aslam::backend::OptimizationProblem>(); // TODO(radam): backend or calibration?
+  auto problem = boost::make_shared<aslam::backend::OptimizationProblem>();
 
   // Add the rotation as design variable
   auto q_i_c_Dv = boost::make_shared<aslam::backend::RotationQuaternion>(T_extrinsic.q());

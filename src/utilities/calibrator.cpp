@@ -272,7 +272,7 @@ void Calibrator::calibrate()  {
   std::cout << "Calibrating using " << targetObservations->size() << " detections." << std::endl;
 
 
-  std::cout << "Building the problem" << std::endl;
+  std::cout << std::endl << "Building the problem" << std::endl;
   iccCalibrator->buildProblem(6,
 							 100,
 							 50,
@@ -290,7 +290,16 @@ void Calibrator::calibrate()  {
 							 1.0,
 							 0.03,
 							 false);
+
+  std::cout << std::endl << "Before Optimization" << std::endl << "###################" << std::endl;
+
+
+  std::cout << std::endl << "Optimizing..." << std::endl;
   iccCalibrator->optimize(nullptr, calibratorOptions.maxIter, false);
+
+  std::cout << std::endl << "After Optimization (Results)" << std::endl << "###################" << std::endl;
+
+  iccCalibrator->printResult();
 
   state = CALIBRATED;
 }

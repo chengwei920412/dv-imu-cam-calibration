@@ -92,7 +92,7 @@ public:
 
   void recoverCovariance();
 
-
+  void printResult();
 
 
 };

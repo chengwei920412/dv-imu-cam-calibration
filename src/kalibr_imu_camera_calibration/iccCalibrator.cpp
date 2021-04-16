@@ -188,8 +188,6 @@ void IccCalibrator::optimize(boost::shared_ptr<aslam::backend::Optimizer2Options
 
   }
 
-  std::cout << "num dv6 " << problem->numDesignVariables() << std::endl; // TODO(radam): del
-
 
   auto optimizer = aslam::backend::Optimizer2(*options);
   optimizer.setProblem(problem);
@@ -208,9 +206,6 @@ void IccCalibrator::optimize(boost::shared_ptr<aslam::backend::Optimizer2Options
 	throw std::runtime_error("Optimization failed");
   }
 
-  // TODO(radam): would be good to print reprojection errors at least just like kalibr does it
-
-  std::cout << "Transformation T_cam_imu:\n" << iccCamera->getTransformation().T() << std::endl;
 
   if (recoverCov) {
 	recoverCovariance();
@@ -230,4 +225,15 @@ void IccCalibrator::recoverCovariance() {
   // # split and store the variance
   // self.std_trafo_ic = np.array(est_stds[0:6])
   // self.std_times = np.array(est_stds[6:])
+}
+
+void IccCalibrator::printResult() {
+
+
+  // TODO(radam): would be good to print reprojection errors at least just like kalibr does it
+
+  std::cout << "Transformation T_cam_imu:" << std::endl;
+  std::cout << iccCamera->getTransformation().T() << std::endl;
+  std::cout << "Camera to imu time: [s] (t_imu = t_cam + shift):" << std::endl;
+  std::cout << iccCamera->getResultTimeShift() << std::endl;
 }

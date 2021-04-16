@@ -74,6 +74,8 @@ public:
 
   sm::kinematics::Transformation getTransformation();
 
+  double getResultTimeShift();
+
   void findOrientationPriorCameraToImu(boost::shared_ptr<IccImu> iccImu);
 
   boost::shared_ptr<aslam::cameras::CameraGeometryBase> getCameraGeometry() {
