@@ -2,6 +2,15 @@
 
 #include <utilities/calibrator.hpp>
 
+
+bool cvExists(const cv::FileNode &fn) {
+  if (fn.type() == cv::FileNode::NONE) {
+	return (false);
+  }
+
+  return (true);
+}
+
 class ImuCamCalibration : public dv::ModuleBase {
 private:
   std::unique_ptr<Calibrator> calibrator = nullptr;
@@ -21,6 +30,9 @@ public:
   }
 
   static void initConfigOptions(dv::RuntimeConfig &config) {
+    // Camera calibration file
+    config.add("calibrationFile", dv::ConfigOption::fileOpenOption("Path to the camera calibration file", "", "xml"));
+
     // Calibration pattern
 	config.add("boardHeight", dv::ConfigOption::intOption("Number of rows in the calibration pattern", 11, 1, 50));
 	config.add("boardWidth", dv::ConfigOption::intOption("Number of cols in the calibration pattern", 4, 1, 50));
@@ -35,6 +47,8 @@ public:
     // Optimization options
     config.add("maxIter", dv::ConfigOption::intOption("Maximum number of iteration of calibration optimization problem", 20, 1, 100));
     config.add("timeCalibration", dv::ConfigOption::boolOption("If true, time offset between the sensors will be calibrated", true));
+
+	config.setPriorityOptions({"calibrationFile", "boardHeight", "boardWidth", "boardSquareSize", "calibrationPattern", "startCollecting", "calibrate" });
   }
 
   void configUpdate() {
@@ -54,13 +68,24 @@ public:
 
   ImuCamCalibration() {
     // Input output
-	const auto inputSize = inputs.getFrameInput("frames").size();
-	const auto description = inputs.getFrameInput("frames").getOriginDescription();
+    const auto frameInput = inputs.getFrameInput("frames");
+	const auto inputSize = frameInput.size();
+	const auto description = frameInput.getOriginDescription();
 	outputs.getFrameOutput("preview").setup(inputSize.width, inputSize.height, description);
+
 
 	// Calibrator options
 	Calibrator::Options options;
 
+	// Calibration file
+	const auto filename = config.getString("calibrationFile");
+	bool success = readCalibrationFile(filename, frameInput.getOriginDescription(), &options);
+
+	if (!success) {
+	  log.error << "Failed to load camera calibration file. Using default data. " << filename ;
+	}
+
+	// Calibration pattern
 	const auto pattern = config.getString("calibrationPattern");
 	if (pattern == "chessboard") {
 	  options.pattern = Calibrator::CalibrationPattern::CHESSBOARD;
@@ -81,8 +106,6 @@ public:
 
 	options.maxIter = static_cast<size_t>(config.getInt("maxIter"));
     options.timeCalibration = config.getBool("timeCalibration");
-
-	// TODO(radam): IMU parameters
 
 	calibrator = std::make_unique<Calibrator>(options);
   }
@@ -113,6 +136,100 @@ public:
 	  outputs.getFrameOutput("preview") << preview.timestamp << preview.image << dv::commit;
 	}
 
+  }
+
+protected:
+  bool readCalibrationFile(const std::string& filename, const std::string& cameraID, Calibrator::Options* options) {
+    assert(options);
+
+	cv::FileStorage fs(filename, cv::FileStorage::READ);
+
+	if (!fs.isOpened()) {
+	  log.error << "Impossible to load the camera calibration file."  << std::endl;
+	  return false;
+	}
+
+	const auto typeNode = fs["type"];
+
+	if (!cvExists(typeNode) || !typeNode.isString() || (typeNode.string() != "camera")) {
+	  log.error << "Wrong type of camera calibration file." << std::endl;
+	  return false;
+	}
+
+	const auto useFisheye = fs["use_fisheye_model"];
+	if (!cvExists(useFisheye) || !useFisheye.isInt()) {
+      int fseye;
+      useFisheye >> fseye;
+      if (fseye != 0) {
+		log.error << "Only non-fisheye calibration is supported!" << std::endl;
+		return false;
+      }
+	}
+
+  auto cameraNode = fs[cameraID];
+
+  if (!cvExists(cameraNode) || !cameraNode.isMap()) {
+	log.warning.format(
+		"Calibration data for camera {:s} not present in file: {:s}", cameraID, filename);
+	return false;
+  }
+
+  if (!cvExists(cameraNode["camera_matrix"]) || !cvExists(cameraNode["distortion_coefficients"])) {
+	log.warning.format(
+		"Calibration data for camera {:s} not present in file: {:s}", cameraID, filename);
+	return false;
+  }
+
+  cv::Mat loadedCameraMatrix = cv::Mat::eye(3, 3, CV_64F);
+  cv::Mat loadedDistCoeffs   = cv::Mat::zeros(8, 1, CV_64F);
+  int imWidth, imHeight;
+
+  cameraNode["camera_matrix"] >> loadedCameraMatrix;
+  cameraNode["distortion_coefficients"] >> loadedDistCoeffs;
+
+
+  cameraNode["image_width"] >> imWidth;
+  cameraNode["image_height"] >> imHeight;
+
+  log.info.format("Loaded camera matrix and distortion coefficients for camera {:s} from file: {:s}", cameraID, filename);
+
+  options->intrinsics = std::vector<double>{loadedCameraMatrix.at<double>(0,0),
+											loadedCameraMatrix.at<double>(1,1),
+											loadedCameraMatrix.at<double>(0,2),
+											loadedCameraMatrix.at<double>(1,2)};
+
+  options->distCoeffs = std::vector<double>{loadedDistCoeffs.at<double>(0,0),
+											loadedDistCoeffs.at<double>(1,0),
+											loadedDistCoeffs.at<double>(2,0),
+											loadedDistCoeffs.at<double>(3,0)};
+  options->imageSize = cv::Size(imWidth, imHeight);
+
+  auto updateRate = cameraNode["update_rate"];
+  if (cvExists(updateRate)) {
+    updateRate >> options->imuParameters.updateRate;
+  }
+
+  auto accNoiseDensity = cameraNode["acc_noise_density"];
+  if (cvExists(accNoiseDensity)) {
+    accNoiseDensity >> options->imuParameters.accNoiseDensity;
+  }
+
+  auto accRandomWalk = cameraNode["acc_random_walk"];
+  if (cvExists(accRandomWalk)) {
+    accRandomWalk >> options->imuParameters.accRandomWalk;
+  }
+
+  auto gyrNoiseDensity = cameraNode["gyr_noise_density"];
+  if (cvExists(gyrNoiseDensity)) {
+    gyrNoiseDensity >> options->imuParameters.gyrNoiseDensity;
+  }
+
+  auto gyrRandomWalk = cameraNode["gyr_random_walk"];
+  if (cvExists(gyrRandomWalk)) {
+    gyrRandomWalk >> options->imuParameters.gyrRandomWalk;
+  }
+
+    return true;
   }
 };
 

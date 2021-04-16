@@ -74,6 +74,17 @@ public:
 
 	// IMU
 	ImuParameters imuParameters;
+
+	// Camera
+	std::vector<double> intrinsics{6.3007006020163419e+02,
+								6.3066578517514370e+02,
+								2.9440730698720517e+02,
+								2.5090606048734924e+02};
+	std::vector<double> distCoeffs{-3.9458674051766940e-01,
+							   4.2159874612649451e-01,
+								  2.3858518861790620e-03,
+								  -2.9775941904103447e-03};
+	cv::Size imageSize{640,480};
   };
 
 protected:

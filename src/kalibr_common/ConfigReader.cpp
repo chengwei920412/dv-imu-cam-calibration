@@ -13,15 +13,17 @@ PinholeRadialTangentialCamera::PinholeRadialTangentialCamera(const std::vector<d
 															 const cv::Size &resolution) {
 
 
-  assert(intrinsics.size() >= 4);
-  const auto focalLength = std::vector<double>(intrinsics.begin(), intrinsics.begin()+2);
-  const auto principalPoint = std::vector<double>(intrinsics.begin()+2, intrinsics.begin()+4);
 
-  assert(distCoeff.size() >= 4);
-  const auto dist = aslam::cameras::RadialTangentialDistortion(distCoeff.at(0),
-															   distCoeff.at(1),
-															   distCoeff.at(2),
-															   distCoeff.at(3)); // TODO(radam): double check order
+  assert(intrinsics.size() == 4);
+  focalLength = std::vector<double>(intrinsics.begin(), intrinsics.begin()+2);
+  principalPoint = std::vector<double>(intrinsics.begin()+2, intrinsics.begin()+4);
+
+  distortionCoefficients = distCoeff;
+  assert(distortionCoefficients.size() >= 4);
+  const auto dist = aslam::cameras::RadialTangentialDistortion(distortionCoefficients.at(0),
+															   distortionCoefficients.at(1),
+															   distortionCoefficients.at(2),
+															   distortionCoefficients.at(3));
   const auto proj = aslam::cameras::PinholeProjection<aslam::cameras::RadialTangentialDistortion>(focalLength[0],
 																							 focalLength[1],
 																							 principalPoint[0],
@@ -41,4 +43,14 @@ boost::shared_ptr<aslam::cameras::DistortedPinholeCameraGeometry> PinholeRadialT
 boost::shared_ptr<aslam::Frame<aslam::cameras::DistortedPinholeCameraGeometry>> PinholeRadialTangentialCamera::frame() {
   auto frame = boost::make_shared<aslam::Frame<aslam::cameras::DistortedPinholeCameraGeometry>>(aslam::Frame<aslam::cameras::DistortedPinholeCameraGeometry>());
   return frame;
+}
+
+
+void PinholeRadialTangentialCamera::printDetails() {
+  std::cout << "Initializing camera:" << std::endl;
+  std::cout << "  Camera model: pinhole" << std::endl;
+  std::cout << "  Focal length: [" << focalLength.at(0) << " " << focalLength.at(1) << "]" << std::endl;
+  std::cout << "  Principal point: [" << principalPoint.at(0) << " " << principalPoint.at(1) << "]" << std::endl;
+  std::cout << "  Distortion model: RadialTangential" << std::endl;
+  std::cout << "  Distortion coefficients: [" << distortionCoefficients.at(0) << " " << distortionCoefficients.at(1) <<" " << distortionCoefficients.at(2) <<" " << distortionCoefficients.at(3) << "]" << std::endl;
 }

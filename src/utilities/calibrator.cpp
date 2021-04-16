@@ -32,7 +32,10 @@ Calibrator::Calibrator(const Options& opts) : calibratorOptions(opts) {
   imuData = boost::make_shared<std::vector<ImuMeasurement>>();
 
   iccImu = boost::make_shared<IccImu>(calibratorOptions.imuParameters, imuData);
-  iccCamera = boost::make_shared<IccCamera>(targetObservations);
+  iccCamera = boost::make_shared<IccCamera>(calibratorOptions.intrinsics,
+  	calibratorOptions.distCoeffs,
+  	calibratorOptions.imageSize,
+  	targetObservations);
   iccCalibrator = boost::make_shared<IccCalibrator>(iccCamera, iccImu);
 
   detectionsQueue.start(std::max(1u, std::thread::hardware_concurrency()-1));

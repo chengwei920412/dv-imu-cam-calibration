@@ -48,12 +48,7 @@ protected:
   const double cornerUncertainty;
   sm::kinematics::Transformation T_extrinsic;
   double timeshiftCamToImuPrior = 0.0;
-  PinholeRadialTangentialCamera camera{
-    std::vector<double>{6.3007006020163419e+02, 6.3066578517514370e+02, 2.9440730698720517e+02, 2.5090606048734924e+02},
-      std::vector<double>{-3.9458674051766940e-01, 4.2159874612649451e-01,
-	  2.3858518861790620e-03, -2.9775941904103447e-03,
-	  -3.2459783818568150e-01},
-      cv::Size(640, 480)}; // TODO(radam): pass these ALL in constructor
+  PinholeRadialTangentialCamera camera;
 
   Eigen::Vector3d gravity_w;
   double timeOffset = 0.0;
@@ -69,7 +64,11 @@ protected:
 
 
 public:
-  IccCamera(boost::shared_ptr<std::map<int64_t, aslam::cameras::GridCalibrationTargetObservation>> observations,
+  IccCamera(
+  	const std::vector<double>& intrinsics,
+  	const std::vector<double>& distCoeffs,
+  	const cv::Size& imageSize,
+  	boost::shared_ptr<std::map<int64_t, aslam::cameras::GridCalibrationTargetObservation>> observations,
   		    const double reprojectionSigma=1.0,
 			const bool showCorners=true,
 			const bool showReproj = true,

@@ -19,19 +19,22 @@ double toSec(const int64_t time) {
   return static_cast<double>(time) / 1e6;
 }
 
-IccCamera::IccCamera(boost::shared_ptr<std::map<int64_t,
+IccCamera::IccCamera(const std::vector<double>& intrinsics,
+					 const std::vector<double>& distCoeffs,
+					 const cv::Size& imageSize,
+	boost::shared_ptr<std::map<int64_t,
 												aslam::cameras::GridCalibrationTargetObservation>> observations,
 					 const double reprojectionSigma,
 					 const bool showCorners,
 					 const bool showReproj,
-					 const bool showOneStep) : cornerUncertainty(reprojectionSigma) {
+					 const bool showOneStep) : camera(intrinsics, distCoeffs, imageSize),
+					 cornerUncertainty(reprojectionSigma) {
 
   targetObservations = observations;
   gravity_w = Eigen::Vector3d(9.80655, 0., 0.);
   T_extrinsic = sm::kinematics::Transformation();
 
-  std::cout << "Initializing camera:" << std::endl;
-  // TODO(radam): print all of the details once camera models are correctly implemented
+  camera.printDetails();
 }
 
 sm::kinematics::Transformation IccCamera::getTransformation() {
