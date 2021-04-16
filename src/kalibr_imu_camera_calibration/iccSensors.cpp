@@ -169,8 +169,8 @@ void IccCamera::findTimeshiftCameraImuPrior(boost::shared_ptr<IccImu> iccImu, bo
 
   auto poseSpline = initPoseSplineFromCamera(6, 100, 0.0);
 
-  std::vector<double> t, omega_measured_norm, omega_predicted_norm;
-  t.reserve(iccImu->getImuData().size());
+  std::vector<double> times, omega_measured_norm, omega_predicted_norm;
+  times.reserve(iccImu->getImuData().size());
   omega_measured_norm.reserve(iccImu->getImuData().size());
   omega_predicted_norm.reserve(iccImu->getImuData().size());
   for (const auto &im : iccImu->getImuData()) {
@@ -180,7 +180,7 @@ void IccCamera::findTimeshiftCameraImuPrior(boost::shared_ptr<IccImu> iccImu, bo
 	  const auto
 		  omega_predicted = aslam::backend::EuclideanExpression(poseSpline->angularVelocityBodyFrame(tk).transpose());
 
-	  t.push_back(tk);
+	  times.push_back(tk);
 	  omega_measured_norm.push_back(omega_measured.norm());
 	  omega_predicted_norm.push_back(omega_predicted.toEuclidean().norm());
 	}
@@ -201,56 +201,38 @@ void IccCamera::findTimeshiftCameraImuPrior(boost::shared_ptr<IccImu> iccImu, bo
 	predicted[i] = omega_predicted_norm[i];
   }
 
+  const auto paddedSize = measured.size() + 2 * predicted.size() - 2;
+  Eigen::VectorXd zeroPaddedMeasurement(paddedSize);
+  zeroPaddedMeasurement.setZero();
+  zeroPaddedMeasurement.segment(predicted.size()/2, measured.size()) = measured;
+
   double maxVal = -1;
   size_t maxIdx = 0;
-
-
-
-  const auto corrSize = measured.size() + 2 * (predicted.size() / 2);
-  for (size_t i = 0 ; i < corrSize ; ++i) {
-    Eigen::VectorXd measuredSlice(predicted.size());
-    measuredSlice.setZero();
-
-    int startIdxUnbound = static_cast<int>(i) - static_cast<int>(predicted.size()/2);
-    int endIdxUnbound = startIdxUnbound + static_cast<int>(predicted.size()) - 1;
-
-    size_t sliceStart, sliceSize, mSliceStart;
-
-    if (startIdxUnbound < 0) {
-
-    } else {
-
-	}
-
-    measuredSlice.segment(sliceStart, sliceSize) = measured.segment(mSliceStart, sliceSize);
-
-
+  for (size_t i = 0 ; i < paddedSize - predicted.size() ; ++i) {
+    Eigen::VectorXd measuredSlice = zeroPaddedMeasurement.segment(i, predicted.size());
     double val = measuredSlice.transpose() * predicted;
     if (val > maxVal) {
       maxVal = val;
       maxIdx = i;
     }
   }
-  const auto discrete_shift = maxIdx - omega_measured_norm.size() - 1;
 
-  std::cout << "maxVal " << maxVal << std::endl; // TODO(radam): delete
-  std::cout << "maxIdx " << maxIdx << std::endl; // TODO(radam): delete
-  std::cout << "discrete_shift " << discrete_shift << std::endl; // TODO(radam): delete
+  const auto discrete_shift = maxIdx - predicted.size()/2;
 
+  double dt = 0;
+  for (size_t i = 0 ; i < times.size() - 1 ; ++i) {
+    dt += times[i+1] - times[i];
+  }
+  dt /= static_cast<double>(times.size()-1);
+  double shift = -static_cast<double>(discrete_shift) * dt;
 
-//  const auto discrete_shift = std::distance(corr.begin(), std::max_element(corr.begin(), corr.end())) - omega_measured_norm.size() - 1;
-//  std::cout << "discrete_shift " << discrete_shift << std::endl; // TODO(radam): delete
+  timeshiftCamToImuPrior = shift;
 
-//
-//  std::cout << measured.transpose() << std::endl; // TODO(radam): del
-//  std::cout << "aaa" << std::endl; // TODO(radam): del
-//  std::cout << predicted.transpose() << std::endl; // TODO(radam): del
-
-  throw std::runtime_error("BUMP!!!!!!!"); // TODO(radam): delete
-
-
-
+  std::cout << "  Time shift camera to imu (t_imu = t_cam + shift): " << std::endl;
+  std::cout << timeshiftCamToImuPrior << std::endl;
 }
+
+
 boost::shared_ptr<bsplines::BSplinePose> IccCamera::initPoseSplineFromCamera(const size_t splineOrder,
 																			 const size_t poseKnotsPerSecond,
 																			 const double timeOffsetPadding) {
@@ -342,7 +324,7 @@ void IccCamera::addDesignVariables(boost::shared_ptr<aslam::calibration::Optimiz
 	  boost::make_shared<aslam::backend::TransformationBasic>(T_c_b_Dv_q->toExpression(), T_c_b_Dv_t->toExpression());
 
   cameraTimeToImuTimeDv = boost::make_shared<aslam::backend::Scalar>(0.0);
-  cameraTimeToImuTimeDv->setActive(false); // TODO(radam): time calib
+  cameraTimeToImuTimeDv->setActive(!noTimeCalibration);
   problem->addDesignVariable(cameraTimeToImuTimeDv, CALIBRATION_GROUP_ID);
 }
 
