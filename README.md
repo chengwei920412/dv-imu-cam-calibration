@@ -20,7 +20,7 @@ This code is based on [kalibr](https://github.com/ethz-asl/kalibr).
   <gyr_noise_density>8.09e-5</gyr_noise_density>
   <gyr_random_walk>2.29e-6</gyr_random_walk>
   ```
-- calibrate
+- collect images of a static calibration pattern while moving the camera (each axis, each rotation)
 
 ## Project structure
 - modules - the DV module
