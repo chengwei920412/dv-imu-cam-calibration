@@ -182,6 +182,11 @@ public:
      */
     void reset();
 
+    /**
+     * Get a string containing DV log information before optimization.
+     *
+     * @param ss string stream into which log will be output
+     */
     void getDvInfoBeforeOptimization(std::stringstream& ss) {
         ss << "Calibrating using ";
         {
@@ -198,6 +203,11 @@ public:
         iccCalibrator->printErrorStatistics(ss);
     }
 
+    /**
+     * Get a string containing DV log information after optimization.
+     *
+     * @param ss string stream into which log will be output
+     */
     void getDvInfoAfterOptimization(std::stringstream& ss) {
         ss << "AFTER OPTIMIZATION" << std::endl;
         iccCalibrator->printErrorStatistics(ss);

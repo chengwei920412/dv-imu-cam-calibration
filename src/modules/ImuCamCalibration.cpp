@@ -349,8 +349,8 @@ protected:
 
     void calibrate() {
         // Function printing std string to DV log with nicely handled newlines
-        auto string2dvLog = [&](const std::string string) {
-            std::stringstream stringReader(string);
+        auto string2dvLog = [&](const std::string& str) {
+            std::stringstream stringReader(str);
             std::string line;
 
             while (std::getline(stringReader, line)) {

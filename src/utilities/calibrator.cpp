@@ -358,7 +358,7 @@ void Calibrator::detectPattern(const StampedImage& stampedImage) {
     }
 
     // Replace the most recent image even if no pattern detected
-    std::lock_guard<std::mutex> lock(latestImageMutex);
+    std::lock_guard<std::mutex> lock1(latestImageMutex);
     bool replace = true;
     if (latestStampedImage != nullptr) {
         if (stampedImage.timestamp < latestStampedImage->timestamp) {
@@ -367,7 +367,9 @@ void Calibrator::detectPattern(const StampedImage& stampedImage) {
     }
     if (replace) {
         latestStampedImage = boost::make_shared<StampedImage>(stampedImage.clone());
-        // latestObservation = // TODO(radam):
+        if (success) {
+            latestObservation = boost::make_shared<aslam::cameras::GridCalibrationTargetObservation>(observation);
+        }
     }
 }
 
