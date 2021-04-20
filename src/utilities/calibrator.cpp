@@ -253,12 +253,7 @@ Calibrator::StampedImage Calibrator::getPreviewImage() {
     return stampedImage;
 }
 
-size_t Calibrator::getNumDetections() {
-    std::lock_guard<std::mutex> lock(targetObservationsMutex);
-    return targetObservations->size();
-}
-
-void Calibrator::calibrate() {
+IccCalibrator::CalibrationResult Calibrator::calibrate() {
     std::cout << "Waiting for the detector to finish..." << std::endl;
     detectionsQueue.waitForEmptyQueue();
 
@@ -269,8 +264,7 @@ void Calibrator::calibrate() {
     std::lock_guard<std::mutex> lock2(imuDataMutex);
 
     if (targetObservations->empty()) {
-        std::cout << "No observations collected" << std::endl;
-        return;
+        throw std::runtime_error("No observations collected");
     }
 
     std::cout << "Calibrating using " << targetObservations->size() << " detections." << std::endl;
@@ -304,10 +298,12 @@ void Calibrator::calibrate() {
     std::cout << std::endl << "After Optimization" << std::endl << "###################" << std::endl;
     iccCalibrator->printErrorStatistics();
 
-    std::cout << std::endl << "Results" << std::endl << "#######" << std::endl;
+    std::cout << std::endl << "Results" << std::endl << "#######" << std::endl << std::endl;
     iccCalibrator->printResult();
 
     state = CALIBRATED;
+
+    return iccCalibrator->getResult();
 }
 
 void Calibrator::detectPattern(const StampedImage& stampedImage) {

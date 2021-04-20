@@ -28,6 +28,16 @@ class IccCalibrator {
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
+    struct CalibrationResult {
+        double t_cam_imu;
+        Eigen::Matrix4d T_cam_imu;
+        bool converged;
+
+        CalibrationResult(const double timeShift, const Eigen::Matrix4d& transformation, bool conv) :
+            t_cam_imu(timeShift), T_cam_imu(transformation), converged(conv) {
+        }
+    };
+
 protected:
     const size_t calibrationGroupId = 0;
 
@@ -39,6 +49,8 @@ protected:
 
     boost::shared_ptr<aslam::backend::DesignVariable> gravityDv = nullptr;
     boost::shared_ptr<aslam::backend::EuclideanExpression> gravityExpression = nullptr;
+
+    bool converged = false;
 
 public:
     IccCalibrator(boost::shared_ptr<IccCamera> camera, boost::shared_ptr<IccImu> imu);
@@ -81,6 +93,8 @@ public:
         const bool recoverCov = false);
 
     void recoverCovariance();
+
+    CalibrationResult getResult();
 
     void printResult();
 

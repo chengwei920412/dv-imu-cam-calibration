@@ -155,14 +155,11 @@ public:
     StampedImage getPreviewImage();
 
     /**
-     * @return number of successful target detections
-     */
-    size_t getNumDetections();
-
-    /**
      * Begin calibration procedure on the collected data.
+     *
+     * @return result of the calibration
      */
-    void calibrate();
+    [[nodiscard]] IccCalibrator::CalibrationResult calibrate();
 
     /**
      * Start collecting data from the camera and IMU.

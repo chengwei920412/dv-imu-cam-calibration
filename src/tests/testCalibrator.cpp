@@ -102,9 +102,18 @@ TEST(CalibratorTestSuite, smokeTest) {
     /// Try to calibrate - this is the actual test
     ////
 
-    calibrator.calibrate();
+    const auto result = calibrator.calibrate();
 
-    EXPECT_TRUE(true);
+    EXPECT_TRUE(result.converged);
+    EXPECT_NEAR(result.t_cam_imu, 0.00454318, 1e-8);
+
+    Eigen::Matrix4d expected;
+    expected << -0.999994, 0.000329469, 0.00342636, 0.000565281, 0.000306871, 0.999978, -0.00659382, 0.0191179,
+        -0.00342846, -0.00659273, -0.999972, -0.0501339, 0, 0, 0, 1;
+    EXPECT_TRUE(result.T_cam_imu.isApprox(expected, 1e-6)) << "result:" << std::endl
+                                                           << result.T_cam_imu << std::endl
+                                                           << "expected:" << std::endl
+                                                           << expected;
 }
 
 int main(int argc, char** argv) {

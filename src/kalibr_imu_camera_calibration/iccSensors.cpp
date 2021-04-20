@@ -443,7 +443,8 @@ void IccCamera::printResiduals() {
     }
 
     const auto [mean, median, std] = errorStatistics(errVals);
-    std::cout << "Reprojection error [px]:      mean: " << mean << " median: " << median << " std: " << std << std::endl;
+    std::cout << "Reprojection error [px]:      mean: " << mean << " median: " << median << " std: " << std
+              << std::endl;
 }
 
 double IccImu::getAccelUncertaintyDiscrete() {

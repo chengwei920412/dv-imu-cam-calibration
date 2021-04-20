@@ -186,6 +186,7 @@ void IccCalibrator::optimize(
         if (retval.linearSolverFailure) {
             optimizationFailed = true;
         }
+        converged = retval.iterations < options->maxIterations;
     } catch (...) {
         optimizationFailed = true;
     }
@@ -213,11 +214,23 @@ void IccCalibrator::recoverCovariance() {
     // self.std_times = np.array(est_stds[6:])
 }
 
+IccCalibrator::CalibrationResult IccCalibrator::getResult() {
+    IccCalibrator::CalibrationResult result(
+        iccCamera->getResultTimeShift(),
+        iccCamera->getTransformation().T(),
+        converged);
+    return result;
+}
+
 void IccCalibrator::printResult() {
+    const auto result = getResult();
+
+    std::cout << "Optimization converged:" << std::endl;
+    std::cout << "  " << (result.converged ? "true" : "false") << std::endl;
     std::cout << "Transformation T_cam_imu:" << std::endl;
-    std::cout << iccCamera->getTransformation().T() << std::endl;
+    std::cout << result.T_cam_imu << std::endl;
     std::cout << "Camera to imu time: [s] (t_imu = t_cam + shift):" << std::endl;
-    std::cout << iccCamera->getResultTimeShift() << std::endl;
+    std::cout << "  " << result.t_cam_imu << std::endl;
 }
 
 void IccCalibrator::printErrorStatistics() {
