@@ -47,8 +47,8 @@ public:
             "calibrationPattern",
             dv::ConfigOption::listOption(
                 "Calibration pattern to use",
-                "assCircleGrid",
-                {"chessboard", "assCircleGrid", "aprilTag"},
+                "asymmetricCirclesGrid",
+                {"chessboard", "asymmetricCirclesGrid", "aprilTag"},
                 false));
 
         // Module control buttons
@@ -111,7 +111,7 @@ public:
         const auto pattern = config.getString("calibrationPattern");
         if (pattern == "chessboard") {
             options.pattern = Calibrator::CalibrationPattern::CHESSBOARD;
-        } else if (pattern == "assCircleGrid") {
+        } else if (pattern == "asymmetricCirclesGrid") {
             options.pattern = Calibrator::CalibrationPattern::ASYMMETRIC_CIRCLES_GRID;
         } else if (pattern == "aprilTag") {
             options.pattern = Calibrator::CalibrationPattern::APRIL_GRID;
