@@ -11,8 +11,12 @@ bool cvExists(const cv::FileNode& fn) {
 }
 
 class ImuCamCalibration : public dv::ModuleBase {
-private:
+protected:
     std::unique_ptr<Calibrator> calibrator = nullptr;
+
+    enum CollectionState { BEFORE_COLLECTING, DURING_COLLECTING, AFTER_COLLECTING, CALIBRATED };
+
+    CollectionState collectionState = BEFORE_COLLECTING;
 
 public:
     static void initInputs(dv::InputDefinitionList& in) {
@@ -54,8 +58,12 @@ public:
         // Module control buttons
         config.add(
             "startCollecting",
-            dv::ConfigOption::buttonOption("Begin collecting calibration images", "startCollecting"));
-        config.add("calibrate", dv::ConfigOption::buttonOption("Start calibration algorithm", "calibrate"));
+            dv::ConfigOption::buttonOption("Start collecting calibration images", "StartCollecting"));
+        config.add(
+            "stopCollecting",
+            dv::ConfigOption::buttonOption("Stop collecting calibration images", "StopCollecting"));
+        config.add("discard", dv::ConfigOption::buttonOption("Discard the collected images", "Discard"));
+        config.add("calibrate", dv::ConfigOption::buttonOption("Start calibration algorithm", "Calibrate"));
 
         // Optimization options
         config.add(
@@ -72,36 +80,95 @@ public:
              "boardSquareSize",
              "calibrationPattern",
              "startCollecting",
+             "stopCollecting",
+             "discard",
              "calibrate"});
     }
 
     void configUpdate() {
-        // Start collecting button was clicked
-        if (config.getBool("startCollecting")) {
-            calibrator->startCollecting();
-            config.setBool("startCollecting", false);
+        // Handle user input
+        switch (collectionState) {
+            case BEFORE_COLLECTING: {
+                if (config.getBool("startCollecting")) {
+                    collectionState = DURING_COLLECTING;
+                    calibrator->startCollecting();
+                }
+                break;
+            }
+            case DURING_COLLECTING: {
+                if (config.getBool("stopCollecting")) {
+                    collectionState = AFTER_COLLECTING;
+                    calibrator->stopCollecting();
+                }
+                break;
+            }
+            case AFTER_COLLECTING: {
+                if (config.getBool("calibrate")) {
+                    auto result = calibrator->calibrate();
+                    // TODO(radam): handle result
+                    collectionState = CALIBRATED;
+                }
+
+                if (config.getBool("discard")) {
+                    collectionState = BEFORE_COLLECTING;
+                    initializeCalibrator();
+                }
+                break;
+            }
+            case CALIBRATED: {
+                if (config.getBool("discard")) {
+                    collectionState = BEFORE_COLLECTING;
+                    initializeCalibrator();
+                }
+                break;
+            }
+            default: throw std::runtime_error("Invalid collection state");
         }
 
-        // Calibrate button was clicked
-        if (config.getBool("calibrate")) {
-            calibrator->calibrate();
-            config.setBool("calibrate", false);
+        // Enable/Disable buttons based on current state
+        switch (collectionState) {
+            case BEFORE_COLLECTING: {
+                config.setBool("startCollecting", false);
+                config.setBool("stopCollecting", true);
+                config.setBool("discard", true);
+                config.setBool("calibrate", true);
+                break;
+            }
+            case DURING_COLLECTING: {
+                config.setBool("startCollecting", true);
+                config.setBool("stopCollecting", false);
+                config.setBool("discard", true);
+                config.setBool("calibrate", true);
+                break;
+            }
+            case AFTER_COLLECTING: {
+                config.setBool("startCollecting", true);
+                config.setBool("stopCollecting", true);
+                config.setBool("discard", false);
+                config.setBool("calibrate", false);
+                break;
+            }
+            case CALIBRATED: {
+                config.setBool("startCollecting", true);
+                config.setBool("stopCollecting", true);
+                config.setBool("discard", false);
+                config.setBool("calibrate", true);
+                break;
+            }
+            default: throw std::runtime_error("Invalid collection state");
         }
     }
 
-    ImuCamCalibration() {
-        // Input output
+    void initializeCalibrator() {
         const auto frameInput = inputs.getFrameInput("frames");
-        const auto inputSize = frameInput.size();
         const auto description = frameInput.getOriginDescription();
-        outputs.getFrameOutput("preview").setup(inputSize.width, inputSize.height, description);
 
         // Calibrator options
         Calibrator::Options options;
 
         // Calibration file
         const auto filename = config.getString("calibrationFile");
-        bool success = readCalibrationFile(filename, frameInput.getOriginDescription(), &options);
+        bool success = readCalibrationFile(filename, description, &options);
 
         if (!success) {
             log.error << "Failed to load camera calibration file. Using default data. " << filename;
@@ -130,6 +197,23 @@ public:
         options.timeCalibration = config.getBool("timeCalibration");
 
         calibrator = std::make_unique<Calibrator>(options);
+    }
+
+    ImuCamCalibration() {
+        // Input output
+        const auto frameInput = inputs.getFrameInput("frames");
+        const auto inputSize = frameInput.size();
+        const auto description = frameInput.getOriginDescription();
+        outputs.getFrameOutput("preview").setup(inputSize.width, inputSize.height, description);
+
+        initializeCalibrator();
+
+        // Unclick all the buttons and update the state
+        config.setBool("startCollecting", false);
+        config.setBool("stopCollecting", false);
+        config.setBool("discard", false);
+        config.setBool("calibrate", false);
+        configUpdate();
     }
 
     void run() override {

@@ -48,7 +48,7 @@ public:
 
     enum CalibrationPattern { CHESSBOARD, ASYMMETRIC_CIRCLES_GRID, APRIL_GRID };
 
-    enum State { INITIALIZED = 0, COLLECTING = 1, CALIBRATING = 2, CALIBRATED = 3 };
+    enum State { INITIALIZED, COLLECTING, COLLECTED, CALIBRATING, CALIBRATED };
 
     struct Options {
         // Calibration pattern
@@ -106,6 +106,7 @@ protected:
 
     // Latest image used for visualization
     boost::shared_ptr<StampedImage> latestStampedImage = nullptr;
+    boost::shared_ptr<aslam::cameras::GridCalibrationTargetObservation> latestObservation = nullptr;
     std::mutex latestImageMutex;
 
     // Colors used in visualization of detected calibtion pattern
@@ -165,6 +166,16 @@ public:
      * Start collecting data from the camera and IMU.
      */
     void startCollecting();
+
+    /**
+     * Stop collecting data from the camera and IMU.
+     */
+    void stopCollecting();
+
+    /**
+     * Discard the collected data and reset the calibrator.
+     */
+    void reset();
 
 protected:
     /**

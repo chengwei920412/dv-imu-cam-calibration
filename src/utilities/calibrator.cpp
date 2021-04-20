@@ -150,8 +150,14 @@ void Calibrator::addImu(
 void Calibrator::addImage(const StampedImage& stampedImage) {
     assert(stampedImage.image.channels() == 1 && "calibrator expect a grayscale image");
 
-    boost::unique_future<void> job;
-    detectionsQueue.scheduleFuture<void>(boost::bind(&Calibrator::detectPattern, this, stampedImage.clone()), job);
+    if (state == COLLECTING) {
+        boost::unique_future<void> job;
+        detectionsQueue.scheduleFuture<void>(boost::bind(&Calibrator::detectPattern, this, stampedImage.clone()), job);
+    } else {
+        std::lock_guard<std::mutex> lock(latestImageMutex);
+        latestStampedImage = boost::make_shared<StampedImage>(stampedImage.clone());
+        latestObservation = nullptr;
+    }
 }
 
 void Calibrator::addImage(const cv::Mat& img, int64_t timestamp) {
@@ -160,22 +166,26 @@ void Calibrator::addImage(const cv::Mat& img, int64_t timestamp) {
 
 Calibrator::StampedImage Calibrator::getPreviewImage() {
     // Get the latest image
-    StampedImage stampedImage;
+    StampedImage latestImage;
+    std::shared_ptr<aslam::cameras::GridCalibrationTargetObservation> latestObs = nullptr;
     {
         std::lock_guard<std::mutex> lock(latestImageMutex);
         if (latestStampedImage == nullptr) {
             return StampedImage(previewImageWithText("No image arrived yet"));
         }
-        stampedImage = latestStampedImage->clone();
-        if (stampedImage.image.channels() == 1) {
-            cv::cvtColor(stampedImage.image, stampedImage.image, cv::COLOR_GRAY2BGR);
+        latestImage = latestStampedImage->clone();
+        if (latestImage.image.channels() == 1) {
+            cv::cvtColor(latestImage.image, latestImage.image, cv::COLOR_GRAY2BGR);
+        }
+        if (latestObservation != nullptr) {
+            latestObs = std::make_shared<aslam::cameras::GridCalibrationTargetObservation>(*latestObservation);
         }
     }
 
     switch (state) {
         case INITIALIZED: {
             cv::putText(
-                stampedImage.image,
+                latestImage.image,
                 "Ready to collect",
                 cv::Point(20, 40),
                 cv::FONT_HERSHEY_DUPLEX,
@@ -187,48 +197,43 @@ Calibrator::StampedImage Calibrator::getPreviewImage() {
         case COLLECTING: {
             // Get the latest observation
             std::stringstream ss;
-            boost::shared_ptr<aslam::cameras::GridCalibrationTargetObservation> observation = nullptr;
             {
                 std::lock_guard<std::mutex> lock(targetObservationsMutex);
                 ss << "Collected " << targetObservations->size() << " images";
-                auto it = targetObservations->find(stampedImage.timestamp);
-                if (it != targetObservations->end()) {
-                    observation = boost::make_shared<aslam::cameras::GridCalibrationTargetObservation>(it->second);
-                }
+                auto it = targetObservations->find(latestImage.timestamp);
             }
 
             cv::putText(
-                stampedImage.image,
+                latestImage.image,
                 ss.str(),
                 cv::Point(20, 40),
                 cv::FONT_HERSHEY_DUPLEX,
                 1.0,
                 cv::Scalar(255, 0, 0),
                 2);
-
-            if (observation != nullptr && observation->time().toDvTime() == stampedImage.timestamp) {
-                cv::Point prevPoint(-1, -1);
-                for (size_t y = 0; y < grid->rows(); ++y) {
-                    const auto color = colors[y % colors.size()];
-                    for (size_t x = 0; x < grid->cols(); ++x) {
-                        const auto idx = y * grid->cols() + x;
-                        Eigen::Vector2d point;
-                        if (observation->imagePoint(idx, point)) {
-                            const cv::Point cvPoint(point.x(), point.y());
-                            cv::circle(stampedImage.image, cvPoint, 8, color, 2);
-                            if (prevPoint != cv::Point(-1, -1)) {
-                                cv::line(stampedImage.image, prevPoint, cvPoint, color, 2);
-                            }
-                            prevPoint = cvPoint;
-                        }
-                    }
-                }
+            break;
+        }
+        case COLLECTED: {
+            std::stringstream ss;
+            {
+                std::lock_guard<std::mutex> lock(targetObservationsMutex);
+                ss << "Ready to calibrate with " << targetObservations->size() << " images";
+                auto it = targetObservations->find(latestImage.timestamp);
             }
+
+            cv::putText(
+                latestImage.image,
+                ss.str(),
+                cv::Point(20, 40),
+                cv::FONT_HERSHEY_DUPLEX,
+                1.0,
+                cv::Scalar(255, 0, 0),
+                2);
             break;
         }
         case CALIBRATING: {
             cv::putText(
-                stampedImage.image,
+                latestImage.image,
                 "Calibrating...",
                 cv::Point(20, 40),
                 cv::FONT_HERSHEY_DUPLEX,
@@ -239,7 +244,7 @@ Calibrator::StampedImage Calibrator::getPreviewImage() {
         }
         case CALIBRATED:
             cv::putText(
-                stampedImage.image,
+                latestImage.image,
                 "Calibrated!",
                 cv::Point(20, 40),
                 cv::FONT_HERSHEY_DUPLEX,
@@ -250,7 +255,26 @@ Calibrator::StampedImage Calibrator::getPreviewImage() {
         default: throw std::runtime_error("Unknown state");
     }
 
-    return stampedImage;
+    if (latestObs != nullptr && latestObs->time().toDvTime() == latestImage.timestamp) {
+        cv::Point prevPoint(-1, -1);
+        for (size_t y = 0; y < grid->rows(); ++y) {
+            const auto color = colors[y % colors.size()];
+            for (size_t x = 0; x < grid->cols(); ++x) {
+                const auto idx = y * grid->cols() + x;
+                Eigen::Vector2d point;
+                if (latestObs->imagePoint(idx, point)) {
+                    const cv::Point cvPoint(point.x(), point.y());
+                    cv::circle(latestImage.image, cvPoint, 8, color, 2);
+                    if (prevPoint != cv::Point(-1, -1)) {
+                        cv::line(latestImage.image, prevPoint, cvPoint, color, 2);
+                    }
+                    prevPoint = cvPoint;
+                }
+            }
+        }
+    }
+
+    return latestImage;
 }
 
 IccCalibrator::CalibrationResult Calibrator::calibrate() {
@@ -333,10 +357,21 @@ void Calibrator::detectPattern(const StampedImage& stampedImage) {
     }
     if (replace) {
         latestStampedImage = boost::make_shared<StampedImage>(stampedImage.clone());
+        // latestObservation = // TODO(radam):
     }
 }
 
 void Calibrator::startCollecting() {
+    reset();
+
+    state = COLLECTING;
+}
+
+void Calibrator::stopCollecting() {
+    state = COLLECTED;
+}
+
+void Calibrator::reset() {
     detectionsQueue.waitForEmptyQueue();
 
     {
@@ -348,6 +383,4 @@ void Calibrator::startCollecting() {
         std::lock_guard<std::mutex> lock2(imuDataMutex);
         imuData->clear();
     }
-
-    state = COLLECTING;
 }
