@@ -54,7 +54,7 @@ ADD_LIBRARY(imu-cam-calibration SHARED
 
 SET_TARGET_PROPERTIES(imu-cam-calibration
         PROPERTIES
-        PREFIX "user_"
+        PREFIX "dv_"
         )
 
 TARGET_LINK_LIBRARIES(imu-cam-calibration PRIVATE

@@ -45,8 +45,8 @@ public:
             "boardSquareSize",
             dv::ConfigOption::doubleOption("Size of a calibration pattern element in meters", 0.05, 0.0, 1.0));
         config.add(
-            "tagSpacing",
-            dv::ConfigOption::doubleOption("Ratio of space between tags to tagSize (AprilTag)", 0.05, 0.0, 1.0));
+            "tagSpacingRatio",
+            dv::ConfigOption::doubleOption("Ratio of space between tags to tagSize (AprilTag)", 0.3, 0.0, 1.0));
         config.add(
             "calibrationPattern",
             dv::ConfigOption::listOption(
@@ -64,6 +64,21 @@ public:
             dv::ConfigOption::buttonOption("Stop collecting calibration images", "StopCollecting"));
         config.add("discard", dv::ConfigOption::buttonOption("Discard the collected images", "Discard"));
         config.add("calibrate", dv::ConfigOption::buttonOption("Start calibration algorithm", "Calibrate"));
+
+        // Optimization options
+        config.add(
+            "maxIter",
+            dv::ConfigOption::intOption("Maximum number of iteration of calibration optimization problem", 50, 1, 100));
+        config.add(
+            "timeCalibration",
+            dv::ConfigOption::boolOption("If true, time offset between the sensors will be calibrated", true));
+
+        // IMU noise parameters
+        config.add("IMUupdateRate", dv::ConfigOption::doubleOption("IMU update rate [Hz]", 200, 10, 10000));
+        config.add("accNoiseDensity", dv::ConfigOption::doubleOption("Accelerometer noise density", 1.49e-3, 0, 1));
+        config.add("accRandomWalk", dv::ConfigOption::doubleOption("Accelerometer noise random walk", 8.69e-5, 0, 1));
+        config.add("gyrNoiseDensity", dv::ConfigOption::doubleOption("Gyroscope noise density", 8.09e-5, 0, 1));
+        config.add("gyrRandomWalk", dv::ConfigOption::doubleOption("Gyroscope noise random walk", 2.29e-6, 0, 1));
 
         // Optimization options
         config.add(
@@ -168,10 +183,15 @@ public:
 
         // Calibration file
         const auto filename = config.getString("calibrationFile");
-        bool success = readCalibrationFile(filename, description, &options);
-
-        if (!success) {
-            log.error << "Failed to load camera calibration file. Using default data. " << filename;
+        std::stringstream ss;
+        ss << "Failed to load camera calibration file: " << filename;
+        try {
+            bool success = readCalibrationFile(filename, description, &options);
+            if (!success) {
+                throw std::runtime_error(ss.str());
+            }
+        } catch (...) {
+            throw std::runtime_error(ss.str());
         }
 
         // Calibration pattern
@@ -191,7 +211,7 @@ public:
         options.rows = static_cast<size_t>(config.getInt("boardHeight"));
         options.cols = static_cast<size_t>(config.getInt("boardWidth"));
         options.spacingMeters = config.getDouble("boardSquareSize");
-        options.tagSpacing = config.getDouble("tagSpacing");
+        options.tagSpacing = config.getDouble("tagSpacingRatio");
 
         options.maxIter = static_cast<size_t>(config.getInt("maxIter"));
         options.timeCalibration = config.getBool("timeCalibration");
@@ -248,6 +268,8 @@ protected:
     bool readCalibrationFile(const std::string& filename, const std::string& cameraID, Calibrator::Options* options) {
         assert(options);
 
+        const auto frameInput = inputs.getFrameInput("frames");
+
         cv::FileStorage fs(filename, cv::FileStorage::READ);
 
         if (!fs.isOpened()) {
@@ -267,7 +289,7 @@ protected:
             int fseye;
             useFisheye >> fseye;
             if (fseye != 0) {
-                log.error << "Only non-fisheye calibration is supported!" << std::endl;
+                log.error << "Only non-fisheye calibration is supported." << std::endl;
                 return false;
             }
         }
@@ -275,12 +297,13 @@ protected:
         auto cameraNode = fs[cameraID];
 
         if (!cvExists(cameraNode) || !cameraNode.isMap()) {
-            log.warning.format("Calibration data for camera {:s} not present in file: {:s}", cameraID, filename);
+            log.error.format("Calibration data for camera {:s} not present in file: {:s}", cameraID, filename);
             return false;
         }
 
-        if (!cvExists(cameraNode["camera_matrix"]) || !cvExists(cameraNode["distortion_coefficients"])) {
-            log.warning.format("Calibration data for camera {:s} not present in file: {:s}", cameraID, filename);
+        if (!cvExists(cameraNode["camera_matrix"]) || !cvExists(cameraNode["distortion_coefficients"])
+            || !cvExists(cameraNode["image_width"]) || !cvExists(cameraNode["image_height"])) {
+            log.error.format("Calibration data for camera {:s} not present in file: {:s}", cameraID, filename);
             return false;
         }
 
@@ -310,32 +333,13 @@ protected:
             loadedDistCoeffs.at<double>(1, 0),
             loadedDistCoeffs.at<double>(2, 0),
             loadedDistCoeffs.at<double>(3, 0)};
+
+        if (imWidth != frameInput.sizeX() || imHeight != frameInput.sizeY()) {
+            log.error.format("Calibration data image size does not match the connected input: {:s}", filename);
+            return false;
+        }
+
         options->imageSize = cv::Size(imWidth, imHeight);
-
-        auto updateRate = cameraNode["update_rate"];
-        if (cvExists(updateRate)) {
-            updateRate >> options->imuParameters.updateRate;
-        }
-
-        auto accNoiseDensity = cameraNode["acc_noise_density"];
-        if (cvExists(accNoiseDensity)) {
-            accNoiseDensity >> options->imuParameters.accNoiseDensity;
-        }
-
-        auto accRandomWalk = cameraNode["acc_random_walk"];
-        if (cvExists(accRandomWalk)) {
-            accRandomWalk >> options->imuParameters.accRandomWalk;
-        }
-
-        auto gyrNoiseDensity = cameraNode["gyr_noise_density"];
-        if (cvExists(gyrNoiseDensity)) {
-            gyrNoiseDensity >> options->imuParameters.gyrNoiseDensity;
-        }
-
-        auto gyrRandomWalk = cameraNode["gyr_random_walk"];
-        if (cvExists(gyrRandomWalk)) {
-            gyrRandomWalk >> options->imuParameters.gyrRandomWalk;
-        }
 
         return true;
     }
