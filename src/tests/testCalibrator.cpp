@@ -102,6 +102,7 @@ TEST(CalibratorTestSuite, smokeTest) {
     /// Try to calibrate - this is the actual test
     ////
 
+    calibrator.buildProblem();
     const auto result = calibrator.calibrate();
 
     EXPECT_TRUE(result.converged);

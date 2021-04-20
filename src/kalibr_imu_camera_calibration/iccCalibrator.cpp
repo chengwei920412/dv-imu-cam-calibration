@@ -85,6 +85,12 @@ void IccCalibrator::buildProblem(
     double accelNoiseScale,
     double timeOffsetPadding,
     bool verbose) {
+    problemBuilt = true;
+
+    if (!problemBuilt) {
+        throw std::runtime_error("Problem was not built before calibrate() was called");
+    }
+
     auto bool2string = [](bool val) {
         return (val ? "true" : "false");
     };
@@ -222,23 +228,21 @@ IccCalibrator::CalibrationResult IccCalibrator::getResult() {
     return result;
 }
 
-void IccCalibrator::printResult() {
-    const auto result = getResult();
-
-    std::cout << "Optimization converged:" << std::endl;
-    std::cout << "  " << (result.converged ? "true" : "false") << std::endl;
-    std::cout << "Transformation T_cam_imu:" << std::endl;
-    std::cout << result.T_cam_imu << std::endl;
-    std::cout << "Camera to imu time: [s] (t_imu = t_cam + shift):" << std::endl;
-    std::cout << "  " << result.t_cam_imu << std::endl;
+void IccCalibrator::printResult(const CalibrationResult& result, std::stringstream& ss) {
+    ss << "Optimization converged:" << std::endl;
+    ss << "  " << (result.converged ? "true" : "false") << std::endl;
+    ss << "Transformation T_cam_imu:" << std::endl;
+    ss << result.T_cam_imu << std::endl;
+    ss << "Camera to imu time: [s] (t_imu = t_cam + shift):" << std::endl;
+    ss << "  " << result.t_cam_imu << std::endl;
 }
 
-void IccCalibrator::printErrorStatistics() {
-    std::cout << std::endl << "Normalized Residuals" << std::endl << "-------------------" << std::endl;
-    iccCamera->printNormalizedResiduals();
-    iccImu->printNormalizedResiduals();
+void IccCalibrator::printErrorStatistics(std::stringstream& ss) {
+    ss << std::endl << "Normalized Residuals" << std::endl << "-------------------" << std::endl;
+    iccCamera->printNormalizedResiduals(ss);
+    iccImu->printNormalizedResiduals(ss);
 
-    std::cout << std::endl << "Residuals" << std::endl << "-------------------" << std::endl;
-    iccCamera->printResiduals();
-    iccImu->printResiduals();
+    ss << std::endl << "Residuals" << std::endl << "-------------------" << std::endl;
+    iccCamera->printResiduals(ss);
+    iccImu->printResiduals(ss);
 }

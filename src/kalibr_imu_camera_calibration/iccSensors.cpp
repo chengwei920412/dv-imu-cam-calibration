@@ -414,9 +414,9 @@ void IccCamera::addCameraErrorTerms(
     std::cout << "  Added " << targetObservations->size() << " camera error tems" << std::endl;
 }
 
-void IccCamera::printNormalizedResiduals() {
+void IccCamera::printNormalizedResiduals(std::stringstream& ss) {
     if (allReprojectionErrors.empty()) {
-        std::cout << "Reprojection error:    no corners" << std::endl;
+        ss << "Reprojection error:    no corners" << std::endl;
     }
 
     std::vector<double> errVals;
@@ -427,12 +427,12 @@ void IccCamera::printNormalizedResiduals() {
     }
 
     const auto [mean, median, std] = errorStatistics(errVals);
-    std::cout << "Reprojection error:    mean: " << mean << " median: " << median << " std: " << std << std::endl;
+    ss << "Reprojection error:    mean: " << mean << " median: " << median << " std: " << std << std::endl;
 }
 
-void IccCamera::printResiduals() {
+void IccCamera::printResiduals(std::stringstream& ss) {
     if (allReprojectionErrors.empty()) {
-        std::cout << "Reprojection error [px]:    no corners" << std::endl;
+        ss << "Reprojection error [px]:    no corners" << std::endl;
     }
 
     std::vector<double> errVals;
@@ -443,8 +443,7 @@ void IccCamera::printResiduals() {
     }
 
     const auto [mean, median, std] = errorStatistics(errVals);
-    std::cout << "Reprojection error [px]:      mean: " << mean << " median: " << median << " std: " << std
-              << std::endl;
+    ss << "Reprojection error [px]:      mean: " << mean << " median: " << median << " std: " << std << std::endl;
 }
 
 double IccImu::getAccelUncertaintyDiscrete() {
@@ -623,7 +622,7 @@ void IccImu::addBiasMotionTerms(boost::shared_ptr<aslam::calibration::Optimizati
     problem->addErrorTerm(accelBiasMotionErr);
 }
 
-void IccImu::printNormalizedResiduals() {
+void IccImu::printNormalizedResiduals(std::stringstream& ss) {
     std::vector<double> gyroVals, accelVals;
     gyroVals.reserve(gyroErrors.size());
     accelVals.reserve(accelErrors.size());
@@ -633,7 +632,7 @@ void IccImu::printNormalizedResiduals() {
     }
     {
         const auto [mean, median, std] = errorStatistics(gyroVals);
-        std::cout << "Gyroscope error:       mean: " << mean << " median: " << median << " std: " << std << std::endl;
+        ss << "Gyroscope error:       mean: " << mean << " median: " << median << " std: " << std << std::endl;
     }
 
     for (const auto& err : accelErrors) {
@@ -641,11 +640,11 @@ void IccImu::printNormalizedResiduals() {
     }
     {
         const auto [mean, median, std] = errorStatistics(accelVals);
-        std::cout << "Accelerometer error:   mean: " << mean << " median: " << median << " std: " << std << std::endl;
+        ss << "Accelerometer error:   mean: " << mean << " median: " << median << " std: " << std << std::endl;
     }
 }
 
-void IccImu::printResiduals() {
+void IccImu::printResiduals(std::stringstream& ss) {
     std::vector<double> gyroVals, accelVals;
     gyroVals.reserve(gyroErrors.size());
     accelVals.reserve(accelErrors.size());
@@ -655,8 +654,7 @@ void IccImu::printResiduals() {
     }
     {
         const auto [mean, median, std] = errorStatistics(gyroVals);
-        std::cout << "Gyroscope error [rad/s]:      mean: " << mean << " median: " << median << " std: " << std
-                  << std::endl;
+        ss << "Gyroscope error [rad/s]:      mean: " << mean << " median: " << median << " std: " << std << std::endl;
     }
 
     for (const auto& err : accelErrors) {
@@ -664,7 +662,6 @@ void IccImu::printResiduals() {
     }
     {
         const auto [mean, median, std] = errorStatistics(accelVals);
-        std::cout << "Accelerometer error [m/s^2]:  mean: " << mean << " median: " << median << " std: " << std
-                  << std::endl;
+        ss << "Accelerometer error [m/s^2]:  mean: " << mean << " median: " << median << " std: " << std << std::endl;
     }
 }

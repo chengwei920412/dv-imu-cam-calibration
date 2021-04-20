@@ -156,6 +156,11 @@ public:
     StampedImage getPreviewImage();
 
     /**
+     * Build optimization problem. Needs to be called before calibrate().
+     */
+    void buildProblem();
+
+    /**
      * Begin calibration procedure on the collected data.
      *
      * @return result of the calibration
@@ -176,6 +181,27 @@ public:
      * Discard the collected data and reset the calibrator.
      */
     void reset();
+
+    void getDvInfoBeforeOptimization(std::stringstream& ss) {
+        ss << "Calibrating using ";
+        {
+            std::lock_guard<std::mutex> lock1(targetObservationsMutex);
+            ss << targetObservations->size() << " target observations and ";
+        }
+
+        {
+            std::lock_guard<std::mutex> lock2(imuDataMutex);
+            ss << imuData->size() << " IMU measurements " << std::endl;
+        }
+
+        ss << "BEFORE OPTIMIZATION" << std::endl;
+        iccCalibrator->printErrorStatistics(ss);
+    }
+
+    void getDvInfoAfterOptimization(std::stringstream& ss) {
+        ss << "AFTER OPTIMIZATION" << std::endl;
+        iccCalibrator->printErrorStatistics(ss);
+    }
 
 protected:
     /**

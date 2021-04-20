@@ -277,7 +277,7 @@ Calibrator::StampedImage Calibrator::getPreviewImage() {
     return latestImage;
 }
 
-IccCalibrator::CalibrationResult Calibrator::calibrate() {
+void Calibrator::buildProblem() {
     std::cout << "Waiting for the detector to finish..." << std::endl;
     detectionsQueue.waitForEmptyQueue();
 
@@ -312,22 +312,32 @@ IccCalibrator::CalibrationResult Calibrator::calibrate() {
         1.0,
         0.03,
         false);
+}
 
-    std::cout << std::endl << "Before Optimization" << std::endl << "###################" << std::endl;
-    iccCalibrator->printErrorStatistics();
+IccCalibrator::CalibrationResult Calibrator::calibrate() {
+    std::lock_guard<std::mutex> lock1(targetObservationsMutex);
+    std::lock_guard<std::mutex> lock2(imuDataMutex);
 
-    std::cout << std::endl << "Optimizing..." << std::endl;
+    std::stringstream ss;
+    ss << std::endl << "Before Optimization" << std::endl << "###################" << std::endl;
+    iccCalibrator->printErrorStatistics(ss);
+
+    ss << std::endl << "Optimizing..." << std::endl;
+    std::cout << ss.str();
+    ss.str("");
     iccCalibrator->optimize(nullptr, calibratorOptions.maxIter, false);
 
-    std::cout << std::endl << "After Optimization" << std::endl << "###################" << std::endl;
-    iccCalibrator->printErrorStatistics();
+    ss << std::endl << "After Optimization" << std::endl << "###################" << std::endl;
+    iccCalibrator->printErrorStatistics(ss);
 
-    std::cout << std::endl << "Results" << std::endl << "#######" << std::endl << std::endl;
-    iccCalibrator->printResult();
+    ss << std::endl << "Results" << std::endl << "#######" << std::endl << std::endl;
+    const auto result = iccCalibrator->getResult();
+    IccCalibrator::printResult(result, ss);
+    std::cout << ss.str();
 
     state = CALIBRATED;
 
-    return iccCalibrator->getResult();
+    return result;
 }
 
 void Calibrator::detectPattern(const StampedImage& stampedImage) {

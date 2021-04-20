@@ -51,6 +51,7 @@ protected:
     boost::shared_ptr<aslam::backend::EuclideanExpression> gravityExpression = nullptr;
 
     bool converged = false;
+    bool problemBuilt = false;
 
 public:
     IccCalibrator(boost::shared_ptr<IccCamera> camera, boost::shared_ptr<IccImu> imu);
@@ -96,7 +97,7 @@ public:
 
     CalibrationResult getResult();
 
-    void printResult();
+    static void printResult(const CalibrationResult& result, std::stringstream& ss);
 
-    void printErrorStatistics();
+    void printErrorStatistics(std::stringstream& ss);
 };

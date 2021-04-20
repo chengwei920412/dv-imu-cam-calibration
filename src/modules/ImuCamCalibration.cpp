@@ -107,6 +107,7 @@ public:
                 if (config.getBool("startCollecting")) {
                     collectionState = DURING_COLLECTING;
                     calibrator->startCollecting();
+                    log.info("Started collecting images");
                 }
                 break;
             }
@@ -114,18 +115,19 @@ public:
                 if (config.getBool("stopCollecting")) {
                     collectionState = AFTER_COLLECTING;
                     calibrator->stopCollecting();
+                    log.info("Stopped collecting images");
                 }
                 break;
             }
             case AFTER_COLLECTING: {
                 if (config.getBool("calibrate")) {
-                    auto result = calibrator->calibrate();
-                    // TODO(radam): handle result
+                    calibrate();
                     collectionState = CALIBRATED;
                 }
 
                 if (config.getBool("discard")) {
                     collectionState = BEFORE_COLLECTING;
+                    log.info("Discarded all collected data");
                     initializeCalibrator();
                 }
                 break;
@@ -133,6 +135,7 @@ public:
             case CALIBRATED: {
                 if (config.getBool("discard")) {
                     collectionState = BEFORE_COLLECTING;
+                    log.info("Discarded all collected data");
                     initializeCalibrator();
                 }
                 break;
@@ -342,6 +345,44 @@ protected:
         options->imageSize = cv::Size(imWidth, imHeight);
 
         return true;
+    }
+
+    void calibrate() {
+        // Function printing std string to DV log with nicely handled newlines
+        auto string2dvLog = [&](const std::string string) {
+            std::stringstream stringReader(string);
+            std::string line;
+
+            while (std::getline(stringReader, line)) {
+                if (!line.empty()) {
+                    log.info << line << dv::logEnd;
+                }
+            }
+        };
+
+        std::stringstream ss;
+
+        log.info("Building the problem...");
+        calibrator->buildProblem();
+
+        // Print the info before optimization
+        calibrator->getDvInfoBeforeOptimization(ss);
+        string2dvLog(ss.str());
+        ss.str("");
+
+        // Run the optimization problem
+        log.info("Optimizing...");
+        const auto result = calibrator->calibrate();
+
+        // Print the info after optimization
+        calibrator->getDvInfoAfterOptimization(ss);
+        string2dvLog(ss.str());
+        ss.str("");
+
+        // Print the result
+        log.info("RESULT");
+        IccCalibrator::printResult(result, ss);
+        string2dvLog(ss.str());
     }
 };
 

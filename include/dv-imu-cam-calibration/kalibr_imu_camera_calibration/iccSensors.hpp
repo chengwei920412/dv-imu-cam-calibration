@@ -101,9 +101,9 @@ public:
         double blakeZissermanDf = 0.0,
         double timeOffsetPadding = 0.0);
 
-    void printNormalizedResiduals();
+    void printNormalizedResiduals(std::stringstream& ss);
 
-    void printResiduals();
+    void printResiduals(std::stringstream& ss);
 };
 
 struct ImuMeasurement {
@@ -199,7 +199,7 @@ public:
 
     void addBiasMotionTerms(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem);
 
-    void printNormalizedResiduals();
+    void printNormalizedResiduals(std::stringstream& ss);
 
-    void printResiduals();
+    void printResiduals(std::stringstream& ss);
 };
