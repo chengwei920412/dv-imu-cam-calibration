@@ -14,6 +14,7 @@
 #include <aslam/backend/OptimizationProblem.hpp>
 #include <aslam/backend/RotationQuaternion.hpp>
 #include <aslam/backend/Scalar.hpp>
+#include <aslam/backend/SimpleReprojectionError.hpp>
 #include <aslam/backend/TransformationBasic.hpp>
 #include <aslam/calibration/core/OptimizationProblem.h>
 #include <aslam/cameras/GridCalibrationTargetObservation.hpp>
@@ -54,6 +55,12 @@ protected:
     // Observations of the calibration target
     boost::shared_ptr<std::map<int64_t, aslam::cameras::GridCalibrationTargetObservation>> targetObservations = nullptr;
 
+    // Error statistics
+    typedef aslam::backend::SimpleReprojectionError<aslam::Frame<aslam::cameras::DistortedPinholeCameraGeometry>>
+        ReprojectionError;
+    typedef boost::shared_ptr<ReprojectionError> ReprojectionErrorSP;
+    std::vector<std::vector<ReprojectionErrorSP>> allReprojectionErrors;
+
 public:
     IccCamera(
         const std::vector<double>& intrinsics,
@@ -93,6 +100,10 @@ public:
         boost::shared_ptr<aslam::splines::BSplinePoseDesignVariable> poseSplineDv,
         double blakeZissermanDf = 0.0,
         double timeOffsetPadding = 0.0);
+
+    void printNormalizedResiduals();
+
+    void printResiduals();
 };
 
 struct ImuMeasurement {
@@ -187,4 +198,8 @@ public:
         size_t biasKnotsPerSecond);
 
     void addBiasMotionTerms(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem);
+
+    void printNormalizedResiduals();
+
+    void printResiduals();
 };

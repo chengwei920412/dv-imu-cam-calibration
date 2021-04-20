@@ -295,16 +295,14 @@ void Calibrator::calibrate() {
         0.03,
         false);
 
-    //  // Printing reprojection errors is quite difficult, not doing it
-    //  std::cout << std::endl << "Before Optimization" << std::endl << "###################" << std::endl;
-    //  iccCalibrator->printErrorStatistics();
+    std::cout << std::endl << "Before Optimization" << std::endl << "###################" << std::endl;
+    iccCalibrator->printErrorStatistics();
 
     std::cout << std::endl << "Optimizing..." << std::endl;
     iccCalibrator->optimize(nullptr, calibratorOptions.maxIter, false);
 
-    //  // Printing reprojection errors is quite difficult, not doing it
-    //  std::cout << std::endl << "After Optimization" << std::endl << "###################" << std::endl;
-    //  iccCalibrator->printErrorStatistics();
+    std::cout << std::endl << "After Optimization" << std::endl << "###################" << std::endl;
+    iccCalibrator->printErrorStatistics();
 
     std::cout << std::endl << "Results" << std::endl << "#######" << std::endl;
     iccCalibrator->printResult();

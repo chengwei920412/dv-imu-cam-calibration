@@ -19,6 +19,7 @@ target_link_libraries(calibrator
         aslam_splines
         bsplines
         incremental_calibration
+        aslam_cv_error_terms
         sm_boost
         sm_kinematics
         kalibr_errorterms)

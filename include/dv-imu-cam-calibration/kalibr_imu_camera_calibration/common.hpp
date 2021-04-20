@@ -27,3 +27,5 @@ void addSplineDesignVariables(
     boost::shared_ptr<aslam::splines::EuclideanBSplineDesignVariable> dvc,
     bool setActive = true,
     size_t groupId = HELPER_GROUP_ID);
+
+std::tuple<double, double, double> errorStatistics(std::vector<double> vals);

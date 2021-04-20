@@ -83,4 +83,6 @@ public:
     void recoverCovariance();
 
     void printResult();
+
+    void printErrorStatistics();
 };

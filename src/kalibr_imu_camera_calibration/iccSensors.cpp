@@ -9,7 +9,6 @@
 #include <aslam/backend/Optimizer2.hpp>
 #include <aslam/backend/Optimizer2Options.hpp>
 #include <aslam/backend/ReprojectionError.hpp>
-#include <aslam/backend/SimpleReprojectionError.hpp>
 #include <kalibr_errorterms/GyroscopeError.hpp>
 #include <sm/kinematics/transformations.hpp>
 
@@ -383,6 +382,8 @@ void IccCamera::addCameraErrorTerms(
             frame->addKeypoint(k);
         }
 
+        std::vector<ReprojectionErrorSP> reprojectionErrors;
+        reprojectionErrors.reserve(imageCornerPoints.size());
         for (size_t idx = 0; idx < imageCornerPoints.size(); ++idx) {
             const auto& imageCornerPoint = imageCornerPoints[idx];
             const auto& targetPoint = targetCornerPoints[idx];
@@ -395,11 +396,7 @@ void IccCamera::addCameraErrorTerms(
             const auto p = T_c_w * aslam::backend::HomogeneousExpression(eigenPoint);
 
             // #build and append the error term
-            auto rerr = boost::make_shared<
-                aslam::backend::SimpleReprojectionError<aslam::Frame<aslam::cameras::DistortedPinholeCameraGeometry>>>(
-                frame.get(),
-                idx,
-                p);
+            auto rerr = boost::make_shared<ReprojectionError>(frame.get(), idx, p);
 
             // #add blake-zisserman m-estimator
             if (blakeZissermanDf > 0.0) {
@@ -409,10 +406,44 @@ void IccCamera::addCameraErrorTerms(
             }
 
             problem->addErrorTerm(rerr);
+            reprojectionErrors.push_back(rerr);
         }
+        allReprojectionErrors.push_back(reprojectionErrors);
     }
 
     std::cout << "  Added " << targetObservations->size() << " camera error tems" << std::endl;
+}
+
+void IccCamera::printNormalizedResiduals() {
+    if (allReprojectionErrors.empty()) {
+        std::cout << "Reprojection error:    no corners" << std::endl;
+    }
+
+    std::vector<double> errVals;
+    for (const auto& vec : allReprojectionErrors) {
+        for (const auto& val : vec) {
+            errVals.push_back(val->evaluateError());
+        }
+    }
+
+    const auto [mean, median, std] = errorStatistics(errVals);
+    std::cout << "Reprojection error:    mean: " << mean << " median: " << median << " std: " << std << std::endl;
+}
+
+void IccCamera::printResiduals() {
+    if (allReprojectionErrors.empty()) {
+        std::cout << "Reprojection error [px]:    no corners" << std::endl;
+    }
+
+    std::vector<double> errVals;
+    for (const auto& vec : allReprojectionErrors) {
+        for (const auto& val : vec) {
+            errVals.push_back(val->error().norm());
+        }
+    }
+
+    const auto [mean, median, std] = errorStatistics(errVals);
+    std::cout << "Reprojection error [px]:    mean: " << mean << " median: " << median << " std: " << std << std::endl;
 }
 
 double IccImu::getAccelUncertaintyDiscrete() {
@@ -589,4 +620,50 @@ void IccImu::addBiasMotionTerms(boost::shared_ptr<aslam::calibration::Optimizati
             Waccel,
             1);
     problem->addErrorTerm(accelBiasMotionErr);
+}
+
+void IccImu::printNormalizedResiduals() {
+    std::vector<double> gyroVals, accelVals;
+    gyroVals.reserve(gyroErrors.size());
+    accelVals.reserve(accelErrors.size());
+
+    for (const auto& err : gyroErrors) {
+        gyroVals.push_back(err->evaluateError());
+    }
+    {
+        const auto [mean, median, std] = errorStatistics(gyroVals);
+        std::cout << "Gyroscope error:    mean: " << mean << " median: " << median << " std: " << std << std::endl;
+    }
+
+    for (const auto& err : accelErrors) {
+        accelVals.push_back(err->evaluateError());
+    }
+    {
+        const auto [mean, median, std] = errorStatistics(accelVals);
+        std::cout << "Accelerometer error:    mean: " << mean << " median: " << median << " std: " << std << std::endl;
+    }
+}
+
+void IccImu::printResiduals() {
+    std::vector<double> gyroVals, accelVals;
+    gyroVals.reserve(gyroErrors.size());
+    accelVals.reserve(accelErrors.size());
+
+    for (const auto& err : gyroErrors) {
+        gyroVals.push_back(err->error().norm());
+    }
+    {
+        const auto [mean, median, std] = errorStatistics(gyroVals);
+        std::cout << "Gyroscope error [rad/s]:    mean: " << mean << " median: " << median << " std: " << std
+                  << std::endl;
+    }
+
+    for (const auto& err : accelErrors) {
+        accelVals.push_back(err->error().norm());
+    }
+    {
+        const auto [mean, median, std] = errorStatistics(accelVals);
+        std::cout << "Accelerometer error [m/s^2]:    mean: " << mean << " median: " << median << " std: " << std
+                  << std::endl;
+    }
 }

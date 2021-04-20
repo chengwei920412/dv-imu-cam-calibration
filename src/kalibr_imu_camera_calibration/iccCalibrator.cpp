@@ -219,3 +219,13 @@ void IccCalibrator::printResult() {
     std::cout << "Camera to imu time: [s] (t_imu = t_cam + shift):" << std::endl;
     std::cout << iccCamera->getResultTimeShift() << std::endl;
 }
+
+void IccCalibrator::printErrorStatistics() {
+    std::cout << std::endl << "Normalized Residuals" << std::endl << "-------------------" << std::endl;
+    iccCamera->printNormalizedResiduals();
+    iccImu->printNormalizedResiduals();
+
+    std::cout << std::endl << "Residuals" << std::endl << "-------------------" << std::endl;
+    iccCamera->printResiduals();
+    iccImu->printResiduals();
+}
