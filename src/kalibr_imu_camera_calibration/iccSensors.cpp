@@ -443,7 +443,7 @@ void IccCamera::printResiduals() {
     }
 
     const auto [mean, median, std] = errorStatistics(errVals);
-    std::cout << "Reprojection error [px]:    mean: " << mean << " median: " << median << " std: " << std << std::endl;
+    std::cout << "Reprojection error [px]:      mean: " << mean << " median: " << median << " std: " << std << std::endl;
 }
 
 double IccImu::getAccelUncertaintyDiscrete() {
@@ -632,7 +632,7 @@ void IccImu::printNormalizedResiduals() {
     }
     {
         const auto [mean, median, std] = errorStatistics(gyroVals);
-        std::cout << "Gyroscope error:    mean: " << mean << " median: " << median << " std: " << std << std::endl;
+        std::cout << "Gyroscope error:       mean: " << mean << " median: " << median << " std: " << std << std::endl;
     }
 
     for (const auto& err : accelErrors) {
@@ -640,7 +640,7 @@ void IccImu::printNormalizedResiduals() {
     }
     {
         const auto [mean, median, std] = errorStatistics(accelVals);
-        std::cout << "Accelerometer error:    mean: " << mean << " median: " << median << " std: " << std << std::endl;
+        std::cout << "Accelerometer error:   mean: " << mean << " median: " << median << " std: " << std << std::endl;
     }
 }
 
@@ -654,7 +654,7 @@ void IccImu::printResiduals() {
     }
     {
         const auto [mean, median, std] = errorStatistics(gyroVals);
-        std::cout << "Gyroscope error [rad/s]:    mean: " << mean << " median: " << median << " std: " << std
+        std::cout << "Gyroscope error [rad/s]:      mean: " << mean << " median: " << median << " std: " << std
                   << std::endl;
     }
 
@@ -663,7 +663,7 @@ void IccImu::printResiduals() {
     }
     {
         const auto [mean, median, std] = errorStatistics(accelVals);
-        std::cout << "Accelerometer error [m/s^2]:    mean: " << mean << " median: " << median << " std: " << std
+        std::cout << "Accelerometer error [m/s^2]:  mean: " << mean << " median: " << median << " std: " << std
                   << std::endl;
     }
 }
