@@ -221,10 +221,16 @@ void IccCalibrator::recoverCovariance() {
 }
 
 IccCalibrator::CalibrationResult IccCalibrator::getResult() {
+    ErrorInfo error_info(
+        iccCamera->getMeanReprojectionError(),
+        iccImu->getMeanGyroscopeError(),
+        iccImu->getMeanAccelerometerError());
+
     IccCalibrator::CalibrationResult result(
         iccCamera->getResultTimeShift(),
         iccCamera->getTransformation().T(),
-        converged);
+        converged,
+        error_info);
     return result;
 }
 

@@ -2,6 +2,8 @@
 
 #include <dv-sdk/module.hpp>
 
+#include <fmt/chrono.h>
+
 bool cvExists(const cv::FileNode& fn) {
     if (fn.type() == cv::FileNode::NONE) {
         return (false);
@@ -37,6 +39,11 @@ public:
         config.add(
             "calibrationFile",
             dv::ConfigOption::fileOpenOption("Path to the camera calibration file", "", "xml"));
+        config.add(
+            "outputCalibrationDirectory",
+            dv::ConfigOption::directoryOption(
+                "Specify directory to save the calibration settings in",
+                dv::portable_get_user_home_directory()));
 
         // Calibration pattern
         config.add("boardHeight", dv::ConfigOption::intOption("Number of rows in the calibration pattern", 11, 1, 50));
@@ -90,6 +97,7 @@ public:
 
         config.setPriorityOptions(
             {"calibrationFile",
+             "outputCalibrationDirectory",
              "boardHeight",
              "boardWidth",
              "boardSquareSize",
@@ -347,6 +355,52 @@ protected:
         return true;
     }
 
+    std::string saveFilePath() {
+        const auto frameInput = inputs.getFrameInput("frames");
+        const auto cameraID = frameInput.getOriginDescription();
+        boost::filesystem::path outputDir{config.getString("outputCalibrationDirectory")};
+
+        if (outputDir.empty()) {
+            outputDir = dv::portable_get_user_home_directory();
+        }
+
+        const std::string fmt("{:%Y_%m_%d_%H_%M_%S}");
+        const std::string timeString
+            = fmt::format(fmt, fmt::localtime(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())));
+        const std::string fileName = "camera_imu_calibration_" + cameraID + "-" + timeString + ".xml";
+
+        auto filePath = (outputDir / fileName).string();
+        return filePath;
+    }
+
+    void saveCalibration(const IccCalibrator::CalibrationResult& result) {
+        const auto filePath = saveFilePath();
+
+        cv::FileStorage fs(filePath, cv::FileStorage::WRITE);
+
+        if (!fs.isOpened()) {
+            log.warning << "Failed to write to calibration file: " << filePath << dv::logEnd;
+            return;
+        }
+
+        fs << "board_width" << config.getInt("boardWidth");
+        fs << "board_height" << config.getInt("boardHeight");
+        fs << "calibration_pattern" << config.getString("calibrationPattern");
+        fs << "board_square_size" << config.getDouble("boardSquareSize");
+
+        fs << "calibration_converged" << result.converged;
+        fs << "time_offset_cam_imu" << result.t_cam_imu;
+        cv::Mat trans;
+        cv::eigen2cv(result.T_cam_imu, trans);
+        fs << "transformation_cam_imu" << trans;
+
+        fs << "mean_reprojection_error" << result.error_info.meanReprojectionError;
+        fs << "mean_accelerometer_error" << result.error_info.meanAccelerometerError;
+        fs << "mean_gyroscope_error" << result.error_info.meanGyroscopeError;
+
+        log.info << "Calibration saved to a file: " << filePath << dv::logEnd;
+    }
+
     void calibrate() {
         // Function printing std string to DV log with nicely handled newlines
         auto string2dvLog = [&](const std::string& str) {
@@ -383,6 +437,9 @@ protected:
         log.info("RESULT");
         IccCalibrator::printResult(result, ss);
         string2dvLog(ss.str());
+
+        // Save the calibration to a text file
+        saveCalibration(result);
     }
 };
 

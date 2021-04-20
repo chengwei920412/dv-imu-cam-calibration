@@ -101,6 +101,8 @@ public:
         double blakeZissermanDf = 0.0,
         double timeOffsetPadding = 0.0);
 
+    double getMeanReprojectionError();
+
     void printNormalizedResiduals(std::stringstream& ss);
 
     void printResiduals(std::stringstream& ss);
@@ -198,6 +200,10 @@ public:
         size_t biasKnotsPerSecond);
 
     void addBiasMotionTerms(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem);
+
+    double getMeanGyroscopeError();
+
+    double getMeanAccelerometerError();
 
     void printNormalizedResiduals(std::stringstream& ss);
 

@@ -28,13 +28,29 @@ class IccCalibrator {
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
+    struct ErrorInfo {
+        double meanReprojectionError;
+        double meanGyroscopeError;
+        double meanAccelerometerError;
+
+        ErrorInfo(const double repr, const double gyr, const double acc) :
+            meanReprojectionError(repr), meanGyroscopeError(gyr), meanAccelerometerError(acc) {
+        }
+    };
+
     struct CalibrationResult {
         double t_cam_imu;
         Eigen::Matrix4d T_cam_imu;
         bool converged;
+        ErrorInfo error_info;
 
-        CalibrationResult(const double timeShift, const Eigen::Matrix4d& transformation, bool conv) :
-            t_cam_imu(timeShift), T_cam_imu(transformation), converged(conv) {
+        CalibrationResult(
+            const double timeShift,
+            const Eigen::Matrix4d& transformation,
+            bool conv,
+            const ErrorInfo& err_info) :
+            t_cam_imu(timeShift),
+            T_cam_imu(transformation), converged(conv), error_info(err_info) {
         }
     };
 

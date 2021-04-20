@@ -414,6 +414,19 @@ void IccCamera::addCameraErrorTerms(
     std::cout << "  Added " << targetObservations->size() << " camera error tems" << std::endl;
 }
 
+double IccCamera::getMeanReprojectionError() {
+    std::vector<double> errVals;
+    for (const auto& vec : allReprojectionErrors) {
+        for (const auto& val : vec) {
+            errVals.push_back(val->error().norm());
+        }
+    }
+
+    const auto [mean, median, std] = errorStatistics(errVals);
+
+    return mean;
+}
+
 void IccCamera::printNormalizedResiduals(std::stringstream& ss) {
     if (allReprojectionErrors.empty()) {
         ss << "Reprojection error:    no corners" << std::endl;
@@ -620,6 +633,30 @@ void IccImu::addBiasMotionTerms(boost::shared_ptr<aslam::calibration::Optimizati
             Waccel,
             1);
     problem->addErrorTerm(accelBiasMotionErr);
+}
+
+double IccImu::getMeanAccelerometerError() {
+    std::vector<double> accelVals;
+    accelVals.reserve(accelErrors.size());
+
+    for (const auto& err : accelErrors) {
+        accelVals.push_back(err->error().norm());
+    }
+
+    const auto [mean, median, std] = errorStatistics(accelVals);
+
+    return mean;
+}
+
+double IccImu::getMeanGyroscopeError() {
+    std::vector<double> gyroVals;
+    gyroVals.reserve(gyroErrors.size());
+
+    for (const auto& err : gyroErrors) {
+        gyroVals.push_back(err->error().norm());
+    }
+    const auto [mean, median, std] = errorStatistics(gyroVals);
+    return mean;
 }
 
 void IccImu::printNormalizedResiduals(std::stringstream& ss) {
