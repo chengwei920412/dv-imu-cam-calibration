@@ -33,13 +33,11 @@ namespace aslam {
 
     Thread::Identifier::Identifier(pthread_t posix) :
         mPosix(posix),
-        mKernel(-1),
         mProcess(-1) {
     }
 
     Thread::Identifier::Identifier(const Identifier& other) :
         mPosix(other.mPosix),
-        mKernel(other.mKernel),
         mProcess(other.mProcess) {
     }
 
@@ -47,7 +45,6 @@ namespace aslam {
         (const Identifier& other) {
       if (this != &other) {
         mPosix = other.mPosix;
-        mKernel = other.mKernel;
         mProcess = other.mProcess;
       }
       return *this;
@@ -205,7 +202,6 @@ namespace aslam {
 
     void Thread::Identifier::reset() {
       mPosix = 0;
-      mKernel = -1;
       mProcess = -1;
     }
 
@@ -340,7 +336,6 @@ namespace aslam {
     void Thread::initialize() {
       Mutex::ScopedLock lock(mMutex);
       mIdentifier.mProcess = getpid();
-      mIdentifier.mKernel = gettid();
       Threads::getInstance().registerThread(*this);
       safeSetState(running);
       mStarted.signal(Condition::broadcast);

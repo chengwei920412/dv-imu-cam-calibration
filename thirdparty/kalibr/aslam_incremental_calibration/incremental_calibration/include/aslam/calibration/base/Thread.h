@@ -93,8 +93,6 @@ namespace aslam {
         /// C
         /// Posix identifier
         pthread_t mPosix;
-        /// Kernel
-        pid_t mKernel;
         /// Process
         pid_t mProcess;
         /// Constructor with parameter
