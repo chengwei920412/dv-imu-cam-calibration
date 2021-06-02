@@ -4,6 +4,8 @@ project(aslam_cameras)
 find_package(Eigen3 REQUIRED)
 include_directories(SYSTEM ${EIGEN3_INCLUDE_DIR})
 
+find_package(OpenCV REQUIRED)
+
 ADD_DEFINITIONS(-DASLAM_USE_ROS )
 
 add_definitions(-fPIC)
@@ -37,6 +39,7 @@ add_library(${PROJECT_NAME} SHARED
 
 target_link_libraries(${PROJECT_NAME}
         ${Boost_LIBRARIES}
+		${OpenCV_LIBS}
         sm_boost
         sm_eigen
         sm_kinematics
@@ -47,4 +50,3 @@ target_link_libraries(${PROJECT_NAME}
 
 target_include_directories(${PROJECT_NAME} PUBLIC
         include)
-

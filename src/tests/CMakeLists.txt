@@ -6,6 +6,8 @@ include_directories(SYSTEM ${OpenCV_INCLUDE_DIRS})
 find_package(Eigen3 REQUIRED)
 include_directories(SYSTEM ${EIGEN3_INCLUDE_DIR})
 
+find_package(GTest REQUIRED)
+
 add_executable(test_calibrator
         testCalibrator.cpp)
 target_link_libraries(test_calibrator
