@@ -10,11 +10,11 @@ add_definitions(-fPIC)
 ADD_DEFINITIONS(-DASLAM_USE_ROS )
 
 
-add_library(${PROJECT_NAME}
+add_library(${PROJECT_NAME} SHARED
   src/GridCalibrationTargetAprilgrid.cpp
   )
 
-find_package(Boost REQUIRED COMPONENTS serialization system) 
+find_package(Boost REQUIRED COMPONENTS serialization system)
 
 target_link_libraries(${PROJECT_NAME}
         ${OpenCV_LIBS}
@@ -26,3 +26,5 @@ target_link_libraries(${PROJECT_NAME}
         )
 target_include_directories(${PROJECT_NAME} PUBLIC
         include)
+
+INSTALL(TARGETS ${PROJECT_NAME} DESTINATION ${DV_MODULES_DIR}/imu-calibration)

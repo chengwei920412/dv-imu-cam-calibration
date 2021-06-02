@@ -5,8 +5,6 @@ include_directories(SYSTEM ${OpenCV_INCLUDE_DIRS})
 find_package(Eigen3 REQUIRED)
 include_directories(SYSTEM ${EIGEN3_INCLUDE_DIR})
 
-add_definitions(-fPIC)
-
 add_library(calibrator SHARED
         calibrator.cpp)
 target_link_libraries(calibrator
@@ -25,3 +23,5 @@ target_link_libraries(calibrator
         kalibr_errorterms)
 target_include_directories(calibrator PUBLIC
         ../../include/dv-imu-cam-calibration)
+
+INSTALL(TARGETS calibrator DESTINATION ${DV_MODULES_DIR}/imu-calibration)

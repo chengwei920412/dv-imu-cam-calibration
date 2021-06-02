@@ -22,10 +22,12 @@ add_library(${PROJECT_NAME} SHARED
   src/BoostPropertyTreeSupport.cpp
 )
 
-target_link_libraries(${PROJECT_NAME} 
+target_link_libraries(${PROJECT_NAME}
                       ${Boost_LIBRARIES}
                       pthread
                       sm_common)
 
 target_include_directories(${PROJECT_NAME} PUBLIC
         include)
+
+INSTALL(TARGETS ${PROJECT_NAME} DESTINATION ${DV_MODULES_DIR}/imu-calibration)

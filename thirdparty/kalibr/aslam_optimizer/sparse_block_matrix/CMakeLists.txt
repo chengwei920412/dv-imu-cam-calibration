@@ -26,3 +26,5 @@ target_include_directories(${PROJECT_NAME} PUBLIC
         include
         ${SUITESPARSE_INCLUDE_DIRS}
         )
+
+INSTALL(TARGETS ${PROJECT_NAME} DESTINATION ${DV_MODULES_DIR}/imu-calibration)

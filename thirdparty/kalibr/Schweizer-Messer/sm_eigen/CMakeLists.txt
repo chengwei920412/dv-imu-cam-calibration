@@ -15,7 +15,7 @@ add_library(${PROJECT_NAME} SHARED
   src/random.cpp
 )
 
-target_link_libraries(${PROJECT_NAME} 
+target_link_libraries(${PROJECT_NAME}
                       ${Boost_LIBRARIES}
                       sm_common
                       sm_random)
@@ -27,15 +27,4 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 ## Installation ##
 ##################
 
-install(TARGETS ${PROJECT_NAME}
-  ARCHIVE DESTINATION lib
-  LIBRARY DESTINATION lib
-  RUNTIME DESTINATION bin
-)
-
-## Mark cpp header files for installation
-install(DIRECTORY include/sm/
-  DESTINATION include
-  FILES_MATCHING PATTERN "*.hpp"
-  PATTERN ".svn" EXCLUDE
-)
+INSTALL(TARGETS ${PROJECT_NAME} DESTINATION ${DV_MODULES_DIR}/imu-calibration)

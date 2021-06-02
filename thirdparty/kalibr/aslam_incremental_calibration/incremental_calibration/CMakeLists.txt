@@ -50,3 +50,5 @@ target_link_libraries(${PROJECT_NAME}
         aslam_backend_expressions)
 target_include_directories(${PROJECT_NAME} PUBLIC
         include)
+
+INSTALL(TARGETS ${PROJECT_NAME} DESTINATION ${DV_MODULES_DIR}/imu-calibration)

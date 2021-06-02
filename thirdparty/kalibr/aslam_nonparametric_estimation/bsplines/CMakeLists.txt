@@ -15,3 +15,5 @@ target_link_libraries(${PROJECT_NAME}
         sm_kinematics)
 target_include_directories(${PROJECT_NAME} PUBLIC
         include)
+
+INSTALL(TARGETS ${PROJECT_NAME} DESTINATION ${DV_MODULES_DIR}/imu-calibration)

@@ -14,3 +14,4 @@ target_link_libraries(config_reader
 target_include_directories(config_reader PUBLIC
         ../../include/dv-imu-cam-calibration)
 
+INSTALL(TARGETS config_reader DESTINATION ${DV_MODULES_DIR}/imu-calibration)

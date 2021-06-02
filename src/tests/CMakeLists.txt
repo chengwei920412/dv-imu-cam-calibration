@@ -27,3 +27,5 @@ target_link_libraries(test_calibrator
         gtest
         pthread
         )
+
+#INSTALL(TARGETS test_calibrator DESTINATION ${DV_MODULES_DIR}/imu-calibration)

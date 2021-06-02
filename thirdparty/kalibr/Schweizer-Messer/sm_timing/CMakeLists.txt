@@ -17,9 +17,11 @@ add_library(${PROJECT_NAME} SHARED
   src/Timer.cpp
   src/NsecTimeUtilities.cpp
 )
-target_link_libraries(${PROJECT_NAME} 
+target_link_libraries(${PROJECT_NAME}
                       ${Boost_LIBRARIES}
                       sm_common
                       sm_random)
 target_include_directories(${PROJECT_NAME} PUBLIC
         include)
+
+INSTALL(TARGETS ${PROJECT_NAME} DESTINATION ${DV_MODULES_DIR}/imu-calibration)

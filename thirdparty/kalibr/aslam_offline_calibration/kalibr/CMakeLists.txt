@@ -18,3 +18,4 @@ target_link_libraries(${PROJECT_NAME}_errorterms
 target_include_directories(${PROJECT_NAME}_errorterms PUBLIC
         include)
 
+INSTALL(TARGETS ${PROJECT_NAME}_errorterms DESTINATION ${DV_MODULES_DIR}/imu-calibration)
