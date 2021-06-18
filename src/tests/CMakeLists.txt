@@ -1,4 +1,7 @@
-
+IF (NOT ENABLE_TESTS)
+	SET(ENABLE_TESTS 0 CACHE BOOL "Compiles tests using Google's GTest framework.")
+	RETURN()
+ENDIF()
 
 find_package(OpenCV REQUIRED)
 include_directories(SYSTEM ${OpenCV_INCLUDE_DIRS})
