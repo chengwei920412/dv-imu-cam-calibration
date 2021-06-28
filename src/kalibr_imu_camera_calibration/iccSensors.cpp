@@ -19,19 +19,23 @@ double toSec(const int64_t time) {
 IccCamera::IccCamera(
     const std::vector<double>& intrinsics,
     const std::vector<double>& distCoeffs,
-    const cv::Size& imageSize,
+    const cv::Size& _imageSize,
     boost::shared_ptr<std::map<int64_t, aslam::cameras::GridCalibrationTargetObservation>> observations,
     const double reprojectionSigma,
     const bool showCorners,
     const bool showReproj,
     const bool showOneStep) :
-    camera(intrinsics, distCoeffs, imageSize),
-    cornerUncertainty(reprojectionSigma) {
+    camera(intrinsics, distCoeffs, _imageSize),
+    imageSize(imageSize), cornerUncertainty(reprojectionSigma) {
     targetObservations = observations;
     gravity_w = Eigen::Vector3d(9.80655, 0., 0.);
     T_extrinsic = sm::kinematics::Transformation();
 
     camera.printDetails();
+}
+
+void IccCamera::updateIntrinsics(const std::vector<double>& _intrinsics, const std::vector<double>& _distCoeffs) {
+    camera = PinholeRadialTangentialCamera(_intrinsics, _distCoeffs, imageSize);
 }
 
 sm::kinematics::Transformation IccCamera::getTransformation() {

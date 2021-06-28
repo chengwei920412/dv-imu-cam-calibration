@@ -15,6 +15,8 @@
 
 static constexpr size_t CALIBRATION_GROUP_ID = 0;
 static constexpr size_t HELPER_GROUP_ID = 1;
+static constexpr size_t TRANSFORMATION_GROUP_ID = 2;
+static constexpr size_t LANDMARK_GROUP_ID = 3;
 
 void addSplineDesignVariables(
     boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,

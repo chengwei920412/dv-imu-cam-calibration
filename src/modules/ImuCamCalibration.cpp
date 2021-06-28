@@ -35,10 +35,7 @@ public:
     }
 
     static void initConfigOptions(dv::RuntimeConfig& config) {
-        // Camera calibration file
-        config.add(
-            "calibrationFile",
-            dv::ConfigOption::fileOpenOption("Path to the camera calibration file", "", "xml"));
+        // Camera calibration file output
         config.add(
             "outputCalibrationDirectory",
             dv::ConfigOption::directoryOption(
@@ -96,8 +93,7 @@ public:
             dv::ConfigOption::boolOption("If true, time offset between the sensors will be calibrated", true));
 
         config.setPriorityOptions(
-            {"calibrationFile",
-             "outputCalibrationDirectory",
+            {"outputCalibrationDirectory",
              "boardHeight",
              "boardWidth",
              "boardSquareSize",
@@ -192,19 +188,6 @@ public:
         // Calibrator options
         Calibrator::Options options;
 
-        // Calibration file
-        const auto filename = config.getString("calibrationFile");
-        std::stringstream ss;
-        ss << "Failed to load camera calibration file: " << filename;
-        try {
-            bool success = readCalibrationFile(filename, description, &options);
-            if (!success) {
-                throw std::runtime_error(ss.str());
-            }
-        } catch (...) {
-            throw std::runtime_error(ss.str());
-        }
-
         // Calibration pattern
         const auto pattern = config.getString("calibrationPattern");
         if (pattern == "chessboard") {
@@ -223,6 +206,7 @@ public:
         options.cols = static_cast<size_t>(config.getInt("boardWidth"));
         options.spacingMeters = config.getDouble("boardSquareSize");
         options.tagSpacing = config.getDouble("tagSpacingRatio");
+        options.imageSize = frameInput.size();
 
         options.maxIter = static_cast<size_t>(config.getInt("maxIter"));
         options.timeCalibration = config.getBool("timeCalibration");
@@ -276,85 +260,6 @@ public:
     }
 
 protected:
-    bool readCalibrationFile(const std::string& filename, const std::string& cameraID, Calibrator::Options* options) {
-        assert(options);
-
-        const auto frameInput = inputs.getFrameInput("frames");
-
-        cv::FileStorage fs(filename, cv::FileStorage::READ);
-
-        if (!fs.isOpened()) {
-            log.error << "Impossible to load the camera calibration file." << std::endl;
-            return false;
-        }
-
-        const auto typeNode = fs["type"];
-
-        if (!cvExists(typeNode) || !typeNode.isString() || (typeNode.string() != "camera")) {
-            log.error << "Wrong type of camera calibration file." << std::endl;
-            return false;
-        }
-
-        const auto useFisheye = fs["use_fisheye_model"];
-        if (!cvExists(useFisheye) || !useFisheye.isInt()) {
-            int fseye;
-            useFisheye >> fseye;
-            if (fseye != 0) {
-                log.error << "Only non-fisheye calibration is supported." << std::endl;
-                return false;
-            }
-        }
-
-        auto cameraNode = fs[cameraID];
-
-        if (!cvExists(cameraNode) || !cameraNode.isMap()) {
-            log.error.format("Calibration data for camera {:s} not present in file: {:s}", cameraID, filename);
-            return false;
-        }
-
-        if (!cvExists(cameraNode["camera_matrix"]) || !cvExists(cameraNode["distortion_coefficients"])
-            || !cvExists(cameraNode["image_width"]) || !cvExists(cameraNode["image_height"])) {
-            log.error.format("Calibration data for camera {:s} not present in file: {:s}", cameraID, filename);
-            return false;
-        }
-
-        cv::Mat loadedCameraMatrix = cv::Mat::eye(3, 3, CV_64F);
-        cv::Mat loadedDistCoeffs = cv::Mat::zeros(8, 1, CV_64F);
-        int imWidth, imHeight;
-
-        cameraNode["camera_matrix"] >> loadedCameraMatrix;
-        cameraNode["distortion_coefficients"] >> loadedDistCoeffs;
-
-        cameraNode["image_width"] >> imWidth;
-        cameraNode["image_height"] >> imHeight;
-
-        log.info.format(
-            "Loaded camera matrix and distortion coefficients for camera {:s} from file: {:s}",
-            cameraID,
-            filename);
-
-        options->intrinsics = std::vector<double>{
-            loadedCameraMatrix.at<double>(0, 0),
-            loadedCameraMatrix.at<double>(1, 1),
-            loadedCameraMatrix.at<double>(0, 2),
-            loadedCameraMatrix.at<double>(1, 2)};
-
-        options->distCoeffs = std::vector<double>{
-            loadedDistCoeffs.at<double>(0, 0),
-            loadedDistCoeffs.at<double>(1, 0),
-            loadedDistCoeffs.at<double>(2, 0),
-            loadedDistCoeffs.at<double>(3, 0)};
-
-        if (imWidth != frameInput.sizeX() || imHeight != frameInput.sizeY()) {
-            log.error.format("Calibration data image size does not match the connected input: {:s}", filename);
-            return false;
-        }
-
-        options->imageSize = cv::Size(imWidth, imHeight);
-
-        return true;
-    }
-
     std::string saveFilePath() {
         const auto frameInput = inputs.getFrameInput("frames");
         const auto cameraID = frameInput.getOriginDescription();
@@ -373,7 +278,9 @@ protected:
         return filePath;
     }
 
-    void saveCalibration(const IccCalibrator::CalibrationResult& result) {
+    void saveCalibration(
+        const CameraCalibration::CalibrationResult& intrinsicResult,
+        const IccCalibrator::CalibrationResult& result) {
         const auto filePath = saveFilePath();
 
         cv::FileStorage fs(filePath, cv::FileStorage::WRITE);
@@ -382,6 +289,19 @@ protected:
             log.warning << "Failed to write to calibration file: " << filePath << dv::logEnd;
             return;
         }
+
+        std::vector<double> vec{0.1, 0.9, 0.2, 0.8, 0.3, 0.7, 0.4, 0.6, 0.5, 1};
+        cv::Mat m2(1, vec.size(), CV_64FC1, vec.data());
+
+        std::vector<double> projCopy(intrinsicResult.projection);
+        cv::Mat projMat(1, intrinsicResult.projection.size(), CV_64FC1, projCopy.data());
+        fs << "projection_coefficients" << projMat;
+        std::vector<double> distCopy(intrinsicResult.distortion);
+        cv::Mat distMat(1, intrinsicResult.distortion.size(), CV_64FC1, distCopy.data());
+        fs << "distortion_coefficients" << distMat;
+        cv::Mat intrErr;
+        cv::eigen2cv(intrinsicResult.err_info.mean, intrErr);
+        fs << "intrinsic_calibration_reprojection_error" << intrErr;
 
         fs << "board_width" << config.getInt("boardWidth");
         fs << "board_height" << config.getInt("boardHeight");
@@ -416,6 +336,15 @@ protected:
 
         std::stringstream ss;
 
+        log.info("Calibrating the intrinsics of the camera...");
+        auto intrinsicsResult = calibrator->calibrateCameraIntrinsics();
+        if (!intrinsicsResult.has_value()) {
+            throw std::runtime_error("Failed to calibrate intrinsics! Please check the dataset");
+        }
+        CameraCalibration::printResult(intrinsicsResult.value(), ss);
+        string2dvLog(ss.str());
+        ss.str("");
+
         log.info("Building the problem...");
         calibrator->buildProblem();
 
@@ -439,7 +368,7 @@ protected:
         string2dvLog(ss.str());
 
         // Save the calibration to a text file
-        saveCalibration(result);
+        saveCalibration(intrinsicsResult.value(), result);
     }
 };
 
