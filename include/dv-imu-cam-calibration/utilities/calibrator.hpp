@@ -8,6 +8,7 @@
 #include <kalibr_imu_camera_calibration/iccSensors.hpp>
 
 #include <aslam/cameras/GridDetector.hpp>
+#include <kalibr_calibrate_cameras/CameraCalibrator.hpp>
 #include <sm/boost/JobQueue.hpp>
 
 #include <opencv2/opencv.hpp>
@@ -66,17 +67,9 @@ public:
         ImuParameters imuParameters;
 
         // Camera
-        std::vector<double> intrinsics{
-            6.3007006020163419e+02,
-            6.3066578517514370e+02,
-            2.9440730698720517e+02,
-            2.5090606048734924e+02};
-        std::vector<double> distCoeffs{
-            -3.9458674051766940e-01,
-            4.2159874612649451e-01,
-            2.3858518861790620e-03,
-            -2.9775941904103447e-03};
-        cv::Size imageSize{640, 480};
+        std::vector<double> intrinsics;
+        std::vector<double> distCoeffs;
+        cv::Size imageSize;
     };
 
 protected:
@@ -84,7 +77,7 @@ protected:
     std::atomic<State> state;
 
     // Calibration options
-    const Options calibratorOptions;
+    Options calibratorOptions;
 
     // Queue scheduling pattern detection jobs
     sm::JobQueue detectionsQueue;
@@ -154,6 +147,11 @@ public:
      * @return preview image visualizing the current status of the calibration
      */
     StampedImage getPreviewImage();
+
+    /**
+     * Calibrate the camera intrinsics (monocular).
+     */
+    std::optional<CameraCalibration::CalibrationResult> calibrateCameraIntrinsics();
 
     /**
      * Build optimization problem. Needs to be called before calibrate().

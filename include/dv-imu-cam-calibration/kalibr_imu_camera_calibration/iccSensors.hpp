@@ -42,6 +42,7 @@ protected:
     sm::kinematics::Transformation T_extrinsic;
     double timeshiftCamToImuPrior = 0.0;
     PinholeRadialTangentialCamera camera;
+    const cv::Size imageSize;
 
     Eigen::Vector3d gravity_w;
     double timeOffset = 0.0;
@@ -65,12 +66,14 @@ public:
     IccCamera(
         const std::vector<double>& intrinsics,
         const std::vector<double>& distCoeffs,
-        const cv::Size& imageSize,
+        const cv::Size& _imageSize,
         boost::shared_ptr<std::map<int64_t, aslam::cameras::GridCalibrationTargetObservation>> observations,
         const double reprojectionSigma = 1.0,
         const bool showCorners = true,
         const bool showReproj = true,
         const bool showOneStep = false);
+
+    void updateIntrinsics(const std::vector<double>& _intrinsics, const std::vector<double>& _distCoeffs);
 
     sm::kinematics::Transformation getTransformation();
 
