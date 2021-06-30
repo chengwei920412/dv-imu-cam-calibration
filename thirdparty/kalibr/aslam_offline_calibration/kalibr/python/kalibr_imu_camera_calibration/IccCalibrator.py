@@ -176,7 +176,7 @@ class IccCalibrator(object):
 
         if optimizationFailed:
             sm.logError("Optimization failed!")
-            raise RuntimeError("Optimization failed!")
+            raise RuntimeError("Optimization failed! Please check your dataset.")
         
         #free some memory
         del self.optimizer
