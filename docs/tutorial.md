@@ -6,7 +6,7 @@ Calculate camera visual-inertial calibration parameters. Calibrate camera intrin
 of an IMU with respect to the camera. This step is essential to many computer vision applications such as SLAM or 3D 
 reconstruction.
 
-## Presequisites
+## Prerequisites
 
 An iniVation camera with built-in IMU, printed calibration pattern with known size.
 
