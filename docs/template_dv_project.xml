@@ -1,0 +1,168 @@
+<dv version="2.0">
+    <node name="mainloop" path="/mainloop/">
+        <attr key="_guiSupport" type="string">{"lastDeployedHash":"d0bcd673458be94bbdd8a21190019f8d699a4999"}</attr>
+        <node name="_visualizer_imu-cam-calibration___preview_758c9f73710143dd9c5c7d82a7df5cee" path="/mainloop/_visualizer_imu-cam-calibration___preview_758c9f73710143dd9c5c7d82a7df5cee/">
+            <attr key="_guiSupport" type="string">{"visualizerX":0,"visualizerY":0,"size":8,"minimized":false,"boxX":450.0,"boxY":700.0}</attr>
+            <attr key="_priorityAttributes" type="string">compression,ipAddress,portNumber</attr>
+            <attr key="compression" type="string">NONE</attr>
+            <attr key="ipAddress" type="string">127.0.0.1</attr>
+            <attr key="logLevel" type="string">INFO</attr>
+            <attr key="maxConcurrentConnections" type="int">10</attr>
+            <attr key="maxConnectionsBacklog" type="int">5</attr>
+            <attr key="maxDataBacklog" type="int">5</attr>
+            <attr key="moduleLibrary" type="string">dv_output_net_tcp_server</attr>
+            <attr key="portNumber" type="int">43271</attr>
+            <attr key="running" type="bool">true</attr>
+            <attr key="timeout" type="long">0</attr>
+            <node name="inputs" path="/mainloop/_visualizer_imu-cam-calibration___preview_758c9f73710143dd9c5c7d82a7df5cee/inputs/">
+                <node name="output0" path="/mainloop/_visualizer_imu-cam-calibration___preview_758c9f73710143dd9c5c7d82a7df5cee/inputs/output0/">
+                    <attr key="from" type="string">imu-cam-calibration[preview]</attr>
+                </node>
+            </node>
+        </node>
+        <node name="accumulator" path="/mainloop/accumulator/">
+            <attr key="_guiSupport" type="string">{"boxX":250.0,"boxY":300.0}</attr>
+            <attr key="_priorityAttributes" type="string">colorDemosaicing,decayFunction,decayParam,sliceMethod,synchronousDecay</attr>
+            <attr key="accumulationNumber" type="int">100000</attr>
+            <attr key="accumulationTime" type="int">33</attr>
+            <attr key="colorDemosaicing" type="bool">false</attr>
+            <attr key="decayFunction" type="string">Linear</attr>
+            <attr key="decayParam" type="double">1.0E-8</attr>
+            <attr key="eventContribution" type="float">0.35</attr>
+            <attr key="logLevel" type="string">INFO</attr>
+            <attr key="maxPotential" type="float">1.0</attr>
+            <attr key="minPotential" type="float">0.0</attr>
+            <attr key="moduleLibrary" type="string">dv_accumulator</attr>
+            <attr key="neutralPotential" type="float">1.0</attr>
+            <attr key="rectifyPolarity" type="bool">false</attr>
+            <attr key="running" type="bool">true</attr>
+            <attr key="sliceMethod" type="string">TIME</attr>
+            <attr key="synchronousDecay" type="bool">false</attr>
+            <node name="inputs" path="/mainloop/accumulator/inputs/">
+                <node name="events" path="/mainloop/accumulator/inputs/events/">
+                    <attr key="from" type="string">dvxplorer[events]</attr>
+                </node>
+            </node>
+        </node>
+        <node name="dvxplorer" path="/mainloop/dvxplorer/">
+            <attr key="_guiSupport" type="string">{"boxX":350.0,"boxY":50.0}</attr>
+            <attr key="_priorityAttributes" type="string">biasSensitivity</attr>
+            <attr key="biasSensitivity" type="string">Default</attr>
+            <attr key="busNumber" type="int">0</attr>
+            <attr key="devAddress" type="int">0</attr>
+            <attr key="externalTriggerMode" type="string">Reset Timestamps</attr>
+            <attr key="logLevel" type="string">WARNING</attr>
+            <attr key="moduleLibrary" type="string">dv_dvxplorer</attr>
+            <attr key="running" type="bool">true</attr>
+            <attr key="serialNumber" type="string">DXA00080</attr>
+            <node name="activityMonitor" path="/mainloop/dvxplorer/activityMonitor/">
+                <attr key="DecrementRate" type="int">1</attr>
+                <attr key="DecrementTime" type="int">3</attr>
+                <attr key="Enable" type="bool">false</attr>
+                <attr key="NegativeThreshold" type="int">20</attr>
+                <attr key="PositiveMaxValue" type="int">300</attr>
+                <attr key="PositiveThreshold" type="int">300</attr>
+                <attr key="_priorityAttributes" type="string"/>
+            </node>
+            <node name="crop" path="/mainloop/dvxplorer/crop/">
+                <attr key="Enable" type="bool">false</attr>
+                <attr key="EndX" type="int">639</attr>
+                <attr key="EndY" type="int">479</attr>
+                <attr key="StartX" type="int">0</attr>
+                <attr key="StartY" type="int">0</attr>
+                <attr key="_priorityAttributes" type="string"/>
+            </node>
+            <node name="externalInput" path="/mainloop/dvxplorer/externalInput/">
+                <attr key="DetectFallingEdges" type="bool">false</attr>
+                <attr key="DetectPulseLength" type="int">10</attr>
+                <attr key="DetectPulsePolarity" type="bool">true</attr>
+                <attr key="DetectPulses" type="bool">false</attr>
+                <attr key="DetectRisingEdges" type="bool">false</attr>
+                <attr key="RunDetector" type="bool">false</attr>
+                <attr key="_priorityAttributes" type="string"/>
+            </node>
+            <node name="imu" path="/mainloop/dvxplorer/imu/">
+                <attr key="AccelDataRate" type="string">800 Hz</attr>
+                <attr key="AccelFilter" type="string">Normal</attr>
+                <attr key="AccelRange" type="string">±4G</attr>
+                <attr key="GyroDataRate" type="string">800 Hz</attr>
+                <attr key="GyroFilter" type="string">Normal</attr>
+                <attr key="GyroRange" type="string">±500°/s</attr>
+                <attr key="RunAccelerometer" type="bool">true</attr>
+                <attr key="RunGyroscope" type="bool">true</attr>
+                <attr key="RunTemperature" type="bool">true</attr>
+                <attr key="_priorityAttributes" type="string">RunAccelerometer,RunGyroscope</attr>
+            </node>
+            <node name="multiplexer" path="/mainloop/dvxplorer/multiplexer/">
+                <attr key="DropDVSOnTransferStall" type="bool">false</attr>
+                <attr key="DropExtInputOnTransferStall" type="bool">true</attr>
+                <attr key="TimestampReset" type="bool">false</attr>
+                <attr key="_priorityAttributes" type="string"/>
+            </node>
+            <node name="readout" path="/mainloop/dvxplorer/readout/">
+                <attr key="FixedReadTime" type="bool">false</attr>
+                <attr key="GlobalHold" type="bool">true</attr>
+                <attr key="GlobalReset" type="bool">false</attr>
+                <attr key="GlobalResetDuringReadout" type="bool">false</attr>
+                <attr key="_priorityAttributes" type="string"/>
+            </node>
+            <node name="statistics" path="/mainloop/dvxplorer/statistics/">
+                <attr key="_priorityAttributes" type="string"/>
+            </node>
+            <node name="subsample" path="/mainloop/dvxplorer/subsample/">
+                <attr key="DualBinning" type="bool">false</attr>
+                <attr key="Enable" type="bool">false</attr>
+                <attr key="EventsFlatten" type="bool">false</attr>
+                <attr key="EventsOffOnly" type="bool">false</attr>
+                <attr key="EventsOnOnly" type="bool">false</attr>
+                <attr key="Horizontal" type="string">none</attr>
+                <attr key="Vertical" type="string">none</attr>
+                <attr key="_priorityAttributes" type="string"/>
+            </node>
+            <node name="system" path="/mainloop/dvxplorer/system/">
+                <attr key="DataExchangeBufferSize" type="int">64</attr>
+                <attr key="PacketContainerInterval" type="int">10000</attr>
+                <attr key="PacketContainerMaxPacketSize" type="int">0</attr>
+                <attr key="_priorityAttributes" type="string"/>
+            </node>
+            <node name="usb" path="/mainloop/dvxplorer/usb/">
+                <attr key="BufferNumber" type="int">8</attr>
+                <attr key="BufferSize" type="int">8192</attr>
+                <attr key="EarlyPacketDelay" type="int">8</attr>
+                <attr key="_priorityAttributes" type="string"/>
+            </node>
+        </node>
+        <node name="imu-cam-calibration" path="/mainloop/imu-cam-calibration/">
+            <attr key="IMUupdateRate" type="double">200.0</attr>
+            <attr key="_guiSupport" type="string">{"boxX":400.0,"boxY":500.0}</attr>
+            <attr key="_priorityAttributes" type="string">boardHeight,boardSquareSize,boardWidth,calibrate,calibrationPattern,discard,outputCalibrationDirectory,startCollecting,stopCollecting</attr>
+            <attr key="accNoiseDensity" type="double">0.00149</attr>
+            <attr key="accRandomWalk" type="double">8.69E-5</attr>
+            <attr key="boardHeight" type="int">6</attr>
+            <attr key="boardSquareSize" type="double">0.02</attr>
+            <attr key="boardWidth" type="int">6</attr>
+            <attr key="calibrate" type="bool">true</attr>
+            <attr key="calibrationPattern" type="string">aprilTag</attr>
+            <attr key="discard" type="bool">false</attr>
+            <attr key="gyrNoiseDensity" type="double">8.09E-5</attr>
+            <attr key="gyrRandomWalk" type="double">2.29E-6</attr>
+            <attr key="logLevel" type="string">INFO</attr>
+            <attr key="maxIter" type="int">50</attr>
+            <attr key="moduleLibrary" type="string">dv_imu-cam-calibration</attr>
+            <attr key="outputCalibrationDirectory" type="string">/home/radam</attr>
+            <attr key="running" type="bool">true</attr>
+            <attr key="startCollecting" type="bool">true</attr>
+            <attr key="stopCollecting" type="bool">true</attr>
+            <attr key="tagSpacingRatio" type="double">0.3</attr>
+            <attr key="timeCalibration" type="bool">true</attr>
+            <node name="inputs" path="/mainloop/imu-cam-calibration/inputs/">
+                <node name="frames" path="/mainloop/imu-cam-calibration/inputs/frames/">
+                    <attr key="from" type="string">accumulator[frames]</attr>
+                </node>
+                <node name="imu" path="/mainloop/imu-cam-calibration/inputs/imu/">
+                    <attr key="from" type="string">dvxplorer[imu]</attr>
+                </node>
+            </node>
+        </node>
+    </node>
+</dv>
