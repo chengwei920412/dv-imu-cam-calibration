@@ -8,6 +8,15 @@ This code is based on [kalibr](https://github.com/ethz-asl/kalibr).
 * eigen
 * libsuitesparse-de
 
+## Build instructions
+```
+mkdir build
+cd build
+cmake -DUSE_CUDA_STEREO=ON ..
+make
+sudo make install
+```
+
 ## Usage
 * calibrate your camea using DV [calibration](https://inivation.gitlab.io/dv/dv-docs/docs/tutorial-calibration/)
 * adjust the module configuration
