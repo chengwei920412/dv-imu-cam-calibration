@@ -276,20 +276,24 @@ Calibrator::StampedImage Calibrator::getPreviewImage() {
         default: throw std::runtime_error("Unknown state");
     }
 
-    if (latestObs != nullptr && latestObs->time().toDvTime() == latestImage.timestamp) {
-        cv::Point prevPoint(-1, -1);
-        for (size_t y = 0; y < grid->rows(); ++y) {
-            const auto color = colors[y % colors.size()];
-            for (size_t x = 0; x < grid->cols(); ++x) {
-                const auto idx = y * grid->cols() + x;
-                Eigen::Vector2d point;
-                if (latestObs->imagePoint(idx, point)) {
-                    const cv::Point cvPoint(point.x(), point.y());
-                    cv::circle(latestImage.image, cvPoint, 8, color, 2);
-                    if (prevPoint != cv::Point(-1, -1)) {
-                        cv::line(latestImage.image, prevPoint, cvPoint, color, 2);
+    if (latestObs != nullptr) {
+        // rounding between double and int64 timestamp can cause a small difference
+        const auto timeDiff = std::abs(latestObs->time().toDvTime() - latestImage.timestamp);
+        if (timeDiff <= 1) {
+            cv::Point prevPoint(-1, -1);
+            for (size_t y = 0; y < grid->rows(); ++y) {
+                const auto color = colors[y % colors.size()];
+                for (size_t x = 0; x < grid->cols(); ++x) {
+                    const auto idx = y * grid->cols() + x;
+                    Eigen::Vector2d point;
+                    if (latestObs->imagePoint(idx, point)) {
+                        const cv::Point cvPoint(static_cast<int>(point.x()), static_cast<int>(point.y()));
+                        cv::circle(latestImage.image, cvPoint, 8, color, 2);
+                        if (prevPoint != cv::Point(-1, -1)) {
+                            cv::line(latestImage.image, prevPoint, cvPoint, color, 2);
+                        }
+                        prevPoint = cvPoint;
                     }
-                    prevPoint = cvPoint;
                 }
             }
         }
