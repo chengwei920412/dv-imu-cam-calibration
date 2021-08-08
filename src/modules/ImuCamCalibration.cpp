@@ -3,6 +3,7 @@
 #include <dv-sdk/module.hpp>
 
 #include <fmt/chrono.h>
+#include <regex>
 
 bool cvExists(const cv::FileNode& fn) {
     if (fn.type() == cv::FileNode::NONE) {
@@ -10,6 +11,11 @@ bool cvExists(const cv::FileNode& fn) {
     }
 
     return (true);
+}
+
+std::string getTimeString(const std::string& fmt) {
+    // Get current time for suffix part.
+    return fmt::format(fmt, fmt::localtime(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())));
 }
 
 class ImuCamCalibration : public dv::ModuleBase {
@@ -188,20 +194,7 @@ public:
         // Calibrator options
         Calibrator::Options options;
 
-        // Calibration pattern
-        const auto pattern = config.getString("calibrationPattern");
-        if (pattern == "chessboard") {
-            options.pattern = Calibrator::CalibrationPattern::CHESSBOARD;
-        } else if (pattern == "asymmetricCirclesGrid") {
-            options.pattern = Calibrator::CalibrationPattern::ASYMMETRIC_CIRCLES_GRID;
-        } else if (pattern == "aprilTag") {
-            options.pattern = Calibrator::CalibrationPattern::APRIL_GRID;
-        } else {
-            std::stringstream ss;
-            ss << "Unknown calibration pattern: " << pattern;
-            throw std::runtime_error(ss.str());
-        }
-
+        options.pattern = getCalibrationPattern();
         options.rows = static_cast<size_t>(config.getInt("boardHeight"));
         options.cols = static_cast<size_t>(config.getInt("boardWidth"));
         options.spacingMeters = config.getDouble("boardSquareSize");
@@ -278,6 +271,38 @@ protected:
         return filePath;
     }
 
+    Calibrator::CalibrationPattern getCalibrationPattern() {
+        const auto pattern = config.getString("calibrationPattern");
+        if (pattern == "chessboard") {
+            return Calibrator::CalibrationPattern::CHESSBOARD;
+        } else if (pattern == "asymmetricCirclesGrid") {
+            return Calibrator::CalibrationPattern::ASYMMETRIC_CIRCLES_GRID;
+        } else if (pattern == "aprilTag") {
+            return Calibrator::CalibrationPattern::APRIL_GRID;
+        } else {
+            std::stringstream ss;
+            ss << "Unknown calibration pattern: " << pattern;
+            throw std::runtime_error(ss.str());
+        }
+    }
+
+    cv::Size getBoardSize() {
+        switch (getCalibrationPattern()) {
+            case Calibrator::CalibrationPattern::CHESSBOARD:
+                // Inner corners, so -1 on each side.
+                return cv::Size(config.getInt("boardWidth") - 1, config.getInt("boardHeight") - 1);
+            case Calibrator::CalibrationPattern::APRIL_GRID:
+            case Calibrator::CalibrationPattern::ASYMMETRIC_CIRCLES_GRID:
+                return cv::Size(config.getInt("boardWidth"), config.getInt("boardHeight"));
+            default: {
+                std::stringstream ss;
+                ss << "Can not get the board size for unknown calibration pattern: "
+                   << config.getString("calibrationPattern");
+                throw std::runtime_error(ss.str());
+            }
+        }
+    }
+
     void saveCalibration(
         const CameraCalibration::CalibrationResult& intrinsicResult,
         const IccCalibrator::CalibrationResult& result) {
@@ -290,33 +315,72 @@ protected:
             return;
         }
 
-        std::vector<double> vec{0.1, 0.9, 0.2, 0.8, 0.3, 0.7, 0.4, 0.6, 0.5, 1};
-        cv::Mat m2(1, vec.size(), CV_64FC1, vec.data());
+        // Camera matrix in OpenCV format
+        std::vector<double> camMatValues{
+            intrinsicResult.projection.at(0),
+            0.0,
+            intrinsicResult.projection.at(2),
+            0.0,
+            intrinsicResult.projection.at(1),
+            intrinsicResult.projection.at(3),
+            0.0,
+            0.0,
+            1.0};
+        cv::Mat cameraMatrix(3, 3, CV_64FC1, camMatValues.data());
 
-        std::vector<double> projCopy(intrinsicResult.projection);
-        cv::Mat projMat(1, intrinsicResult.projection.size(), CV_64FC1, projCopy.data());
-        fs << "projection_coefficients" << projMat;
+        // Distortion coefficients in OpenCV format
         std::vector<double> distCopy(intrinsicResult.distortion);
-        cv::Mat distMat(1, intrinsicResult.distortion.size(), CV_64FC1, distCopy.data());
-        fs << "distortion_coefficients" << distMat;
-        cv::Mat intrErr;
-        cv::eigen2cv(intrinsicResult.err_info.mean, intrErr);
-        fs << "intrinsic_calibration_reprojection_error" << intrErr;
+        cv::Mat distCoeffs(1, static_cast<int>(intrinsicResult.distortion.size()), CV_64FC1, distCopy.data());
 
+        // Get the camera ID
+        const auto frameInput = inputs.getFrameInput("frames");
+        const auto originDescription = frameInput.getOriginDescription();
+        static const std::regex filenameCleanupRegex{"[^a-zA-Z-_\\d]"};
+        auto cameraID = std::regex_replace(originDescription, filenameCleanupRegex, "_");
+        if ((cameraID[0] == '-') || (std::isdigit(cameraID[0]) != 0)) {
+            cameraID = "_" + cameraID;
+        }
+
+        // Single camera calibration data
+        fs << cameraID; // Node name.
+        fs << "{";      // Node start.
+        fs << "camera_matrix" << cameraMatrix;
+        fs << "distortion_coefficients" << distCoeffs;
+        fs << "image_width" << frameInput.sizeX();
+        fs << "image_height" << frameInput.sizeY();
+        fs << "}"; // Node end.
+        fs << "use_fisheye_model" << false;
+        fs << "type"
+           << "camera";
+
+        // The fields in the block below existed in DV Camera Calibration module, for compatibility reasons they are
+        // also output here
+        fs << "pattern_width" << getBoardSize().width;
+        fs << "pattern_height" << getBoardSize().height;
+        fs << "pattern_type" << config.getString("calibrationPattern");
         fs << "board_width" << config.getInt("boardWidth");
         fs << "board_height" << config.getInt("boardHeight");
-        fs << "calibration_pattern" << config.getString("calibrationPattern");
-        fs << "board_square_size" << config.getDouble("boardSquareSize");
+        fs << "square_size" << config.getFloat("boardSquareSize");
+        fs << "calibration_error"
+           << "N/A"; // Now we have two errors, intrinsic and extrinsic. This one is not output
+                     // to avoid confusion
+        fs << "calibration_time" << getTimeString("{:%c}");
 
+        // The fields in the block below are related to camera IMU calibration. They did not exist in original camera
+        // calibration module
         fs << "calibration_converged" << result.converged;
         fs << "time_offset_cam_imu" << result.t_cam_imu;
         cv::Mat trans;
         cv::eigen2cv(result.T_cam_imu, trans);
         fs << "transformation_cam_imu" << trans;
-
         fs << "mean_reprojection_error" << result.error_info.meanReprojectionError;
         fs << "mean_accelerometer_error" << result.error_info.meanAccelerometerError;
         fs << "mean_gyroscope_error" << result.error_info.meanGyroscopeError;
+
+        // Intrinsic calibration error
+        cv::Mat intrErr;
+        cv::eigen2cv(intrinsicResult.err_info.mean, intrErr);
+        fs << "intrinsic_calibration_reprojection_error" << intrErr;
 
         log.info << "Calibration saved to a file: " << filePath << dv::logEnd;
     }
