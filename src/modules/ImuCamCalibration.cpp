@@ -369,7 +369,7 @@ protected:
         // The fields in the block below are related to camera IMU calibration. They did not exist in original camera
         // calibration module
         fs << "calibration_converged" << result.converged;
-        fs << "time_offset_cam_imu" << result.t_cam_imu;
+        fs << "time_offset_cam_imu__t_imu_equals_t_cam_plus_shift" << result.t_cam_imu;
         cv::Mat trans;
         cv::eigen2cv(result.T_cam_imu, trans);
         fs << "transformation_cam_imu" << trans;
