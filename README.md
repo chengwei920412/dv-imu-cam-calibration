@@ -18,7 +18,7 @@ sudo make install
 ```
 
 ## Usage
-* calibrate your camea using DV [calibration](https://inivation.gitlab.io/dv/dv-docs/docs/tutorial-calibration/)
+* calibrate your camera using DV [calibration](https://inivation.gitlab.io/dv/dv-docs/docs/tutorial-calibration/)
 * adjust the module configuration
   * adjust your camera input IMU rate for BOTH calibration module AND camera input module (recommended 200Hz)
   * set the path to your DV camera calibration file
@@ -28,6 +28,7 @@ sudo make install
   * connect IMU and accumulated frames inputs
     * recommended accumulator values - linear decay, 1e-8 decay coeff, 0.35 event contrib, decay at frame gen time, min/neutral/max potential 0.0/1.0/1.0
 * collect images of a static calibration pattern while moving the camera 
+    * we recommend using AprilTag calibration pattern displayed on a monitor [link](https://github.com/ethz-asl/kalibr/wiki/downloads)
     * you should record about 60s of data with calibration pattern visible on all frames
     * tilt camera 3x about each axis (left/right, up/down, clockwise/counterclockwise)
     * move camera 3x about each axis (left/right, up/down, front/back)
