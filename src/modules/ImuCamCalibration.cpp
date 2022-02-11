@@ -13,11 +13,6 @@ bool cvExists(const cv::FileNode& fn) {
     return (true);
 }
 
-std::string getTimeString(const std::string& fmt) {
-    // Get current time for suffix part.
-    return fmt::format(fmt, fmt::localtime(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())));
-}
-
 class ImuCamCalibration : public dv::ModuleBase {
 protected:
     std::unique_ptr<Calibrator> calibrator = nullptr;
@@ -262,9 +257,8 @@ protected:
             outputDir = dv::portable_get_user_home_directory();
         }
 
-        const std::string fmt("{:%Y_%m_%d_%H_%M_%S}");
         const std::string timeString
-            = fmt::format(fmt, fmt::localtime(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())));
+            = fmt::format("{:%Y_%m_%d_%H_%M_%S}", fmt::localtime(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())));
         const std::string fileName = "camera_imu_calibration_" + cameraID + "-" + timeString + ".xml";
 
         auto filePath = (outputDir / fileName).string();
@@ -364,7 +358,7 @@ protected:
         fs << "calibration_error"
            << "N/A"; // Now we have two errors, intrinsic and extrinsic. This one is not output
                      // to avoid confusion
-        fs << "calibration_time" << getTimeString("{:%c}");
+        fs << "calibration_time" << fmt::format("{:%c}", fmt::localtime(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())));
 
         // The fields in the block below are related to camera IMU calibration. They did not exist in original camera
         // calibration module
