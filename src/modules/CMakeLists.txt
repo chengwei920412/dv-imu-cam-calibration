@@ -21,8 +21,6 @@ TARGET_LINK_LIBRARIES(imu-cam-calibration PRIVATE
         aslam_splines
         bsplines
         calibrator
-        camera_calibrator
-        config_reader
         incremental_calibration
         kalibr_errorterms
         kalibr_imu_camera_calibration

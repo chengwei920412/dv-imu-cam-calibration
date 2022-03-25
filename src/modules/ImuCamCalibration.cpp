@@ -1,5 +1,6 @@
 #include <utilities/calibrator.hpp>
 
+#include <aslam/cameras.hpp>
 #include <dv-sdk/module.hpp>
 
 #include <fmt/chrono.h>
@@ -15,7 +16,10 @@ bool cvExists(const cv::FileNode& fn) {
 
 class ImuCamCalibration : public dv::ModuleBase {
 protected:
-    std::unique_ptr<Calibrator> calibrator = nullptr;
+    // Calibrator options
+    CalibratorUtils::Options mOptions;
+
+    std::unique_ptr<CalibratorBase> calibrator = nullptr;
 
     enum CollectionState { BEFORE_COLLECTING, DURING_COLLECTING, AFTER_COLLECTING, CALIBRATED };
 
@@ -58,6 +62,14 @@ public:
                 "Calibration pattern to use",
                 "asymmetricCirclesGrid",
                 {"chessboard", "asymmetricCirclesGrid", "aprilTag"},
+                false));
+
+        config.add(
+            "calibrationModel",
+            dv::ConfigOption::listOption(
+                "Calibration model to use",
+                "Pinhole-RadialTangential",
+                {"Pinhole-RadialTangential", "Pinhole-Fisheye"},
                 false));
 
         // Module control buttons
@@ -182,24 +194,34 @@ public:
         }
     }
 
+    void setupCalibrator() {
+        if (calibrator != nullptr) {
+            calibrator->reset();
+        }
+        if (config.getString("calibrationModel") == "Pinhole-RadialTangential") {
+            calibrator = std::make_unique<
+                Calibrator<aslam::cameras::DistortedPinholeCameraGeometry, aslam::cameras::RadialTangentialDistortion>>(
+                mOptions);
+        } else {
+            calibrator = std::make_unique<Calibrator<
+                aslam::cameras::EquidistantDistortedPinholeCameraGeometry,
+                aslam::cameras::EquidistantDistortion>>(mOptions);
+        }
+    }
+
     void initializeCalibrator() {
         const auto frameInput = inputs.getFrameInput("frames");
         const auto description = frameInput.getOriginDescription();
 
-        // Calibrator options
-        Calibrator::Options options;
+        mOptions.pattern = getCalibrationPattern();
+        mOptions.rows = static_cast<size_t>(config.getInt("boardHeight"));
+        mOptions.cols = static_cast<size_t>(config.getInt("boardWidth"));
+        mOptions.spacingMeters = config.getDouble("boardSquareSize");
+        mOptions.tagSpacing = config.getDouble("tagSpacingRatio");
+        mOptions.imageSize = frameInput.size();
 
-        options.pattern = getCalibrationPattern();
-        options.rows = static_cast<size_t>(config.getInt("boardHeight"));
-        options.cols = static_cast<size_t>(config.getInt("boardWidth"));
-        options.spacingMeters = config.getDouble("boardSquareSize");
-        options.tagSpacing = config.getDouble("tagSpacingRatio");
-        options.imageSize = frameInput.size();
-
-        options.maxIter = static_cast<size_t>(config.getInt("maxIter"));
-        options.timeCalibration = config.getBool("timeCalibration");
-
-        calibrator = std::make_unique<Calibrator>(options);
+        mOptions.maxIter = static_cast<size_t>(config.getInt("maxIter"));
+        mOptions.timeCalibration = config.getBool("timeCalibration");
     }
 
     ImuCamCalibration() {
@@ -257,22 +279,23 @@ protected:
             outputDir = dv::portable_get_user_home_directory();
         }
 
-        const std::string timeString
-            = fmt::format("{:%Y_%m_%d_%H_%M_%S}", fmt::localtime(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())));
+        const std::string timeString = fmt::format(
+            "{:%Y_%m_%d_%H_%M_%S}",
+            fmt::localtime(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())));
         const std::string fileName = "camera_imu_calibration_" + cameraID + "-" + timeString + ".xml";
 
         auto filePath = (outputDir / fileName).string();
         return filePath;
     }
 
-    Calibrator::CalibrationPattern getCalibrationPattern() {
+    CalibratorUtils::CalibrationPattern getCalibrationPattern() {
         const auto pattern = config.getString("calibrationPattern");
         if (pattern == "chessboard") {
-            return Calibrator::CalibrationPattern::CHESSBOARD;
+            return CalibratorUtils::CalibrationPattern::CHESSBOARD;
         } else if (pattern == "asymmetricCirclesGrid") {
-            return Calibrator::CalibrationPattern::ASYMMETRIC_CIRCLES_GRID;
+            return CalibratorUtils::CalibrationPattern::ASYMMETRIC_CIRCLES_GRID;
         } else if (pattern == "aprilTag") {
-            return Calibrator::CalibrationPattern::APRIL_GRID;
+            return CalibratorUtils::CalibrationPattern::APRIL_GRID;
         } else {
             std::stringstream ss;
             ss << "Unknown calibration pattern: " << pattern;
@@ -282,11 +305,11 @@ protected:
 
     cv::Size getBoardSize() {
         switch (getCalibrationPattern()) {
-            case Calibrator::CalibrationPattern::CHESSBOARD:
+            case CalibratorUtils::CalibrationPattern::CHESSBOARD:
                 // Inner corners, so -1 on each side.
                 return cv::Size(config.getInt("boardWidth") - 1, config.getInt("boardHeight") - 1);
-            case Calibrator::CalibrationPattern::APRIL_GRID:
-            case Calibrator::CalibrationPattern::ASYMMETRIC_CIRCLES_GRID:
+            case CalibratorUtils::CalibrationPattern::APRIL_GRID:
+            case CalibratorUtils::CalibrationPattern::ASYMMETRIC_CIRCLES_GRID:
                 return cv::Size(config.getInt("boardWidth"), config.getInt("boardHeight"));
             default: {
                 std::stringstream ss;
@@ -298,8 +321,8 @@ protected:
     }
 
     void saveCalibration(
-        const CameraCalibration::CalibrationResult& intrinsicResult,
-        const IccCalibrator::CalibrationResult& result) {
+        const CameraCalibrationUtils::CalibrationResult& intrinsicResult,
+        const IccCalibratorUtils::CalibrationResult& result) {
         const auto filePath = saveFilePath();
 
         cv::FileStorage fs(filePath, cv::FileStorage::WRITE);
@@ -358,7 +381,10 @@ protected:
         fs << "calibration_error"
            << "N/A"; // Now we have two errors, intrinsic and extrinsic. This one is not output
                      // to avoid confusion
-        fs << "calibration_time" << fmt::format("{:%c}", fmt::localtime(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())));
+        fs << "calibration_time"
+           << fmt::format(
+                  "{:%c}",
+                  fmt::localtime(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())));
 
         // The fields in the block below are related to camera IMU calibration. They did not exist in original camera
         // calibration module
@@ -399,7 +425,7 @@ protected:
         if (!intrinsicsResult.has_value()) {
             throw std::runtime_error("Failed to calibrate intrinsics! Please check the dataset");
         }
-        CameraCalibration::printResult(intrinsicsResult.value(), ss);
+        CameraCalibrationUtils::printResult(intrinsicsResult.value(), ss);
         string2dvLog(ss.str());
         ss.str("");
 
@@ -422,7 +448,7 @@ protected:
 
         // Print the result
         log.info("RESULT");
-        IccCalibrator::printResult(result, ss);
+        IccCalibratorUtils::printResult(result, ss);
         string2dvLog(ss.str());
 
         // Save the calibration to a text file

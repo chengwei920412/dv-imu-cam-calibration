@@ -10,16 +10,13 @@ include_directories(${Boost_INCLUDE_DIRS})
 
 add_library(kalibr_imu_camera_calibration SHARED
         common.cpp
-        iccCalibrator.cpp
-        iccSensors.cpp)
+        )
 target_link_libraries(kalibr_imu_camera_calibration
         aslam_backend
         aslam_cameras
         aslam_cv_backend
         aslam_splines
         bsplines
-        camera_calibrator
-        config_reader
         incremental_calibration
         sm_kinematics
         kalibr_errorterms

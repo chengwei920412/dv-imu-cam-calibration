@@ -16,25 +16,64 @@
 
 #include <vector>
 
-class PinholeRadialTangentialCamera {
+
+template<typename CameraGeometryType, typename DistortionType>
+class CameraModel {
 protected:
-    boost::shared_ptr<aslam::cameras::DistortedPinholeCameraGeometry> geometry = nullptr;
+    boost::shared_ptr<CameraGeometryType> geometry = nullptr;
 
     std::vector<double> focalLength;
     std::vector<double> principalPoint;
     std::vector<double> distortionCoefficients;
 
 public:
-    PinholeRadialTangentialCamera(
+    CameraModel(
         const std::vector<double>& intrinsics,
         const std::vector<double>& distCoeff,
-        const cv::Size& resolution);
+        const cv::Size& resolution) {
+        assert(intrinsics.size() == 4);
+        focalLength = std::vector<double>(intrinsics.begin(), intrinsics.begin() + 2);
+        principalPoint = std::vector<double>(intrinsics.begin() + 2, intrinsics.begin() + 4);
 
-    boost::shared_ptr<aslam::cameras::DistortedPinholeCameraGeometry> getGeometry();
+        distortionCoefficients = distCoeff;
+        assert(distortionCoefficients.size() >= 4);
+        const auto dist = DistortionType(
+            distortionCoefficients.at(0),
+            distortionCoefficients.at(1),
+            distortionCoefficients.at(2),
+            distortionCoefficients.at(3));
+        const auto proj = aslam::cameras::PinholeProjection<DistortionType>(
+            focalLength[0],
+            focalLength[1],
+            principalPoint[0],
+            principalPoint[1],
+            resolution.width,
+            resolution.height,
+            dist);
 
-    boost::shared_ptr<aslam::Frame<aslam::cameras::DistortedPinholeCameraGeometry>> frame();
+        geometry = boost::make_shared<CameraGeometryType>(proj);
+    }
 
-    void printDetails();
+    boost::shared_ptr<CameraGeometryType> getGeometry() {
+        return geometry;
+    }
+
+    boost::shared_ptr<aslam::Frame<CameraGeometryType>> frame() {
+        auto frame = boost::make_shared<aslam::Frame<CameraGeometryType>>(
+            aslam::Frame<CameraGeometryType>());
+        return frame;
+    }
+
+    void printDetails() {
+        std::cout << "Initializing camera:" << std::endl;
+        std::cout << "  Camera model: pinhole" << std::endl;
+        std::cout << "  Focal length: [" << focalLength.at(0) << " " << focalLength.at(1) << "]" << std::endl;
+        std::cout << "  Principal point: [" << principalPoint.at(0) << " " << principalPoint.at(1) << "]" << std::endl;
+        std::cout << "  Distortion model: RadialTangential" << std::endl;
+        std::cout << "  Distortion coefficients: [" << distortionCoefficients.at(0) << " "
+                  << distortionCoefficients.at(1) << " " << distortionCoefficients.at(2) << " "
+                  << distortionCoefficients.at(3) << "]" << std::endl;
+    }
 };
 
 struct ImuParameters {
