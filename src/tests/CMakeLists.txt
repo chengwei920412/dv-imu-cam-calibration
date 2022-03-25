@@ -21,7 +21,6 @@ target_link_libraries(test_calibrator
         aslam_cv_backend
         aslam_splines
         bsplines
-        calibrator
         incremental_calibration
         sm_boost
         sm_kinematics
