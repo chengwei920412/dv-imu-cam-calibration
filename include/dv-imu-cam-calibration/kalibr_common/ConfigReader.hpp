@@ -16,7 +16,6 @@
 
 #include <vector>
 
-
 template<typename CameraGeometryType, typename DistortionType>
 class CameraModel {
 protected:
@@ -35,13 +34,42 @@ public:
         focalLength = std::vector<double>(intrinsics.begin(), intrinsics.begin() + 2);
         principalPoint = std::vector<double>(intrinsics.begin() + 2, intrinsics.begin() + 4);
 
+        if constexpr (
+            std::is_same<CameraGeometryType, aslam::cameras::EquidistantDistortedPinholeCameraGeometry>()
+            && std::is_same<DistortionType, aslam::cameras::EquidistantDistortion>()) {
+            std::cout << "Camera Model: Equidistant Distorted Pinhole\nDistortion Model: Equidistant" << std::endl;
+        }
+        if constexpr (
+            std::is_same<CameraGeometryType, aslam::cameras::DistortedPinholeCameraGeometry>()
+            && std::is_same<DistortionType, aslam::cameras::RadialTangentialDistortion>()) {
+            std::cout << "Camera Model: Distorted Pinhole \nDistortion Model: RadialTangential" << std::endl;
+        }
+        if constexpr (
+            std::is_same<CameraGeometryType, aslam::cameras::FovDistortedPinholeCameraGeometry>()
+            && std::is_same<DistortionType, aslam::cameras::FovDistortion>()) {
+            std::cout << "Camera Model: Distorted Pinhole Fov \nDistortion Model: FovDistortion" << std::endl;
+        }
+
         distortionCoefficients = distCoeff;
-        assert(distortionCoefficients.size() >= 4);
-        const auto dist = DistortionType(
-            distortionCoefficients.at(0),
-            distortionCoefficients.at(1),
-            distortionCoefficients.at(2),
-            distortionCoefficients.at(3));
+        assert(
+            (std::is_same<CameraGeometryType, aslam::cameras::FovDistortedPinholeCameraGeometry>()
+             && distortionCoefficients.size() == 1)
+            || (!std::is_same<CameraGeometryType, aslam::cameras::FovDistortedPinholeCameraGeometry>()
+                && distortionCoefficients.size() >= 4));
+
+        DistortionType dist;
+        if constexpr (
+            std::is_same<CameraGeometryType, aslam::cameras::FovDistortedPinholeCameraGeometry>()
+            && std::is_same<DistortionType, aslam::cameras::FovDistortion>()) {
+            std::cout << "Camera Model: Distorted Pinhole Fov \nDistortion Model: FovDistortion" << std::endl;
+            dist = aslam::cameras::FovDistortion(distortionCoefficients.at(0));
+        } else {
+            dist = DistortionType(
+                distortionCoefficients.at(0),
+                distortionCoefficients.at(1),
+                distortionCoefficients.at(2),
+                distortionCoefficients.at(3));
+        }
         const auto proj = aslam::cameras::PinholeProjection<DistortionType>(
             focalLength[0],
             focalLength[1],
@@ -59,8 +87,7 @@ public:
     }
 
     boost::shared_ptr<aslam::Frame<CameraGeometryType>> frame() {
-        auto frame = boost::make_shared<aslam::Frame<CameraGeometryType>>(
-            aslam::Frame<CameraGeometryType>());
+        auto frame = boost::make_shared<aslam::Frame<CameraGeometryType>>(aslam::Frame<CameraGeometryType>());
         return frame;
     }
 
@@ -69,10 +96,18 @@ public:
         std::cout << "  Camera model: pinhole" << std::endl;
         std::cout << "  Focal length: [" << focalLength.at(0) << " " << focalLength.at(1) << "]" << std::endl;
         std::cout << "  Principal point: [" << principalPoint.at(0) << " " << principalPoint.at(1) << "]" << std::endl;
-        std::cout << "  Distortion model: RadialTangential" << std::endl;
-        std::cout << "  Distortion coefficients: [" << distortionCoefficients.at(0) << " "
-                  << distortionCoefficients.at(1) << " " << distortionCoefficients.at(2) << " "
-                  << distortionCoefficients.at(3) << "]" << std::endl;
+        if constexpr (std::is_same<CameraGeometryType, aslam::cameras::EquidistantDistortedPinholeCameraGeometry>()) {
+            std::cout << "  Distortion model: Equidistant" << std::endl;
+        } else {
+            std::cout << "  Distortion model: RadialTangential" << std::endl;
+        }
+        if constexpr (std::is_same<CameraGeometryType, aslam::cameras::FovDistortedPinholeCameraGeometry>()) {
+            std::cout << "  Distortion coefficients: [" << distortionCoefficients.at(0) << "]" << std::endl;
+        } else {
+            std::cout << "  Distortion coefficients: [" << distortionCoefficients.at(0) << " "
+                      << distortionCoefficients.at(1) << " " << distortionCoefficients.at(2) << " "
+                      << distortionCoefficients.at(3) << "]" << std::endl;
+        }
     }
 };
 

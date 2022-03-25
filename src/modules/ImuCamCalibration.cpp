@@ -1,6 +1,7 @@
 #include <utilities/calibrator.hpp>
 
 #include <aslam/cameras.hpp>
+
 #include <dv-sdk/module.hpp>
 
 #include <fmt/chrono.h>
@@ -69,7 +70,7 @@ public:
             dv::ConfigOption::listOption(
                 "Calibration model to use",
                 "Pinhole-RadialTangential",
-                {"Pinhole-RadialTangential", "Pinhole-Fisheye"},
+                {"Pinhole-RadialTangential", "Pinhole-Equidistant", "Pinhole-Fov"},
                 false));
 
         // Module control buttons
@@ -130,7 +131,7 @@ public:
                 break;
             }
             case DURING_COLLECTING: {
-                if(calibrator== nullptr){
+                if (calibrator == nullptr) {
                     throw std::runtime_error("Calibrator is not initialized.");
                 }
                 if (config.getBool("stopCollecting")) {
@@ -141,7 +142,7 @@ public:
                 break;
             }
             case AFTER_COLLECTING: {
-                if(calibrator== nullptr){
+                if (calibrator == nullptr) {
                     throw std::runtime_error("Calibrator is not initialized.");
                 }
                 if (config.getBool("calibrate")) {
@@ -157,7 +158,7 @@ public:
                 break;
             }
             case CALIBRATED: {
-                if(calibrator== nullptr){
+                if (calibrator == nullptr) {
                     throw std::runtime_error("Calibrator is not initialized.");
                 }
                 if (config.getBool("discard")) {
@@ -177,6 +178,7 @@ public:
                 config.setBool("stopCollecting", true);
                 config.setBool("discard", true);
                 config.setBool("calibrate", true);
+                config.setBool("calibrationModel", true);
                 break;
             }
             case DURING_COLLECTING: {
@@ -184,6 +186,7 @@ public:
                 config.setBool("stopCollecting", false);
                 config.setBool("discard", true);
                 config.setBool("calibrate", true);
+                config.setBool("calibrationModel", false);
                 break;
             }
             case AFTER_COLLECTING: {
@@ -191,6 +194,7 @@ public:
                 config.setBool("stopCollecting", true);
                 config.setBool("discard", false);
                 config.setBool("calibrate", false);
+                config.setBool("calibrationModel", false);
                 break;
             }
             case CALIBRATED: {
@@ -198,6 +202,7 @@ public:
                 config.setBool("stopCollecting", true);
                 config.setBool("discard", false);
                 config.setBool("calibrate", true);
+                config.setBool("calibrationModel", true);
                 break;
             }
             default: throw std::runtime_error("Invalid collection state");
@@ -208,14 +213,17 @@ public:
         if (calibrator != nullptr) {
             calibrator->reset();
         }
-        if (config.getString("calibrationModel") == "Pinhole-RadialTangential") {
-            calibrator = std::make_unique<
-                Calibrator<aslam::cameras::DistortedPinholeCameraGeometry, aslam::cameras::RadialTangentialDistortion>>(
-                mOptions);
-        } else {
+        if (config.getString("calibrationModel") == "Pinhole-Equidistant") {
             calibrator = std::make_unique<Calibrator<
                 aslam::cameras::EquidistantDistortedPinholeCameraGeometry,
                 aslam::cameras::EquidistantDistortion>>(mOptions);
+        } else if (config.getString("calibrationModel") == "Pinhole-Fov") {
+            calibrator = std::make_unique<
+                Calibrator<aslam::cameras::FovDistortedPinholeCameraGeometry, aslam::cameras::FovDistortion>>(mOptions);
+        } else {
+            calibrator = std::make_unique<
+                Calibrator<aslam::cameras::DistortedPinholeCameraGeometry, aslam::cameras::RadialTangentialDistortion>>(
+                mOptions);
         }
     }
 
@@ -384,6 +392,16 @@ protected:
         // also output here
         fs << "pattern_width" << getBoardSize().width;
         fs << "pattern_height" << getBoardSize().height;
+        if (config.getString("calibrationModel") == "Pinhole-Equidistant") {
+            fs << "distortion_model"
+               << "Equidistant";
+        } else if (config.getString("calibrationModel") == "Pinhole-Fov") {
+            fs << "distortion_model"
+               << "FOV";
+        } else {
+            fs << "distortion_model"
+               << "RadialTangential";
+        }
         fs << "pattern_type" << config.getString("calibrationPattern");
         fs << "board_width" << config.getInt("boardWidth");
         fs << "board_height" << config.getInt("boardHeight");

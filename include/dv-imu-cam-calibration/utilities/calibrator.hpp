@@ -240,10 +240,16 @@ public:
 
         // Guess the distortion coefficients
         if (calibratorOptions.distCoeffs.empty()) {
-            calibratorOptions.distCoeffs.push_back(0.0);
-            calibratorOptions.distCoeffs.push_back(0.0);
-            calibratorOptions.distCoeffs.push_back(0.0);
-            calibratorOptions.distCoeffs.push_back(0.0);
+            if constexpr (
+                std::is_same<CameraGeometryType, aslam::cameras::FovDistortedPinholeCameraGeometry>()
+                && std::is_same<DistortionType, aslam::cameras::FovDistortion>()) {
+                calibratorOptions.distCoeffs.push_back(0.0);
+            } else {
+                calibratorOptions.distCoeffs.push_back(0.0);
+                calibratorOptions.distCoeffs.push_back(0.0);
+                calibratorOptions.distCoeffs.push_back(0.0);
+                calibratorOptions.distCoeffs.push_back(0.0);
+            }
         }
 
         targetObservations = boost::make_shared<std::map<int64_t, aslam::cameras::GridCalibrationTargetObservation>>();
@@ -546,9 +552,8 @@ public:
                     static constexpr size_t numCams = 1;
                     static constexpr size_t minViewOutlier = 20;
                     static constexpr bool removeOutliers = true;
-                    if (((success && numActiveBatches > minViewOutlier * numCams)
-                         || (runEndFiltering && numActiveBatches > minViewOutlier * numCams))
-                        and removeOutliers) {
+                    if ((success && numActiveBatches > minViewOutlier * numCams)
+                        || (runEndFiltering && numActiveBatches > minViewOutlier * numCams)) {
                         // create the list of the batches to check
                         std::vector<size_t> batches_to_check;
                         if (initOutlierRejection) {
