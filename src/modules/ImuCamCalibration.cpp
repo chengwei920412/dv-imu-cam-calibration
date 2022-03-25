@@ -121,6 +121,7 @@ public:
         // Handle user input
         switch (collectionState) {
             case BEFORE_COLLECTING: {
+                setupCalibrator();
                 if (config.getBool("startCollecting")) {
                     collectionState = DURING_COLLECTING;
                     calibrator->startCollecting();
@@ -129,6 +130,9 @@ public:
                 break;
             }
             case DURING_COLLECTING: {
+                if(calibrator== nullptr){
+                    throw std::runtime_error("Calibrator is not initialized.");
+                }
                 if (config.getBool("stopCollecting")) {
                     collectionState = AFTER_COLLECTING;
                     calibrator->stopCollecting();
@@ -137,6 +141,9 @@ public:
                 break;
             }
             case AFTER_COLLECTING: {
+                if(calibrator== nullptr){
+                    throw std::runtime_error("Calibrator is not initialized.");
+                }
                 if (config.getBool("calibrate")) {
                     calibrate();
                     collectionState = CALIBRATED;
@@ -150,6 +157,9 @@ public:
                 break;
             }
             case CALIBRATED: {
+                if(calibrator== nullptr){
+                    throw std::runtime_error("Calibrator is not initialized.");
+                }
                 if (config.getBool("discard")) {
                     collectionState = BEFORE_COLLECTING;
                     log.info("Discarded all collected data");
