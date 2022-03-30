@@ -13,6 +13,7 @@
 #include <aslam/backend/Optimizer2Options.hpp>
 #include <aslam/backend/ReprojectionError.hpp>
 #include <aslam/calibration/core/IncrementalEstimator.h>
+#include <ostream>
 
 boost::shared_ptr<aslam::backend::TransformationBasic> addPoseDesignVariable(
     boost::shared_ptr<aslam::backend::OptimizationProblem>& problem,
@@ -196,7 +197,7 @@ protected:
         // ## solve
         // ############################################
         aslam::backend::Optimizer2Options options;
-        options.verbose = false;
+        options.verbose = true;
         options.nThreads = 4;
         options.convergenceDeltaX = 1e-3;
         options.convergenceDeltaJ = 1;
@@ -247,49 +248,68 @@ template<typename CameraGeometryType, typename DistortionType>
 class CalibrationTargetOptimizationProblem : public aslam::calibration::OptimizationProblem {
 public:
     // arguments
-    boost::shared_ptr<CameraGeometry<CameraGeometryType, DistortionType>> camera;
+    std::vector<boost::shared_ptr<CameraGeometry<CameraGeometryType, DistortionType>>> cameras;
     boost::shared_ptr<aslam::cameras::GridCalibrationTargetBase> target;
     sm::kinematics::Transformation T_tc_guess;
-    aslam::cameras::GridCalibrationTargetObservation rig_observation;
+    std::map<size_t, aslam::cameras::GridCalibrationTargetObservation> rig_observations;
 
     // others
-    boost::shared_ptr<aslam::backend::RotationQuaternion> dv_T_target_camera_q = nullptr;
-    boost::shared_ptr<aslam::backend::EuclideanPoint> dv_T_target_camera_t = nullptr;
-    boost::shared_ptr<aslam::backend::TransformationBasic> dv_T_target_camera = nullptr;
+    std::vector<boost::shared_ptr<aslam::backend::RotationQuaternion>> dv_T_target_camera_q;
+    std::vector<boost::shared_ptr<aslam::backend::EuclideanPoint>> dv_T_target_camera_t;
+    std::vector<boost::shared_ptr<aslam::backend::TransformationBasic>> dv_T_target_camera;
+    std::vector<std::pair<
+        boost::shared_ptr<aslam::backend::RotationQuaternion>,
+        boost::shared_ptr<aslam::backend::EuclideanPoint>>>
+        baselines;
+    std::vector<boost::shared_ptr<aslam::backend::TransformationBasic>> baselinesT;
     std::vector<aslam::backend::HomogeneousExpression> P_t_ex;
-    std::vector<boost::shared_ptr<aslam::backend::HomogeneousPoint>> P_t_dv;
-    std::vector<boost::shared_ptr<aslam::backend::ReprojectionError<CameraGeometryType>>> rerrs;
+    std::vector<boost::shared_ptr<aslam::backend::HomogeneousPoint>> P_t_dv;std::vector<std::vector<
+        boost::shared_ptr<aslam::backend::ReprojectionError<CameraGeometryType>>>>
+        rerrs;
 
     // constructor is merged with factory method from Python "fromTargetViewObservations"
     CalibrationTargetOptimizationProblem(
-        boost::shared_ptr<CameraGeometry<CameraGeometryType, DistortionType>> _camera,
-        boost::shared_ptr<aslam::cameras::GridCalibrationTargetBase> _target,
+        const std::vector<boost::shared_ptr<CameraGeometry<CameraGeometryType, DistortionType>>>& _cameras,
+        const boost::shared_ptr<aslam::cameras::GridCalibrationTargetBase>& _target,
+        const std::vector<std::pair<
+            boost::shared_ptr<aslam::backend::RotationQuaternion>,
+            boost::shared_ptr<aslam::backend::EuclideanPoint>>>& _baselines,
         const sm::kinematics::Transformation& _T_tc_guess,
-        const aslam::cameras::GridCalibrationTargetObservation& _rig_observation,
+        const std::map<size_t, aslam::cameras::GridCalibrationTargetObservation>& _rig_observations,
         bool estimateLandmarks,
-        bool useBlakeZissermanMest) {
-        // store the arguments in case we want to rebuild a modified problem
-        camera = _camera;
-        target = _target;
-        T_tc_guess = _T_tc_guess;
-        rig_observation = _rig_observation;
-
+        bool useBlakeZissermanMest) :
+        cameras(_cameras),
+        target(_target), T_tc_guess(_T_tc_guess), rig_observations(_rig_observations), baselines(_baselines) {
         // 1. Create a design variable for this pose
         const auto T_target_camera = T_tc_guess;
 
-        dv_T_target_camera_q = boost::make_shared<aslam::backend::RotationQuaternion>(T_target_camera.q());
-        dv_T_target_camera_q->setActive(true);
-        this->addDesignVariable(dv_T_target_camera_q, TRANSFORMATION_GROUP_ID);
-        dv_T_target_camera_t = boost::make_shared<aslam::backend::EuclideanPoint>(T_target_camera.t());
-        dv_T_target_camera_t->setActive(true);
-        this->addDesignVariable(dv_T_target_camera_t, TRANSFORMATION_GROUP_ID);
+        for (size_t i = 0; i < cameras.size(); i++) {
+            auto dv_T_q = boost::make_shared<aslam::backend::RotationQuaternion>(T_target_camera.q());
+            dv_T_q->setActive(true);
+            this->addDesignVariable(dv_T_q, TRANSFORMATION_GROUP_ID);
+            auto dv_T_t = boost::make_shared<aslam::backend::EuclideanPoint>(T_target_camera.t());
+            dv_T_t->setActive(true);
+            this->addDesignVariable(dv_T_t, TRANSFORMATION_GROUP_ID);
 
-        dv_T_target_camera = boost::make_shared<aslam::backend::TransformationBasic>(
-            dv_T_target_camera_q->toExpression(),
-            dv_T_target_camera_t->toExpression());
+            dv_T_target_camera.push_back(boost::make_shared<aslam::backend::TransformationBasic>(
+                dv_T_q->toExpression(),
+                dv_T_t->toExpression()));
+
+            dv_T_target_camera_q.push_back(dv_T_q);
+            dv_T_target_camera_t.push_back(dv_T_t);
+        }
 
         // 2. Add all baselines DVs
-        // No baselines, only monocular calibration supported at the moment
+        for (const auto& baseline : baselines) {
+            baseline.first->setActive(true);
+            this->addDesignVariable(baseline.first, CALIBRATION_GROUP_ID);
+            baseline.second->setActive(true);
+            this->addDesignVariable(baseline.second, CALIBRATION_GROUP_ID);
+
+            baselinesT.push_back(boost::make_shared<aslam::backend::TransformationBasic>(
+                baseline.first->toExpression(),
+                baseline.second->toExpression()));
+        }
 
         // 3. Add landmark DVs
         P_t_ex.reserve(target->size());
@@ -306,18 +326,23 @@ public:
         }
 
         // 4. add camera DVs
-        if (!camera->getIsGeometryInitialized()) {
-            throw std::runtime_error("The camera geometry is not initialized. Please initialize with initGeometry() or "
-                                     "initGeometryFromDataset()");
+        for (const auto& camera : cameras) {
+            if (!camera->getIsGeometryInitialized()) {
+                throw std::runtime_error(
+                    "The camera geometry is not initialized. Please initialize with initGeometry() or "
+                    "initGeometryFromDataset()");
+            }
+            camera->setDvActiveStatus(true, true, false);
+            this->addDesignVariable(camera->getDv()->distortionDesignVariable(), CALIBRATION_GROUP_ID);
+            this->addDesignVariable(camera->getDv()->projectionDesignVariable(), CALIBRATION_GROUP_ID);
+            this->addDesignVariable(camera->getDv()->shutterDesignVariable(), CALIBRATION_GROUP_ID);
         }
-        camera->setDvActiveStatus(true, true, false);
-        this->addDesignVariable(camera->getDv()->distortionDesignVariable(), CALIBRATION_GROUP_ID);
-        this->addDesignVariable(camera->getDv()->projectionDesignVariable(), CALIBRATION_GROUP_ID);
-        this->addDesignVariable(camera->getDv()->shutterDesignVariable(), CALIBRATION_GROUP_ID);
 
         // 5. add all observations for this view
         size_t rerr_cnt = 0;
-        rerrs.reserve(P_t_ex.size());
+        for (const auto& camera : cameras) {
+            rerrs.emplace_back().reserve(P_t_ex.size());
+        }
 
         double cornerUncertainty = 1.0;
         const auto R = Eigen::Matrix2d::Identity() * cornerUncertainty * cornerUncertainty;
@@ -325,29 +350,35 @@ public:
 
         // add reprojection errors
         // build baseline chain (target->cam0->baselines->camN)
-        const auto T_cam0_target = dv_T_target_camera->toExpression().inverse();
-        auto T_camN_calib = T_cam0_target;
-        // no chain to build as we only support mono calibration
+        for (auto& [camId, rig_observation] : rig_observations) {
+            const auto T_cam0_target = dv_T_target_camera[camId]->toExpression().inverse();
+            auto T_camN_calib = T_cam0_target;
 
-        for (size_t i = 0; i < P_t_ex.size(); ++i) {
-            const auto p_target = P_t_ex[i];
+            for (size_t cId = 0; cId <= camId; cId++) {
+                T_camN_calib = baselinesT[cId]->toExpression() * T_camN_calib;
+            }
+
             Eigen::Vector2d y;
-            if (rig_observation.imagePoint(i, y)) {
-                ++rerr_cnt;
-                // create an error term.
-                auto rerr = boost::make_shared<aslam::backend::ReprojectionError<CameraGeometryType>>(
-                    y,
-                    invR,
-                    T_camN_calib * p_target,
-                    *camera->getDv());
+            for (size_t i = 0; i < P_t_ex.size(); ++i) {
+                const auto& p_target = P_t_ex[i];
+                if (rig_observation.imagePoint(i, y)) {
+                    ++rerr_cnt;
+                    // create an error term.
+                    auto rerr = boost::make_shared<
+                        aslam::backend::ReprojectionError<CameraGeometryType>>(
+                        y,
+                        invR,
+                        T_camN_calib * p_target,
+                        *cameras[camId]->getDv());
 
-                if (useBlakeZissermanMest) {
-                    throw std::runtime_error("useBlakeZissermanMest not implemented");
+                    if (useBlakeZissermanMest) {
+                        throw std::runtime_error("useBlakeZissermanMest not implemented");
+                    }
+                    this->addErrorTerm(rerr);
+                    rerrs[camId].push_back(rerr);
+                } else {
+                    rerrs[camId].emplace_back(nullptr);
                 }
-                this->addErrorTerm(rerr);
-                rerrs.push_back(rerr);
-            } else {
-                rerrs.emplace_back(nullptr);
             }
         }
     }
@@ -378,16 +409,18 @@ struct CalibrationResult {
     const std::vector<double> projection;
     const std::vector<double> distortion;
     const ErrorInfo err_info;
+    Eigen::Matrix4d baseline;
 
     CalibrationResult(
         const std::vector<double>& _projection,
         const std::vector<double>& _distortion,
-        const ErrorInfo& _err_info) :
+        const ErrorInfo& _err_info,
+        const Eigen::Matrix4d& _baseline) :
         projection(_projection),
-        distortion(_distortion), err_info(_err_info) {
+        distortion(_distortion), err_info(_err_info), baseline(_baseline) {
     }
 };
-static void printResult(const CameraCalibrationUtils::CalibrationResult& result, std::stringstream& ss) {
+static void printResult(const CameraCalibrationUtils::CalibrationResult& result, std::ostream& ss) {
     ss << "Intrinsic calibration results:" << std::endl;
     ss << "  projection: ";
     for (const auto val : result.projection) {
@@ -402,27 +435,36 @@ static void printResult(const CameraCalibrationUtils::CalibrationResult& result,
 
     ss << "  reprojection error: [" << result.err_info.mean.x() << ", " << result.err_info.mean.y() << "] +- ["
        << result.err_info.std.x() << ", " << result.err_info.std.y() << "]" << std::endl;
+
+    ss << "  baseline: " << result.baseline << std::endl;
 }
 } // namespace CameraCalibrationUtils
 
 template<typename CameraGeometryType, typename DistortionType>
 class CameraCalibration {
 private:
-    boost::shared_ptr<CameraGeometry<CameraGeometryType, DistortionType>> camera = nullptr;
+    std::vector<boost::shared_ptr<CameraGeometry<CameraGeometryType, DistortionType>>> cameras;
     bool estimateLandmarks;
     bool useBlakeZissermanMest;
     boost::shared_ptr<aslam::calibration::IncrementalEstimator> estimator = nullptr;
     boost::shared_ptr<aslam::cameras::GridCalibrationTargetBase> target = nullptr;
     std::vector<boost::shared_ptr<CalibrationTargetOptimizationProblem<CameraGeometryType, DistortionType>>> views;
+    std::vector<boost::shared_ptr<sm::kinematics::Transformation>> baselines;
+    std::vector<std::pair<
+        boost::shared_ptr<aslam::backend::RotationQuaternion>,
+        boost::shared_ptr<aslam::backend::EuclideanPoint>>>
+        dv_baselines;
 
 public:
     CameraCalibration(
-        boost::shared_ptr<CameraGeometry<CameraGeometryType, DistortionType>> cam,
-        boost::shared_ptr<aslam::cameras::GridCalibrationTargetBase> _target,
-        bool _estimateLandmarks = false,
-        bool _useBlakeZissermanMest = true) :
-        camera(cam),
-        target(_target), estimateLandmarks(_estimateLandmarks), useBlakeZissermanMest(_useBlakeZissermanMest) {
+        const std::vector<boost::shared_ptr<CameraGeometry<CameraGeometryType, DistortionType>>>& cams,
+        const boost::shared_ptr<aslam::cameras::GridCalibrationTargetBase>& _target,
+        const std::vector<boost::shared_ptr<sm::kinematics::Transformation>>& _baselines,
+        bool _estimateLandmarks,
+        bool _useBlakeZissermanMest) :
+        cameras(cams),
+        target(_target), baselines(_baselines), estimateLandmarks(_estimateLandmarks),
+        useBlakeZissermanMest(_useBlakeZissermanMest) {
         static constexpr bool verbose = false;
 
         // create the incremental estimator and set options
@@ -437,24 +479,42 @@ public:
 
         estimator->getOptimizerOptions().maxIterations = 50;
         estimator->getOptimizerOptions().verbose = verbose;
+
+        inititializeBaselines();
     }
 
-    bool addTargetView(const aslam::cameras::GridCalibrationTargetObservation& observation, bool force = false) {
-        auto T_tc_guess = observation.T_t_c();
+    void inititializeBaselines() {
+        for (const auto& baseline : baselines) {
+            auto dv_T_q = boost::make_shared<aslam::backend::RotationQuaternion>(baseline->q());
+            auto dv_T_t = boost::make_shared<aslam::backend::EuclideanPoint>(baseline->t());
+            dv_baselines.emplace_back(dv_T_q, dv_T_t);
+        }
+    }
+
+    bool addTargetView(
+        const std::map<size_t, aslam::cameras::GridCalibrationTargetObservation>& observations,
+        bool force = false) {
+        // Find observation with most points visible and use that target-camera transform estimation
+        // as T_tc_guess
+        auto obsWithMostPoints
+            = std::max_element(observations.begin(), observations.end(), [](const auto& a, const auto& b) {
+                  std::vector<unsigned int> aIdx, bIdx;
+                  a.second.getCornersIdx(aIdx);
+                  b.second.getCornersIdx(bIdx);
+                  return aIdx.size() > bIdx.size();
+              });
+        auto T_tc_guess = obsWithMostPoints->second.T_t_c();
+
         auto batch_problem
             = boost::make_shared<CalibrationTargetOptimizationProblem<CameraGeometryType, DistortionType>>(
-                camera,
+                cameras,
                 target,
+                dv_baselines,
                 T_tc_guess,
-                observation,
+                observations,
                 estimateLandmarks,
                 useBlakeZissermanMest);
         auto estimator_return_value = estimator->addBatch(batch_problem, force);
-
-        if (estimator_return_value.numIterations >= estimator->getOptimizerOptions().maxIterations) {
-            std::cout << "Did not converge in maxIterations..." << std::endl;
-            throw OptimizationDiverged("Optimization did not converge in maxIterations");
-        }
 
         bool success = estimator_return_value.batchAccepted;
         if (success) {
@@ -486,15 +546,12 @@ public:
         std::vector<std::vector<Eigen::MatrixXd>>,
         std::vector<std::vector<Eigen::MatrixXd>>>
         getReprojectionErrors(const size_t cameraId) {
-        assert(cameraId == 0); // only mono supported
-
         std::vector<std::vector<Eigen::MatrixXd>> all_corners, all_reprojections, all_reprojection_errs;
 
-        for (size_t view_id = 0; view_id < views.size(); ++view_id) {
-            const auto view = views.at(view_id);
+        for (auto& view : views) {
             // if cam_id in view.rerrs.keys(): // mono, not needed
             std::vector<Eigen::MatrixXd> view_corners, view_reprojections, view_reprojection_errs;
-            for (const auto& rerr : view->rerrs) {
+            for (const auto& rerr : view->rerrs[cameraId]) {
                 // add if the corners were observed
                 Eigen::MatrixXd corner, reprojection, err;
                 if (rerr) {
@@ -518,8 +575,35 @@ public:
         return std::make_tuple(all_corners, all_reprojections, all_reprojection_errs);
     }
 
-    CameraCalibrationUtils::CalibrationResult getResult() {
-        const auto projectionMat = camera->getDv()->projectionDesignVariable()->getParameters();
+    boost::shared_ptr<CalibrationTargetOptimizationProblem<CameraGeometryType, DistortionType>> removeCornersFromBatch(
+        const size_t batch_id,
+        const size_t cameraId,
+        const std::vector<size_t>& cornerIdList,
+        const bool useBlakeZissermanMest) {
+        auto& batch = views.at(batch_id);
+
+        // disable the corners
+        bool hasCornerRemoved = false;
+        for (const size_t cornerId : cornerIdList) {
+            batch->rig_observations.at(cameraId).removeImagePoint(cornerId);
+            hasCornerRemoved = true;
+        }
+        assert(hasCornerRemoved);
+
+        // rebuild problem
+        auto new_problem = boost::make_shared<CalibrationTargetOptimizationProblem<CameraGeometryType, DistortionType>>(
+            batch->cameras,
+            batch->target,
+            batch->baselines,
+            batch->T_tc_guess,
+            batch->rig_observations,
+            estimateLandmarks,
+            useBlakeZissermanMest);
+        return new_problem;
+    }
+
+    CameraCalibrationUtils::CalibrationResult getResult(const size_t cameraId) {
+        const auto projectionMat = cameras[cameraId]->getDv()->projectionDesignVariable()->getParameters();
         assert(projectionMat.rows() == 4);
         assert(projectionMat.cols() == 1);
         std::vector<double> projection;
@@ -528,7 +612,7 @@ public:
         projection.push_back(projectionMat(2, 0));
         projection.push_back(projectionMat(3, 0));
 
-        const auto distortionMat = camera->getDv()->distortionDesignVariable()->getParameters();
+        const auto distortionMat = cameras[cameraId]->getDv()->distortionDesignVariable()->getParameters();
         assert(distortionMat.rows() == 4);
         assert(distortionMat.cols() == 1);
         std::vector<double> distortion;
@@ -545,31 +629,10 @@ public:
             err_info = CameraCalibrationUtils::ErrorInfo(me, std);
         }
 
-        return {projection, distortion, err_info};
-    }
+        Eigen::Matrix4d baseline = Eigen::Matrix4d::Identity();
+        baseline.block<3, 3>(0, 0) = dv_baselines[cameraId].first->toRotationMatrix();
+        baseline.block<3, 1>(0, 3) = dv_baselines[cameraId].second->toEuclidean();
 
-    boost::shared_ptr<CalibrationTargetOptimizationProblem<CameraGeometryType, DistortionType>> removeCornersFromBatch(
-        const size_t batch_id,
-        const std::vector<size_t>& cornerIdList,
-        const bool useBlakeZissermanMest = true) {
-        auto& batch = views.at(batch_id);
-
-        // disable the corners
-        bool hasCornerRemoved = false;
-        for (const auto& cornerId : cornerIdList) {
-            batch->rig_observation.removeImagePoint(cornerId);
-            hasCornerRemoved = true;
-        }
-        assert(hasCornerRemoved);
-
-        // rebuild problem
-        auto new_problem = boost::make_shared<CalibrationTargetOptimizationProblem<CameraGeometryType, DistortionType>>(
-            batch->camera,
-            batch->target,
-            batch->T_tc_guess,
-            batch->rig_observation,
-            estimateLandmarks,
-            useBlakeZissermanMest);
-        return new_problem;
+        return {projection, distortion, err_info, baseline};
     }
 };

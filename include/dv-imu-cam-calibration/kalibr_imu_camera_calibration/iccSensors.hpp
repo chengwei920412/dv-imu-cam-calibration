@@ -33,6 +33,7 @@
 #include <sm/kinematics/transformations.hpp>
 
 #include <boost/make_shared.hpp>
+#include <ostream>
 
 #include <Eigen/Eigen>
 
@@ -65,7 +66,7 @@ public:
     }
 };
 
-} // namespace iccSensors
+} // namespace IccSensors
 
 class IccImu {
 public:
@@ -113,7 +114,7 @@ public:
         return gyroUncertaintyDiscrete;
     }
 
-    IccImu(const ImuParameters& imuParams, boost::shared_ptr<std::vector<IccSensors::ImuMeasurement>> data):
+    IccImu(const ImuParameters& imuParams, boost::shared_ptr<std::vector<IccSensors::ImuMeasurement>> data) :
         imuParameters(imuParams) {
         imuData = data;
 
@@ -143,11 +144,11 @@ public:
         std::cout << "    Random walk: " << gyroRandomWalk << std::endl;
     }
 
-    std::vector<IccSensors::ImuMeasurement>& getImuData(){
+    std::vector<IccSensors::ImuMeasurement>& getImuData() {
         return *imuData;
     }
 
-    void addDesignVariables(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem){
+    void addDesignVariables(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem) {
         gyroBiasDv = boost::make_shared<aslam::splines::EuclideanBSplineDesignVariable>(*gyroBias);
         accelBiasDv = boost::make_shared<aslam::splines::EuclideanBSplineDesignVariable>(*accelBias);
 
@@ -167,7 +168,7 @@ public:
         boost::shared_ptr<aslam::splines::BSplinePoseDesignVariable> poseSplineDv,
         const Eigen::Vector3d& g_w,
         double mSigma = 0.0,
-        double accelNoiseScale = 1.0){
+        double accelNoiseScale = 1.0) {
         std::cout << std::endl << "Adding accelerometer error terms (" << imuData->size() << ") ..." << std::endl;
 
         const double weight = 1.0 / accelNoiseScale;
@@ -192,7 +193,8 @@ public:
                 const auto C_i_b = q_i_b_Dv->toExpression();
                 const auto r_b = r_b_Dv->toExpression();
                 const auto a = C_i_b * (C_b_w * (a_w - g_w) + w_dot_b.cross(r_b) + w_b.cross(w_b.cross(r_b)));
-                auto aerr = boost::make_shared<kalibr_errorterms::EuclideanError>(im.alpha, im.alphaInvR * weight, a + b_i);
+                auto aerr
+                    = boost::make_shared<kalibr_errorterms::EuclideanError>(im.alpha, im.alphaInvR * weight, a + b_i);
                 aerr->setMEstimatorPolicy(mest);
                 accelErrors.push_back(aerr);
                 problem->addErrorTerm(aerr);
@@ -211,7 +213,7 @@ public:
         boost::shared_ptr<aslam::splines::BSplinePoseDesignVariable> poseSplineDv,
         const Eigen::Vector3d& g_w,
         double mSigma = 0.0,
-        double gyroNoiseScale = 1.0){
+        double gyroNoiseScale = 1.0) {
         std::cout << std::endl << "Adding gyroscope error terms (" << imuData->size() << ") ..." << std::endl;
 
         const double weight = 1.0 / gyroNoiseScale;
@@ -232,7 +234,8 @@ public:
                 const auto b_i = gyroBiasDv->toEuclideanExpression(tk, 0);
                 const auto C_i_b = q_i_b_Dv->toExpression();
                 const auto w = C_i_b * w_b;
-                auto gerr = boost::make_shared<kalibr_errorterms::EuclideanError>(im.omega, im.omegaInvR * weight, w + b_i);
+                auto gerr
+                    = boost::make_shared<kalibr_errorterms::EuclideanError>(im.omega, im.omegaInvR * weight, w + b_i);
                 gerr->setMEstimatorPolicy(mest);
                 gyroErrors.push_back(gerr);
                 problem->addErrorTerm(gerr);
@@ -241,14 +244,15 @@ public:
             }
         }
 
-        std::cout << "  Added " << imuData->size() - numSkipped << " of " << imuData->size() << " gyroscope error terms "
+        std::cout << "  Added " << imuData->size() - numSkipped << " of " << imuData->size()
+                  << " gyroscope error terms "
                   << "(skipped " << numSkipped << " out-of-bounds measurements)" << std::endl;
     }
 
     void initBiasSplines(
         boost::shared_ptr<bsplines::BSplinePose> poseSpline,
         size_t splineOrder,
-        size_t biasKnotsPerSecond){
+        size_t biasKnotsPerSecond) {
         const auto start = poseSpline->t_min();
         const auto end = poseSpline->t_max();
         const auto seconds = end - start;
@@ -264,7 +268,7 @@ public:
         accelBias->initConstantSpline(start, end, knots, Eigen::Vector3d(0., 0., 0.));
     }
 
-    void addBiasMotionTerms(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem){
+    void addBiasMotionTerms(boost::shared_ptr<aslam::calibration::OptimizationProblem> problem) {
         const auto Wgyro = Eigen::Matrix3d::Identity() / (gyroRandomWalk * gyroRandomWalk);
         const auto Waccel = Eigen::Matrix3d::Identity() / (accelRandomWalk * accelRandomWalk);
         const auto gyroBiasMotionErr
@@ -281,7 +285,7 @@ public:
         problem->addErrorTerm(accelBiasMotionErr);
     }
 
-    double getMeanGyroscopeError(){
+    double getMeanGyroscopeError() {
         std::vector<double> gyroVals;
         gyroVals.reserve(gyroErrors.size());
 
@@ -291,7 +295,6 @@ public:
         const auto [mean, median, std] = errorStatistics(gyroVals);
         return mean;
     }
-
 
     double getMeanAccelerometerError() {
         std::vector<double> accelVals;
@@ -306,7 +309,7 @@ public:
         return mean;
     }
 
-    void printNormalizedResiduals(std::stringstream& ss){
+    void printNormalizedResiduals(std::ostream& ss) {
         std::vector<double> gyroVals, accelVals;
         gyroVals.reserve(gyroErrors.size());
         accelVals.reserve(accelErrors.size());
@@ -328,7 +331,7 @@ public:
         }
     }
 
-    void printResiduals(std::stringstream& ss){
+    void printResiduals(std::ostream& ss) {
         std::vector<double> gyroVals, accelVals;
         gyroVals.reserve(gyroErrors.size());
         accelVals.reserve(accelErrors.size());
@@ -338,7 +341,8 @@ public:
         }
         {
             const auto [mean, median, std] = errorStatistics(gyroVals);
-            ss << "Gyroscope error [rad/s]:      mean: " << mean << " median: " << median << " std: " << std << std::endl;
+            ss << "Gyroscope error [rad/s]:      mean: " << mean << " median: " << median << " std: " << std
+               << std::endl;
         }
 
         for (const auto& err : accelErrors) {
@@ -346,10 +350,15 @@ public:
         }
         {
             const auto [mean, median, std] = errorStatistics(accelVals);
-            ss << "Accelerometer error [m/s^2]:  mean: " << mean << " median: " << median << " std: " << std << std::endl;
+            ss << "Accelerometer error [m/s^2]:  mean: " << mean << " median: " << median << " std: " << std
+               << std::endl;
         }
     }
 };
+
+namespace IccCameraUtils {
+using ObservationsPtr = boost::shared_ptr<std::map<int64_t, aslam::cameras::GridCalibrationTargetObservation>>;
+}
 
 template<typename CameraGeometryType, typename DistortionType>
 class IccCamera {
@@ -376,8 +385,7 @@ protected:
     boost::shared_ptr<std::map<int64_t, aslam::cameras::GridCalibrationTargetObservation>> targetObservations = nullptr;
 
     // Error statistics
-    typedef aslam::backend::SimpleReprojectionError<aslam::Frame<CameraGeometryType>>
-        ReprojectionError;
+    typedef aslam::backend::SimpleReprojectionError<aslam::Frame<CameraGeometryType>> ReprojectionError;
     typedef boost::shared_ptr<ReprojectionError> ReprojectionErrorSP;
     std::vector<std::vector<ReprojectionErrorSP>> allReprojectionErrors;
 
@@ -799,7 +807,7 @@ public:
         return mean;
     }
 
-    void printNormalizedResiduals(std::stringstream& ss) {
+    void printNormalizedResiduals(std::ostream& ss) {
         if (allReprojectionErrors.empty()) {
             ss << "Reprojection error:    no corners" << std::endl;
         }
@@ -815,7 +823,7 @@ public:
         ss << "Reprojection error:    mean: " << mean << " median: " << median << " std: " << std << std::endl;
     }
 
-    void printResiduals(std::stringstream& ss) {
+    void printResiduals(std::ostream& ss) {
         if (allReprojectionErrors.empty()) {
             ss << "Reprojection error [px]:    no corners" << std::endl;
         }

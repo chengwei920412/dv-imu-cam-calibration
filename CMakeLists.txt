@@ -20,24 +20,26 @@ PROJECT(dv-imu-cam-calibration
 	VERSION 1.0.0
 	LANGUAGES C CXX)
 
+ADD_DEFINITIONS(-march=native)
+
 # Define installation paths
 INCLUDE(GNUInstallDirs)
 
 # Custom CMake base module
-SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
-	${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_DATAROOTDIR}/dv ${CMAKE_INSTALL_PREFIX}/share/dv
-	/usr/${CMAKE_INSTALL_DATAROOTDIR}/dv /usr/share/dv
-	/usr/local/${CMAKE_INSTALL_DATAROOTDIR}/dv /usr/local/share/dv)
-
-# Support new Homebrew paths on MacOS
-IF (APPLE)
-	SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
-		/opt/homebrew/${CMAKE_INSTALL_DATAROOTDIR}/dv /opt/homebrew/share/dv)
-ENDIF()
+#SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
+#	${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_DATAROOTDIR}/dv ${CMAKE_INSTALL_PREFIX}/share/dv
+#	/usr/${CMAKE_INSTALL_DATAROOTDIR}/dv /usr/share/dv
+#	/usr/local/${CMAKE_INSTALL_DATAROOTDIR}/dv /usr/local/share/dv)
+#
+## Support new Homebrew paths on MacOS
+#IF (APPLE)
+#	SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
+#		/opt/homebrew/${CMAKE_INSTALL_DATAROOTDIR}/dv /opt/homebrew/share/dv)
+#ENDIF()
 
 # Basic setup
-INCLUDE(dv-modules)
-DV_MODULE_SETUP()
+FIND_PACKAGE(dv 1.5.0 REQUIRED)
+SET(DV_LIBRARIES dv::sdk)
 
 SET(CMAKE_C_VISIBILITY_PRESET default)
 SET(CMAKE_CXX_VISIBILITY_PRESET default)

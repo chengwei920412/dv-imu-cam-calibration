@@ -4,15 +4,20 @@
 
 #include <dv-sdk/module.hpp>
 
+#include <dv-processing/camera/calibration_set.hpp>
+#include <dv-processing/io/mono_camera_writer.hpp>
+#include <filesystem>
 #include <fmt/chrono.h>
+#include <fstream>
 #include <regex>
 
-bool cvExists(const cv::FileNode& fn) {
-    if (fn.type() == cv::FileNode::NONE) {
-        return (false);
-    }
+namespace pt = boost::property_tree;
+namespace fs = std::filesystem;
 
-    return (true);
+std::string getTimeString() {
+    return fmt::format(
+        "{:%Y-%m-%dT%H-%M-%SZ}",
+        fmt::localtime(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())));
 }
 
 class ImuCamCalibration : public dv::ModuleBase {
@@ -21,19 +26,85 @@ protected:
     CalibratorUtils::Options mOptions;
 
     std::unique_ptr<CalibratorBase> calibrator = nullptr;
+    std::unique_ptr<dv::io::MonoCameraWriter> dataLog = nullptr;
+    using DVMessage = std::variant<dv::TimedKeyPointPacket, dv::Frame, dv::IMU>;
+    using DVStreamAndMessage = std::pair<std::string, DVMessage>;
+    std::multimap<int64_t, DVStreamAndMessage> dataLogBuffer;
+    std::string timestampString;
+    std::vector<int64_t> times;
+    int64_t startTime = -1;
+    int64_t warmUpDuration = 100'000;
+
+    boost::circular_buffer<dv::Frame> leftFrames = boost::circular_buffer<dv::Frame>(3);
+    boost::circular_buffer<dv::Frame> rightFrames = boost::circular_buffer<dv::Frame>(10);
 
     enum CollectionState { BEFORE_COLLECTING, DURING_COLLECTING, AFTER_COLLECTING, CALIBRATED };
 
     CollectionState collectionState = BEFORE_COLLECTING;
 
+    static std::optional<double> estimateFrequency(const std::vector<int64_t>& timestamps) {
+        std::vector<double> freq;
+        if (timestamps.size() < 2) {
+            return std::nullopt;
+        }
+
+        for (auto iter = std::next(timestamps.begin()); iter < timestamps.end(); iter++) {
+            // We are interested in frequencies in 1Hz to 1000Hz, so converting to milliseconds, this should give a good
+            // enough approximation
+            int64_t t1 = *std::prev(iter);
+            int64_t t2 = *iter;
+            freq.push_back(1e+6 / static_cast<double>(t2 - t1));
+        }
+
+        return std::accumulate(freq.begin(), freq.end(), 0.) / static_cast<double>(freq.size());
+    }
+
+    std::optional<double> imuUpdateRate = std::nullopt;
+
+    void writeDataLogBuffer(const int64_t leaveLastMicroseconds = 0) {
+        if (dataLogBuffer.empty()) {
+            // Nothing to write
+            return;
+        }
+
+        // Write the data up to last - minus a bit microseconds
+        const auto lastTs = dataLogBuffer.rbegin()->first;
+        int64_t lastWrittenTs = -1;
+        for (const auto& [ts, streamAndData] : dataLogBuffer) {
+            if (ts > lastTs - leaveLastMicroseconds) {
+                break;
+            }
+            lastWrittenTs = ts;
+            std::cout << "writing : " << ts << std::endl;
+            const auto& [stream, data] = streamAndData;
+            if (const auto* pval = std::get_if<dv::TimedKeyPointPacket>(&data)) {
+                dataLog->writePacket(*pval, stream);
+            } else if (const auto* pval = std::get_if<dv::Frame>(&data)) {
+                dataLog->writePacket(*pval, stream);
+            } else if (const auto* pval = std::get_if<dv::IMU>(&data)) {
+                dataLog->writeImu(*pval, stream);
+            } else {
+                throw std::runtime_error("Unknown packet type");
+            }
+        }
+
+        // Erase the data that has been written
+        if (lastWrittenTs != -1) {
+            const auto it = dataLogBuffer.find(lastWrittenTs);
+            dataLogBuffer.erase(dataLogBuffer.begin(), it);
+        }
+    }
+
 public:
     static void initInputs(dv::InputDefinitionList& in) {
         in.addFrameInput("frames");
-        in.addIMUInput("imu");
+        in.addIMUInput("imu", true);
+        in.addFrameInput("right", true);
     }
 
     static void initOutputs(dv::OutputDefinitionList& out) {
         out.addFrameOutput("preview");
+        out.addFrameOutput("right");
     }
 
     static const char* initDescription() {
@@ -45,26 +116,29 @@ public:
         config.add(
             "outputCalibrationDirectory",
             dv::ConfigOption::directoryOption(
-                "Specify directory to save the calibration settings in",
+                "Path to a directory to save the calibration settings in",
                 dv::portable_get_user_home_directory()));
 
         // Calibration pattern
-        config.add("boardHeight", dv::ConfigOption::intOption("Number of rows in the calibration pattern", 11, 1, 50));
-        config.add("boardWidth", dv::ConfigOption::intOption("Number of cols in the calibration pattern", 4, 1, 50));
         config.add(
-            "boardSquareSize",
-            dv::ConfigOption::doubleOption("Size of a calibration pattern element in meters", 0.05, 0.0, 1.0));
+            "numPatternColumns",
+            dv::ConfigOption::intOption("Number of columns in the calibration pattern", 6, 1, 50));
         config.add(
-            "tagSpacingRatio",
-            dv::ConfigOption::doubleOption("Ratio of space between tags to tagSize (AprilTag)", 0.3, 0.0, 1.0));
+            "numPatternRows",
+            dv::ConfigOption::intOption("Number of rows in the calibration pattern", 6, 1, 50));
         config.add(
-            "calibrationPattern",
+            "markerSize",
+            dv::ConfigOption::floatOption("Size of a calibration pattern element in meters", 0.05, 0.0, 1.0));
+        config.add(
+            "markerSpacing",
+            dv::ConfigOption::floatOption("Ratio of space between tags to tagSize (AprilGrid only)", 0.3, 0.0, 1.0));
+        config.add(
+            "patternType",
             dv::ConfigOption::listOption(
-                "Calibration pattern to use",
-                "asymmetricCirclesGrid",
-                {"chessboard", "asymmetricCirclesGrid", "aprilTag"},
+                "Type of calibration pattern to use",
+                "aprilGrid",
+                {"aprilGrid", "asymmetricCirclesGrid", "chessboard"},
                 false));
-
         config.add(
             "calibrationModel",
             dv::ConfigOption::listOption(
@@ -72,7 +146,6 @@ public:
                 "Pinhole-RadialTangential",
                 {"Pinhole-RadialTangential", "Pinhole-Equidistant", "Pinhole-Fov"},
                 false));
-
         // Module control buttons
         config.add(
             "startCollecting",
@@ -92,37 +165,26 @@ public:
             dv::ConfigOption::boolOption("If true, time offset between the sensors will be calibrated", true));
 
         // IMU noise parameters
-        config.add("IMUupdateRate", dv::ConfigOption::doubleOption("IMU update rate [Hz]", 200, 10, 10000));
-        config.add("accNoiseDensity", dv::ConfigOption::doubleOption("Accelerometer noise density", 1.49e-3, 0, 1));
-        config.add("accRandomWalk", dv::ConfigOption::doubleOption("Accelerometer noise random walk", 8.69e-5, 0, 1));
-        config.add("gyrNoiseDensity", dv::ConfigOption::doubleOption("Gyroscope noise density", 8.09e-5, 0, 1));
-        config.add("gyrRandomWalk", dv::ConfigOption::doubleOption("Gyroscope noise random walk", 2.29e-6, 0, 1));
-
-        // Optimization options
-        config.add(
-            "maxIter",
-            dv::ConfigOption::intOption("Maximum number of iteration of calibration optimization problem", 50, 1, 100));
-        config.add(
-            "timeCalibration",
-            dv::ConfigOption::boolOption("If true, time offset between the sensors will be calibrated", true));
+        config.add("recordData", dv::ConfigOption::boolOption("Record collected data in the output directory", true));
 
         config.setPriorityOptions(
             {"outputCalibrationDirectory",
+             "calibrationModel",
              "boardHeight",
              "boardWidth",
-             "boardSquareSize",
-             "calibrationPattern",
+             "markerSize",
+             "patternType",
              "startCollecting",
              "stopCollecting",
              "discard",
              "calibrate"});
     }
 
-    void configUpdate() {
+    void handleCollectionState() {
         // Handle user input
         switch (collectionState) {
             case BEFORE_COLLECTING: {
-                setupCalibrator();
+                // setupCalibrator();
                 if (config.getBool("startCollecting")) {
                     collectionState = DURING_COLLECTING;
                     calibrator->startCollecting();
@@ -146,7 +208,8 @@ public:
                     throw std::runtime_error("Calibrator is not initialized.");
                 }
                 if (config.getBool("calibrate")) {
-                    calibrate();
+                    dataLog = nullptr;
+                    calibrate(inputs.isConnected("imu"));
                     collectionState = CALIBRATED;
                 }
 
@@ -178,7 +241,6 @@ public:
                 config.setBool("stopCollecting", true);
                 config.setBool("discard", true);
                 config.setBool("calibrate", true);
-                config.setBool("calibrationModel", true);
                 break;
             }
             case DURING_COLLECTING: {
@@ -186,7 +248,6 @@ public:
                 config.setBool("stopCollecting", false);
                 config.setBool("discard", true);
                 config.setBool("calibrate", true);
-                config.setBool("calibrationModel", false);
                 break;
             }
             case AFTER_COLLECTING: {
@@ -194,7 +255,6 @@ public:
                 config.setBool("stopCollecting", true);
                 config.setBool("discard", false);
                 config.setBool("calibrate", false);
-                config.setBool("calibrationModel", false);
                 break;
             }
             case CALIBRATED: {
@@ -202,7 +262,6 @@ public:
                 config.setBool("stopCollecting", true);
                 config.setBool("discard", false);
                 config.setBool("calibrate", true);
-                config.setBool("calibrationModel", true);
                 break;
             }
             default: throw std::runtime_error("Invalid collection state");
@@ -227,19 +286,52 @@ public:
         }
     }
 
+    void configUpdate() override {
+        handleCollectionState();
+    }
+
     void initializeCalibrator() {
         const auto frameInput = inputs.getFrameInput("frames");
-        const auto description = frameInput.getOriginDescription();
+        timestampString = getTimeString();
 
-        mOptions.pattern = getCalibrationPattern();
-        mOptions.rows = static_cast<size_t>(config.getInt("boardHeight"));
-        mOptions.cols = static_cast<size_t>(config.getInt("boardWidth"));
-        mOptions.spacingMeters = config.getDouble("boardSquareSize");
-        mOptions.tagSpacing = config.getDouble("tagSpacingRatio");
-        mOptions.imageSize = frameInput.size();
+        mOptions.pattern = getPatternType();
+        mOptions.cols = static_cast<size_t>(config.getInt("numPatternColumns"));
+        mOptions.rows = static_cast<size_t>(config.getInt("numPatternRows"));
+        mOptions.spacingMeters = static_cast<double>(config.getFloat("markerSize"));
+        mOptions.patternSpacing = static_cast<double>(config.getFloat("markerSpacing"));
+        mOptions.cameraInitialSettings.emplace_back().imageSize = frameInput.size();
+
+        // Add config for the second camera if it is connected
+        const auto rightInput = inputs.getFrameInput("right");
+        if (rightInput.isConnected()) {
+            mOptions.cameraInitialSettings.emplace_back().imageSize = rightInput.size();
+        }
 
         mOptions.maxIter = static_cast<size_t>(config.getInt("maxIter"));
         mOptions.timeCalibration = config.getBool("timeCalibration");
+
+        if (imuUpdateRate.has_value()) {
+            mOptions.imuParameters.updateRate = *imuUpdateRate;
+        }
+
+        setupCalibrator();
+
+        if (config.getBool("recordData")) {
+            dv::io::MonoCameraWriter::Config cfg;
+            cfg.cameraName = getCameraID();
+            cfg.frameResolution = frameInput.size();
+            cfg.enableImu = inputs.getIMUInput("imu").isConnected();
+            cfg.addFrameStream(frameInput.size(), "left_frames", frameInput.getOriginDescription());
+            cfg.addStream<dv::TimedKeyPointPacket>("left_markers");
+            if (rightInput.isConnected()) {
+                cfg.addFrameStream(rightInput.size(), "right_frames", rightInput.getOriginDescription());
+                cfg.addStream<dv::TimedKeyPointPacket>("right_markers");
+            }
+
+            dataLog = std::make_unique<dv::io::MonoCameraWriter>(
+                fs::path(getCalibrationSaveDirectory()) / "data.aedat4",
+                cfg);
+        }
     }
 
     ImuCamCalibration() {
@@ -249,125 +341,257 @@ public:
         const auto description = frameInput.getOriginDescription();
         outputs.getFrameOutput("preview").setup(inputSize.width, inputSize.height, description);
 
-        initializeCalibrator();
+        if (inputs.isConnected("right")) {
+            outputs.getFrameOutput("right").setup(inputs.getFrameInput("right"));
+        } else {
+            // Setup using left camera info, but it will not output anthing
+            outputs.getFrameOutput("right").setup(inputs.getFrameInput("frames"));
+        }
+
+        // If imu input is connected, do not initialize and wait until imu frequency is estimated
+        if (!inputs.getIMUInput("imu").isConnected()) {
+            initializeCalibrator();
+        }
 
         // Unclick all the buttons and update the state
         config.setBool("startCollecting", false);
         config.setBool("stopCollecting", false);
         config.setBool("discard", false);
         config.setBool("calibrate", false);
-        configUpdate();
+        handleCollectionState();
+    }
+
+    ~ImuCamCalibration() {
+        writeDataLogBuffer();
+    }
+
+    void logObservationData() {
+        auto detection = calibrator->getLatestObservations();
+        if (!detection.first.empty() && !detection.second.empty()) {
+            dv::runtime_assert(
+                detection.first.size() == detection.second.size(),
+                "Observation count does not match image count!");
+        } else {
+            return;
+        }
+        // TODO: Log both streams
+        size_t index = 0;
+        for (size_t index = 0; index < detection.first.size(); index++) {
+            int64_t timestamp = detection.first[index].timestamp;
+            dv::TimedKeyPointPacket markers;
+            std::vector<uint32_t> ids;
+            size_t count = detection.second[index]->getCornersIdx(ids);
+
+            markers.elements.reserve(count);
+            for (uint32_t id : ids) {
+                Eigen::Vector2d cornerEigen;
+                detection.second[index]->imagePoint(id, cornerEigen);
+                markers.elements.emplace_back(
+                    dv::Point2f(static_cast<float>(cornerEigen(0)), static_cast<float>(cornerEigen(1))),
+                    1.f,
+                    -1.f,
+                    1.f,
+                    0,
+                    id,
+                    timestamp);
+            }
+            if (index == 0) {
+                const auto ts = detection.first[index].timestamp;
+                dataLogBuffer.emplace(
+                    std::make_pair(ts, std::make_pair("left_frames", dv::Frame(ts, detection.first[index].image))));
+                dataLogBuffer.emplace(std::make_pair(ts, std::make_pair("left_markers", markers)));
+                std::cout << "pushing: " << ts << std::endl;
+            } else {
+                const auto ts = detection.first[index].timestamp;
+                dataLogBuffer.emplace(
+                    std::make_pair(ts, std::make_pair("right_frames", dv::Frame(ts, detection.first[index].image))));
+                dataLogBuffer.emplace(std::make_pair(ts, std::make_pair("right_markers", markers)));
+            }
+        }
+
+        // Write the log data from the buffer only if it is more than 1 second old
+        writeDataLogBuffer(10000000);
+    }
+
+    std::optional<size_t> estimateImuFrequency(const dv::IMUPacket& packet) {
+        for (const auto& measurement : packet.elements) {
+            times.push_back(measurement.timestamp);
+        }
+        if (times.size() > 10) {
+            auto result = estimateFrequency(times);
+            times.clear();
+            return result;
+        } else {
+            return std::nullopt;
+        }
+    }
+
+    const dv::Frame& closestRightFrame(const int64_t timestamp) {
+        auto iter = std::min_element(rightFrames.begin(), rightFrames.end(), [timestamp](const auto& a, const auto& b) {
+            return std::abs(a.timestamp - timestamp) < std::abs(b.timestamp - timestamp);
+        });
+        return *iter;
     }
 
     void run() override {
         // Process IMU input
-        auto imuInput = inputs.getIMUInput("imu");
-        if (auto imuData = imuInput.data()) {
-            for (const auto& singleImu : imuData) {
-                calibrator->addImu(
-                    singleImu.timestamp,
-                    static_cast<double>(singleImu.gyroscopeX) * M_PI / 180.0,
-                    static_cast<double>(singleImu.gyroscopeY) * M_PI / 180.0,
-                    static_cast<double>(singleImu.gyroscopeZ) * M_PI / 180.0,
-                    static_cast<double>(singleImu.accelerometerX) * 9.81,
-                    static_cast<double>(singleImu.accelerometerY) * 9.81,
-                    static_cast<double>(singleImu.accelerometerZ) * 9.81);
+        if (inputs.isConnected("imu")) {
+            auto imuInput = inputs.getIMUInput("imu");
+            if (auto imuData = imuInput.data()) {
+                if (!calibrator) {
+                    if (startTime < 0) {
+                        startTime = imuData.front().timestamp;
+                    }
+
+                    // Skip some data during warm up, the timestamps are not well aligned during startup
+                    if (imuData.front().timestamp - startTime < warmUpDuration) {
+                        return;
+                    }
+
+                    if (auto frequency = estimateImuFrequency(*imuData.getBasePointer()); frequency.has_value()) {
+                        imuUpdateRate = static_cast<double>(*frequency);
+                        initializeCalibrator();
+                    }
+                    // wait for frequency estimation
+                    return;
+                }
+
+                for (const auto& singleImu : imuData) {
+                    calibrator->addImu(
+                        singleImu.timestamp,
+                        singleImu.getAngularVelocities().cast<double>(),
+                        singleImu.getAccelerations().cast<double>());
+                }
+                if (collectionState == DURING_COLLECTING) {
+                    for (const auto& singleImu : imuData) {
+                        const auto ts = singleImu.timestamp;
+                        dataLogBuffer.emplace(std::make_pair(ts, std::make_pair("imu", singleImu)));
+                    }
+                }
+            }
+        }
+
+        if (!calibrator) {
+            return;
+        }
+
+        const auto& rightInput = inputs.getFrameInput("right");
+        const bool stereo = rightInput.isConnected();
+
+        if (stereo) {
+            if (auto frame = rightInput.data()) {
+                rightFrames.push_back(*frame.getBasePointer());
             }
         }
 
         // Process frame input
         auto frameInput = inputs.getFrameInput("frames");
         if (auto frame = frameInput.data()) {
-            cv::Mat img = *frame.getMatPointer();
-            calibrator->addImage(img, frame.timestamp());
+            leftFrames.push_back(*frame.getBasePointer());
+        }
+
+        if (stereo && !rightFrames.full()) {
+            return;
+        }
+
+        if (leftFrames.full()) {
+            std::vector<CalibratorUtils::StampedImage> images;
+            dv::Frame& left = leftFrames.front();
+            if (left.image.channels() == 3) {
+                cv::Mat gray;
+                cv::cvtColor(left.image, gray, cv::COLOR_BGR2GRAY);
+                images.emplace_back(gray, left.timestamp);
+            } else {
+                images.emplace_back(left.image, left.timestamp);
+            }
+
+            if (stereo) {
+                const dv::Frame& right = closestRightFrame(left.timestamp);
+                // Pass in left timestamp so it can be easily pair-matched
+                if (right.image.channels() == 3) {
+                    cv::Mat gray;
+                    cv::cvtColor(right.image, gray, cv::COLOR_BGR2GRAY);
+                    images.emplace_back(gray, right.timestamp);
+                } else {
+                    images.emplace_back(right.image, left.timestamp);
+                }
+            }
+            calibrator->addImages(images);
 
             // Output preview image
-            auto preview = calibrator->getPreviewImage();
-            outputs.getFrameOutput("preview") << preview.timestamp << preview.image << dv::commit;
+            auto previews = calibrator->getPreviewImages();
+            if (!previews.empty()) {
+                outputs.getFrameOutput("preview") << previews[0].timestamp << previews[0].image << dv::commit;
+                if (previews.size() == 2) {
+                    outputs.getFrameOutput("right") << previews[1].timestamp << previews[1].image << dv::commit;
+                }
+            }
+            if (dataLog) {
+                logObservationData();
+            }
+            leftFrames.pop_front();
         }
     }
 
 protected:
-    std::string saveFilePath() {
+    fs::path getCalibrationSaveDirectory() {
         const auto frameInput = inputs.getFrameInput("frames");
         const auto cameraID = frameInput.getOriginDescription();
-        boost::filesystem::path outputDir{config.getString("outputCalibrationDirectory")};
+        fs::path outputDir{config.getString("outputCalibrationDirectory")};
 
         if (outputDir.empty()) {
             outputDir = dv::portable_get_user_home_directory();
         }
 
-        const std::string timeString = fmt::format(
-            "{:%Y_%m_%d_%H_%M_%S}",
-            fmt::localtime(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())));
-        const std::string fileName = "camera_imu_calibration_" + cameraID + "-" + timeString + ".xml";
+        const std::string dirName = "dv_calibration_" + timestampString;
+        auto outputDirWithTs = outputDir / dirName;
 
-        auto filePath = (outputDir / fileName).string();
-        return filePath;
+        if (!fs::is_directory(outputDirWithTs)) {
+            fs::create_directories(outputDirWithTs);
+        }
+
+        return outputDirWithTs;
     }
 
-    CalibratorUtils::CalibrationPattern getCalibrationPattern() {
-        const auto pattern = config.getString("calibrationPattern");
-        if (pattern == "chessboard") {
-            return CalibratorUtils::CalibrationPattern::CHESSBOARD;
+    CalibratorUtils::PatternType getPatternType() {
+        const auto pattern = config.getString("patternType");
+        if (pattern == "aprilGrid") {
+            return CalibratorUtils::PatternType::APRIL_GRID;
         } else if (pattern == "asymmetricCirclesGrid") {
-            return CalibratorUtils::CalibrationPattern::ASYMMETRIC_CIRCLES_GRID;
-        } else if (pattern == "aprilTag") {
-            return CalibratorUtils::CalibrationPattern::APRIL_GRID;
+            return CalibratorUtils::PatternType::ASYMMETRIC_CIRCLES_GRID;
+        } else if (pattern == "chessboard") {
+            return CalibratorUtils::PatternType::CHESSBOARD;
         } else {
-            std::stringstream ss;
-            ss << "Unknown calibration pattern: " << pattern;
-            throw std::runtime_error(ss.str());
+            throw std::runtime_error("Unknown calibration pattern: " + pattern);
         }
     }
 
-    cv::Size getBoardSize() {
-        switch (getCalibrationPattern()) {
-            case CalibratorUtils::CalibrationPattern::CHESSBOARD:
-                // Inner corners, so -1 on each side.
-                return cv::Size(config.getInt("boardWidth") - 1, config.getInt("boardHeight") - 1);
-            case CalibratorUtils::CalibrationPattern::APRIL_GRID:
-            case CalibratorUtils::CalibrationPattern::ASYMMETRIC_CIRCLES_GRID:
-                return cv::Size(config.getInt("boardWidth"), config.getInt("boardHeight"));
-            default: {
-                std::stringstream ss;
-                ss << "Can not get the board size for unknown calibration pattern: "
-                   << config.getString("calibrationPattern");
-                throw std::runtime_error(ss.str());
-            }
-        }
+    int getPatternColumns() {
+        return config.getInt("numPatternColumns");
     }
 
-    void saveCalibration(
-        const CameraCalibrationUtils::CalibrationResult& intrinsicResult,
-        const IccCalibratorUtils::CalibrationResult& result) {
-        const auto filePath = saveFilePath();
+    int getPatternRows() {
+        return config.getInt("numPatternRows");
+    }
 
-        cv::FileStorage fs(filePath, cv::FileStorage::WRITE);
-
-        if (!fs.isOpened()) {
-            log.warning << "Failed to write to calibration file: " << filePath << dv::logEnd;
-            return;
+    int getInternalPatternColumns() {
+        int cols = getPatternColumns();
+        if (getPatternType() == CalibratorUtils::PatternType::CHESSBOARD) {
+            // In case of chessboard we actually detect the inner corners
+            cols -= 1;
         }
+        return cols;
+    }
 
-        // Camera matrix in OpenCV format
-        std::vector<double> camMatValues{
-            intrinsicResult.projection.at(0),
-            0.0,
-            intrinsicResult.projection.at(2),
-            0.0,
-            intrinsicResult.projection.at(1),
-            intrinsicResult.projection.at(3),
-            0.0,
-            0.0,
-            1.0};
-        cv::Mat cameraMatrix(3, 3, CV_64FC1, camMatValues.data());
-
-        // Distortion coefficients in OpenCV format
-        std::vector<double> distCopy(intrinsicResult.distortion);
-        cv::Mat distCoeffs(1, static_cast<int>(intrinsicResult.distortion.size()), CV_64FC1, distCopy.data());
-
-        // Get the camera ID
+    int getInternalPatternRows() {
+        int rows = getPatternRows();
+        if (getPatternType() == CalibratorUtils::PatternType::CHESSBOARD) {
+            // In case of chessboard we actually detect the inner corners
+            rows -= 1;
+        }
+        return rows;
+    }
+    std::string getCameraID() {
         const auto frameInput = inputs.getFrameInput("frames");
         const auto originDescription = frameInput.getOriginDescription();
         static const std::regex filenameCleanupRegex{"[^a-zA-Z-_\\d]"};
@@ -375,112 +599,240 @@ protected:
         if ((cameraID[0] == '-') || (std::isdigit(cameraID[0]) != 0)) {
             cameraID = "_" + cameraID;
         }
-
-        // Single camera calibration data
-        fs << cameraID; // Node name.
-        fs << "{";      // Node start.
-        fs << "camera_matrix" << cameraMatrix;
-        fs << "distortion_coefficients" << distCoeffs;
-        fs << "image_width" << frameInput.sizeX();
-        fs << "image_height" << frameInput.sizeY();
-        fs << "}"; // Node end.
-        fs << "use_fisheye_model" << false;
-        fs << "type"
-           << "camera";
-
-        // The fields in the block below existed in DV Camera Calibration module, for compatibility reasons they are
-        // also output here
-        fs << "pattern_width" << getBoardSize().width;
-        fs << "pattern_height" << getBoardSize().height;
-        if (config.getString("calibrationModel") == "Pinhole-Equidistant") {
-            fs << "distortion_model"
-               << "Equidistant";
-        } else if (config.getString("calibrationModel") == "Pinhole-Fov") {
-            fs << "distortion_model"
-               << "FOV";
-        } else {
-            fs << "distortion_model"
-               << "RadialTangential";
-        }
-        fs << "pattern_type" << config.getString("calibrationPattern");
-        fs << "board_width" << config.getInt("boardWidth");
-        fs << "board_height" << config.getInt("boardHeight");
-        fs << "square_size" << config.getFloat("boardSquareSize");
-        fs << "calibration_error"
-           << "N/A"; // Now we have two errors, intrinsic and extrinsic. This one is not output
-                     // to avoid confusion
-        fs << "calibration_time"
-           << fmt::format(
-                  "{:%c}",
-                  fmt::localtime(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())));
-
-        // The fields in the block below are related to camera IMU calibration. They did not exist in original camera
-        // calibration module
-        fs << "calibration_converged" << result.converged;
-        fs << "time_offset_cam_imu__t_imu_equals_t_cam_plus_shift" << result.t_cam_imu;
-        cv::Mat trans;
-        cv::eigen2cv(result.T_cam_imu, trans);
-        fs << "transformation_cam_imu" << trans;
-        fs << "mean_reprojection_error" << result.error_info.meanReprojectionError;
-        fs << "mean_accelerometer_error" << result.error_info.meanAccelerometerError;
-        fs << "mean_gyroscope_error" << result.error_info.meanGyroscopeError;
-
-        // Intrinsic calibration error
-        cv::Mat intrErr;
-        cv::eigen2cv(intrinsicResult.err_info.mean, intrErr);
-        fs << "intrinsic_calibration_reprojection_error" << intrErr;
-
-        log.info << "Calibration saved to a file: " << filePath << dv::logEnd;
+        return cameraID;
     }
 
-    void calibrate() {
-        // Function printing std string to DV log with nicely handled newlines
-        auto string2dvLog = [&](const std::string& str) {
-            std::stringstream stringReader(str);
-            std::string line;
+    cv::Size getInputResolution() {
+        const auto frameInput = inputs.getFrameInput("frames");
+        return {frameInput.sizeX(), frameInput.sizeY()};
+    }
 
-            while (std::getline(stringReader, line)) {
-                if (!line.empty()) {
-                    log.info << line << dv::logEnd;
-                }
+    static std::vector<float> getIdentityMatrixVector() {
+        return std::vector<float>{1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 0.f, 1.f};
+    }
+
+    dv::camera::calibrations::CameraCalibration::Metadata
+        getCameraCalibrationMetadata(const CameraCalibrationUtils::CalibrationResult& intrinsicResult) {
+        std::stringstream ssError;
+        ssError << "Mean: " << intrinsicResult.err_info.mean.transpose()
+                << " Standard deviation: " << intrinsicResult.err_info.std.transpose();
+
+        auto meanStd = (intrinsicResult.err_info.std.x() + intrinsicResult.err_info.std.y()) / 2.0;
+        std::string quality;
+        if (meanStd < 0.1) {
+            quality = "excellent";
+        } else if (meanStd < 0.2) {
+            quality = "good";
+        } else if (meanStd < 0.5) {
+            quality = "poor";
+        } else {
+            quality = "bad";
+        }
+
+        return {
+            cv::Size(getPatternColumns(), getPatternRows()),
+            cv::Size(getInternalPatternColumns(), getInternalPatternRows()),
+            config.getString("patternType"),
+            config.getFloat("markerSize"),
+            config.getFloat("markerSpacing"),
+            meanStd,
+            timestampString,
+            quality,
+            ""};
+    }
+
+    dv::camera::calibrations::CameraCalibration
+        getIntrinsicCalibrationData(const CameraCalibrationUtils::CalibrationResult& res) {
+        const auto floatTransform = res.baseline.cast<float>().eval();
+        std::string distortionModel = "radialTangential";
+        if (config.getString("calibrationModel") == "Pinhole-Equidistant") {
+            distortionModel = "equidistant";
+        } else if (config.getString("calibrationModel") == "Pinhole-Fov") {
+            distortionModel = "fov";
+        }
+
+        dv::camera::calibrations::CameraCalibration cal(
+            getCameraID(),
+            "left",
+            true,
+            getInputResolution(),
+            cv::Point2f(static_cast<float>(res.projection.at(2)), static_cast<float>(res.projection.at(3))),
+            cv::Point2f(static_cast<float>(res.projection.at(0)), static_cast<float>(res.projection.at(1))),
+            std::vector<float>(res.distortion.begin(), res.distortion.end()),
+            distortionModel,
+            std::vector<float>(floatTransform.data(), floatTransform.data() + 16),
+            getCameraCalibrationMetadata(res));
+
+        return cal;
+    }
+
+    std::tuple<float, float, cv::Point3f, cv::Point3f, float, float, float, float, float, float>
+        getIMUCharacteristics() {
+        float omega_max, acc_max, omega_offset_var, acc_offset_var, omega_noise_density, acc_noise_density,
+            omega_noise_random_walk, acc_noise_random_walk;
+
+        cv::Point3f omega_offset_avg, acc_offset_avg;
+
+        const auto cameraId = getCameraID();
+        if (cameraId.substr(0, 9) == "DVXplorer") {
+            omega_max = 34.89f;
+            acc_max = 156.96f;
+            omega_offset_avg = {0, 0, 0};
+            acc_offset_avg = {0, 0, 0};
+            omega_offset_var = 0.03f;
+            acc_offset_var = 0.1f;
+            omega_noise_density = 8.0e-5f;
+            acc_noise_density = 1.0e-3f;
+            omega_noise_random_walk = 4.0e-6f;
+            acc_noise_random_walk = 4.0e-5f;
+        } else if (cameraId.substr(0, 5) == "DAVIS") {
+            omega_max = 7.8f;
+            acc_max = 176.0f;
+            omega_offset_avg = {0, 0, 0};
+            acc_offset_avg = {0, 0, 0};
+            omega_offset_var = 0.03f;
+            acc_offset_var = 0.1f;
+            omega_noise_density = 0.00018f;
+            acc_noise_density = 0.002f;
+            omega_noise_random_walk = 0.001f;
+            acc_noise_random_walk = 4.0e-5f;
+        } else {
+            log.warning << "Could not determine the camera type. IMU noise characteristics are unknown." << dv::logEnd;
+        }
+
+        return std::make_tuple(
+            omega_max,
+            acc_max,
+            omega_offset_avg,
+            acc_offset_avg,
+            omega_offset_var,
+            acc_offset_var,
+            omega_noise_density,
+            acc_noise_density,
+            omega_noise_random_walk,
+            acc_noise_random_walk);
+    }
+
+    dv::camera::calibrations::IMUCalibration
+        getIMUCalibrationData(const IccCalibratorUtils::CalibrationResult& result) {
+        const auto& [om, am, ooavg, aoavg, oovar, aovar, onden, anden, onrw, anrw] = getIMUCharacteristics();
+
+        std::vector<float> transData;
+        transData.reserve(16);
+        for (long row = 0; row < result.T_cam_imu.rows(); ++row) {
+            for (long col = 0; col < result.T_cam_imu.cols(); ++col) {
+                transData.push_back(static_cast<float>(result.T_cam_imu(row, col)));
             }
-        };
+        }
 
-        std::stringstream ss;
+        std::stringstream ssCom;
+        ssCom << "Time offset usage: t_correct = t_imu - offset"
+              << " Mean reprojection error: " << result.error_info.meanReprojectionError
+              << " Mean acc error: " << result.error_info.meanAccelerometerError
+              << " Mean gyroscope error: " << result.error_info.meanGyroscopeError;
+
+        auto cal = dv::camera::calibrations::IMUCalibration(
+            getCameraID(),
+            om,
+            am,
+            ooavg,
+            aoavg,
+            oovar,
+            aovar,
+            onden,
+            anden,
+            onrw,
+            anrw,
+            static_cast<int64_t>(result.t_cam_imu * 1e+6),
+            transData,
+            dv::camera::calibrations::IMUCalibration::Metadata{timestampString, ssCom.str()});
+
+        return cal;
+    }
+
+    void saveIntrinsicCalibration(const std::vector<CameraCalibrationUtils::CalibrationResult>& intrinsicResult) {
+        const auto saveDir = getCalibrationSaveDirectory();
+
+        const auto filePath = saveDir / "calibration.json";
+
+        dv::camera::CalibrationSet calib;
+
+        for (const auto& intrinsics : intrinsicResult) {
+            calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsics));
+        }
+        // TODO(rokas): save stereo calibration!
+
+        calib.writeToFile(filePath.string());
+
+        log.info << "Saved intrinsic calibration to a file: " << filePath << dv::logEnd;
+    }
+
+    void saveCalibration(
+        const std::vector<CameraCalibrationUtils::CalibrationResult>& intrinsicResult,
+        const IccCalibratorUtils::CalibrationResult& result) {
+        const auto saveDir = getCalibrationSaveDirectory();
+
+        const auto filePath = saveDir / "calibration.json";
+
+        dv::camera::CalibrationSet calib;
+
+        for (const auto& intrinsics : intrinsicResult) {
+            calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsics));
+        }
+        calib.addImuCalibration(getIMUCalibrationData(result));
+        // TODO(rokas): save stereo calibration!
+
+        calib.writeToFile(filePath.string());
+
+        log.info << "Saved calibration to a file: " << filePath << dv::logEnd;
+    }
+
+    void calibrate(const bool calibrateImu) {
+        fmt::print("getCalibrationSaveDirectory: {0}\n", getCalibrationSaveDirectory());
+//        std::ofstream outLog(getCalibrationSaveDirectory() / "log.txt");
+//        outLog << "Calibrating begins..." << std::endl;
+//
+//        outLog << *calibrator;
+
+//        const auto& rdbuf = std::cout.rdbuf();
+//        std::cout.rdbuf(outLog.rdbuf());
 
         log.info("Calibrating the intrinsics of the camera...");
         auto intrinsicsResult = calibrator->calibrateCameraIntrinsics();
         if (!intrinsicsResult.has_value()) {
-            throw std::runtime_error("Failed to calibrate intrinsics! Please check the dataset");
+            throw std::runtime_error(
+                "Failed to calibrate intrinsics! Please check that the pattern was well detected on the images");
         }
-        CameraCalibrationUtils::printResult(intrinsicsResult.value(), ss);
-        string2dvLog(ss.str());
-        ss.str("");
 
-        log.info("Building the problem...");
-        calibrator->buildProblem();
+        if (calibrateImu) {
+//            outLog << "Building the problem..." << std::endl;
+            calibrator->buildProblem();
 
-        // Print the info before optimization
-        calibrator->getDvInfoBeforeOptimization(ss);
-        string2dvLog(ss.str());
-        ss.str("");
+            // Print the info before optimization
+//            calibrator->getDvInfoBeforeOptimization(outLog);
 
-        // Run the optimization problem
-        log.info("Optimizing...");
-        const auto result = calibrator->calibrate();
+            // Run the optimization problem
+//            outLog << "Optimizing..." << std::endl;
+            try {
+                IccCalibratorUtils::CalibrationResult result = calibrator->calibrate();
+                // Print the info after optimization
+//                calibrator->getDvInfoAfterOptimization(outLog);
 
-        // Print the info after optimization
-        calibrator->getDvInfoAfterOptimization(ss);
-        string2dvLog(ss.str());
-        ss.str("");
+                // Print the result
+//                outLog << "RESULT" << std::endl;
+//                IccCalibratorUtils::printResult(result, outLog);
 
-        // Print the result
-        log.info("RESULT");
-        IccCalibratorUtils::printResult(result, ss);
-        string2dvLog(ss.str());
-
-        // Save the calibration to a text file
-        saveCalibration(intrinsicsResult.value(), result);
+                // Save the calibration to a text file
+                saveCalibration(intrinsicsResult.value(), result);
+            } catch (std::exception& e) {
+                log.error << "Optimization failed. Please make sure that the pattern is detected on all frames in your "
+                             "dataset and repeat the calibration"
+                          << dv::logEnd;
+            }
+        } else {
+            saveIntrinsicCalibration(intrinsicsResult.value());
+        }
+//        std::cout.rdbuf(rdbuf);
     }
 };
 

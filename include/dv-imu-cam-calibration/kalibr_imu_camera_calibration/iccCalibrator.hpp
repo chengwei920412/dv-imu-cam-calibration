@@ -56,7 +56,7 @@ struct CalibrationResult {
     }
 };
 
-static void printResult(const IccCalibratorUtils::CalibrationResult& result, std::stringstream& ss) {
+static void printResult(const IccCalibratorUtils::CalibrationResult& result, std::ostream& ss) {
     ss << "Optimization converged:" << std::endl;
     ss << "  " << (result.converged ? "true" : "false") << std::endl;
     ss << "Transformation T_cam_imu:" << std::endl;
@@ -311,7 +311,7 @@ public:
         return result;
     }
 
-    void printErrorStatistics(std::stringstream& ss) {
+    void printErrorStatistics(std::ostream& ss) {
         ss << std::endl << "Normalized Residuals" << std::endl << "-------------------" << std::endl;
         iccCamera->printNormalizedResiduals(ss);
         iccImu->printNormalizedResiduals(ss);

@@ -15,14 +15,15 @@ TEST(CalibratorTestSuite, smokeTest) {
     ////
     /// Prepare the calibrator
     ////
-    Calibrator::Options options;
+    CalibratorUtils::Options options;
     options.cols = 6;
     options.rows = 6;
     options.spacingMeters = 0.018;
     options.tagSpacing = 0.3;
-    options.pattern = Calibrator::CalibrationPattern::APRIL_GRID;
+    options.pattern = CalibratorUtils::PatternType::APRIL_GRID;
     options.imageSize = cv::Size(640, 480);
-    Calibrator calibrator(options);
+    Calibrator<aslam::cameras::DistortedPinholeCameraGeometry, aslam::cameras::RadialTangentialDistortion> calibrator(
+        options);
     calibrator.startCollecting();
 
     ////
