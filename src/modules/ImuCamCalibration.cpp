@@ -646,11 +646,11 @@ protected:
         const std::string& inputName,
         const bool master) {
         const auto floatTransform = res.baseline.cast<float>().eval();
-        std::string distortionModel = "radialTangential";
+        dv::camera::DistortionModel distortionModel = dv::camera::DistortionModel::RadTan;
         if (config.getString("calibrationModel") == "Pinhole-Equidistant") {
-            distortionModel = "equidistant";
+            distortionModel = dv::camera::DistortionModel::Equidistant;
         } else if (config.getString("calibrationModel") == "Pinhole-Fov") {
-            distortionModel = "fov";
+            distortionModel = dv::camera::DistortionModel::FOV;
         }
 
         dv::camera::calibrations::CameraCalibration cal(
