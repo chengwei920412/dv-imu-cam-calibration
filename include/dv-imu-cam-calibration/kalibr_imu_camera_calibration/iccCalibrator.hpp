@@ -1,11 +1,9 @@
-//
-// Created by radam on 2021-03-25.
-//
-
 #pragma once
 
 #include <kalibr_imu_camera_calibration/common.hpp>
-#include <kalibr_imu_camera_calibration/iccSensors.hpp>
+
+#include <kalibr_imu_camera_calibration/iccCamera.hpp>
+#include <kalibr_imu_camera_calibration/iccImu.hpp>
 
 #include <aslam/backend/BSplineMotionErrorFactory.hpp>
 #include <aslam/backend/BlockCholeskyLinearSystemSolver.hpp>
@@ -26,6 +24,7 @@
 
 #include <Eigen/Eigen>
 #include <iostream>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -56,7 +55,7 @@ struct CalibrationResult {
     }
 };
 
-static void printResult(const IccCalibratorUtils::CalibrationResult& result, std::ostream& ss) {
+void printResult(const CalibrationResult& result, std::ostream& ss) {
     ss << "Optimization converged:" << std::endl;
     ss << "  " << (result.converged ? "true" : "false") << std::endl;
     ss << "Transformation T_cam_imu:" << std::endl;
@@ -64,6 +63,7 @@ static void printResult(const IccCalibratorUtils::CalibrationResult& result, std
     ss << "Camera to imu time: [s] (t_imu = t_cam + shift):" << std::endl;
     ss << "  " << result.t_cam_imu << std::endl;
 }
+
 } // namespace IccCalibratorUtils
 
 template<typename CameraGeometryType, typename DistortionType>

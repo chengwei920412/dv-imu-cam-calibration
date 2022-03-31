@@ -1,4 +1,5 @@
-#include <utilities/calibrator.hpp>
+#include "utilities/Calibrator.hpp"
+#include "utilities/CalibratorBase.hpp"
 
 #include <aslam/cameras.hpp>
 
@@ -793,13 +794,13 @@ protected:
 
     void calibrate(const bool calibrateImu) {
         fmt::print("getCalibrationSaveDirectory: {0}\n", getCalibrationSaveDirectory());
-        //        std::ofstream outLog(getCalibrationSaveDirectory() / "log.txt");
-        //        outLog << "Calibrating begins..." << std::endl;
-        //
-        //        outLog << *calibrator;
+        std::ofstream outLog(getCalibrationSaveDirectory() / "log.txt");
+        outLog << "Calibrating begins..." << std::endl;
 
-        //        const auto& rdbuf = std::cout.rdbuf();
-        //        std::cout.rdbuf(outLog.rdbuf());
+        calibrator->print(outLog);
+
+        const auto& rdbuf = std::cout.rdbuf();
+        std::cout.rdbuf(outLog.rdbuf());
 
         log.info("Calibrating the intrinsics of the camera...");
         auto intrinsicsResult = calibrator->calibrateCameraIntrinsics();
@@ -809,22 +810,22 @@ protected:
         }
 
         if (calibrateImu) {
-            //            outLog << "Building the problem..." << std::endl;
+            outLog << "Building the problem..." << std::endl;
             calibrator->buildProblem();
 
             // Print the info before optimization
-            //            calibrator->getDvInfoBeforeOptimization(outLog);
+            calibrator->getDvInfoBeforeOptimization(outLog);
 
             // Run the optimization problem
-            //            outLog << "Optimizing..." << std::endl;
+            outLog << "Optimizing..." << std::endl;
             try {
                 IccCalibratorUtils::CalibrationResult result = calibrator->calibrate();
                 // Print the info after optimization
-                //                calibrator->getDvInfoAfterOptimization(outLog);
+                calibrator->getDvInfoAfterOptimization(outLog);
 
                 // Print the result
-                //                outLog << "RESULT" << std::endl;
-                //                IccCalibratorUtils::printResult(result, outLog);
+                outLog << "RESULT" << std::endl;
+                IccCalibratorUtils::printResult(result, outLog);
 
                 // Save the calibration to a text file
                 saveCalibration(intrinsicsResult.value(), result);
@@ -836,7 +837,7 @@ protected:
         } else {
             saveIntrinsicCalibration(intrinsicsResult.value());
         }
-        //        std::cout.rdbuf(rdbuf);
+        std::cout.rdbuf(rdbuf);
     }
 };
 

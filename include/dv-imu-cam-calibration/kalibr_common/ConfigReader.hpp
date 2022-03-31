@@ -109,6 +109,19 @@ public:
                       << distortionCoefficients.at(3) << "]" << std::endl;
         }
     }
+
+    std::ostream& print(std::ostream& os) {
+        os << "Initializing camera:" << std::endl;
+        os << "  Camera model: pinhole" << std::endl;
+        os << "  Focal length: [" << focalLength.at(0) << " " << focalLength.at(1) << "]" << std::endl;
+        os << "  Principal point: [" << principalPoint.at(0) << " " << principalPoint.at(1) << "]"
+           << std::endl;
+        os << "  Distortion model: RadialTangential" << std::endl;
+        os << "  Distortion coefficients: [" << distortionCoefficients.at(0) << " "
+           << distortionCoefficients.at(1) << " " << distortionCoefficients.at(2) << " "
+           << distortionCoefficients.at(3) << "]" << std::endl;
+        return os;
+    }
 };
 
 struct ImuParameters {

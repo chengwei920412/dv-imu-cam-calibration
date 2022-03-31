@@ -1,4 +1,4 @@
-#include <utilities/calibrator.hpp>
+#include <utilities/Calibrator.hpp>
 
 #include <boost/filesystem.hpp>
 

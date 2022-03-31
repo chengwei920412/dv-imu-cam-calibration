@@ -1,11 +1,9 @@
-//
-// Created by radam on 2021-03-23.
-//
-
 #pragma once
 
-#include <kalibr_imu_camera_calibration/iccCalibrator.hpp>
-#include <kalibr_imu_camera_calibration/iccSensors.hpp>
+#include "CalibratorBase.hpp"
+#include "kalibr_imu_camera_calibration/iccCalibrator.hpp"
+#include "kalibr_imu_camera_calibration/iccCamera.hpp"
+#include "kalibr_imu_camera_calibration/iccImu.hpp"
 
 #include <aslam/cameras.hpp>
 #include <aslam/cameras/GridCalibrationTargetAprilgrid.hpp>
@@ -21,165 +19,10 @@
 #include <atomic>
 #include <dv-processing/exception/exception.hpp>
 #include <dv-processing/kinematics/transformation.hpp>
+#include <iostream>
 #include <mutex>
+#include <string>
 #include <tbb/parallel_for_each.h>
-
-namespace CalibratorUtils {
-
-/**
- * Hold image and corresponding timestamp.
- */
-struct StampedImage {
-    cv::Mat image;
-    int64_t timestamp;
-
-    StampedImage(){};
-
-    StampedImage(cv::Mat img, const int64_t ts) : image(std::move(img)), timestamp(ts){};
-
-    /**
-     * Clone the underlying image.
-     *
-     * @return
-     */
-    StampedImage clone() const {
-        StampedImage clone;
-        clone.image = image.clone();
-        clone.timestamp = timestamp;
-        return clone;
-    }
-};
-
-enum PatternType { CHESSBOARD, ASYMMETRIC_CIRCLES_GRID, APRIL_GRID };
-
-enum State { INITIALIZED, COLLECTING, COLLECTED, CALIBRATING, CALIBRATED };
-
-struct Options {
-    // Calibration pattern
-    size_t rows = 11;
-    size_t cols = 4;
-    double spacingMeters = 0.05;
-    double patternSpacing = 0.3;
-    PatternType pattern = PatternType::ASYMMETRIC_CIRCLES_GRID;
-
-    // Optimization problem
-    size_t maxIter = 20;
-    bool timeCalibration = true;
-
-    // IMU
-    ImuParameters imuParameters;
-
-    // Camera
-    struct CameraInits {
-        std::vector<double> intrinsics;
-        std::vector<double> distCoeffs;
-        cv::Size imageSize;
-    };
-
-    std::vector<CameraInits> cameraInitialSettings;
-};
-
-StampedImage previewImageWithText(
-    const std::string& text,
-    const int64_t timestamp = 0LL,
-    const cv::Size& size = cv::Size(640, 480)) {
-    cv::Mat img = cv::Mat::zeros(size, CV_8UC3);
-
-    cv::putText(
-        img,
-        text,
-        cv::Point(size.width / 8, size.height / 2),
-        cv::FONT_HERSHEY_DUPLEX,
-        1.0,
-        cv::Scalar(255, 255, 255),
-        2);
-
-    return StampedImage(img, timestamp);
-}
-
-} // namespace CalibratorUtils
-
-/**
- * IMU camera calibration.
- */
-class CalibratorBase {
-public:
-    virtual ~CalibratorBase() = default;
-    /**
-     * Add IMU measurement to the calibration buffer.
-     */
-    virtual void addImu(const int64_t timestamp, const Eigen::Vector3d& gyro, const Eigen::Vector3d& acc) = 0;
-
-    /**
-     * Add a stamped image to the calibration buffer.
-     *
-     * @param CalibratorUtils::StampedImage
-     */
-    virtual void addImages(const std::vector<CalibratorUtils::StampedImage>& stampedImages) = 0;
-
-    virtual std::pair<
-        std::vector<CalibratorUtils::StampedImage>,
-        std::vector<boost::shared_ptr<aslam::cameras::GridCalibrationTargetObservation>>>
-        getLatestObservations() = 0;
-    /**
-     * @return preview image visualizing the current status of the calibration
-     */
-    virtual std::vector<CalibratorUtils::StampedImage> getPreviewImages() = 0;
-
-    /**
-     * Calibrate the camera intrinsics (monocular).
-     */
-    virtual std::optional<std::vector<CameraCalibrationUtils::CalibrationResult>> calibrateCameraIntrinsics() = 0;
-
-    /**
-     * Build optimization problem. Needs to be called before calibrate().
-     */
-    virtual void buildProblem() = 0;
-
-    /**
-     * Begin calibration procedure on the collected data.
-     *
-     * @return result of the calibration
-     */
-    [[nodiscard]] virtual IccCalibratorUtils::CalibrationResult calibrate() = 0;
-
-    /**
-     * Start collecting data from the camera and IMU.
-     */
-    virtual void startCollecting() = 0;
-
-    /**
-     * Stop collecting data from the camera and IMU.
-     */
-    virtual void stopCollecting() = 0;
-
-    /**
-     * Discard the collected data and reset the calibrator.
-     */
-    virtual void reset() = 0;
-
-    /**
-     * Get a string containing DV log information before optimization.
-     *
-     * @param ss string stream into which log will be output
-     */
-    virtual void getDvInfoBeforeOptimization(std::ostream& ss) = 0;
-
-    /**
-     * Get a string containing DV log information after optimization.
-     *
-     * @param ss string stream into which log will be output
-     */
-    virtual void getDvInfoAfterOptimization(std::ostream& ss) = 0;
-
-protected:
-    /**
-     * Detect the calibration pattern on the given stamped image.
-     *
-     * @param stampedImage
-     */
-    virtual void detectPattern(const std::vector<CalibratorUtils::StampedImage>& frames) = 0;
-};
 
 /**
  * IMU camera calibration.
@@ -200,7 +43,7 @@ protected:
     sm::JobQueue detectionsQueue;
 
     // IMU data
-    boost::shared_ptr<std::vector<IccSensors::ImuMeasurement>> imuData = nullptr;
+    boost::shared_ptr<std::vector<IccImuUtils::ImuMeasurement>> imuData = nullptr;
     std::mutex imuDataMutex;
 
     // IccCalibrator
@@ -234,8 +77,8 @@ public:
     /**
      * Constructor.
      */
-    Calibrator(const CalibratorUtils::Options& opts) : calibratorOptions(opts) {
-        imuData = boost::make_shared<std::vector<IccSensors::ImuMeasurement>>();
+    explicit Calibrator(const CalibratorUtils::Options& opts) : calibratorOptions(opts) {
+        imuData = boost::make_shared<std::vector<IccImuUtils::ImuMeasurement>>();
         std::cout << "Initializing calibration target:" << std::endl;
 
         switch (calibratorOptions.pattern) {
@@ -352,7 +195,7 @@ public:
             camId++;
         }
 
-        assert(iccCameras.size()>0);
+        assert(iccCameras.size() > 0);
 
         iccImu = boost::make_shared<IccImu>(calibratorOptions.imuParameters, imuData);
 
@@ -379,7 +222,7 @@ public:
         const double tsS = static_cast<double>(timestamp) / 1e6;
         const auto Rgyro = Eigen::Matrix3d::Identity() * iccImu->getGyroUncertaintyDiscrete();
         const auto Raccel = Eigen::Matrix3d::Identity() * iccImu->getAccelUncertaintyDiscrete();
-        IccSensors::ImuMeasurement imuMeas(tsS, gyro, acc, Rgyro, Raccel);
+        IccImuUtils::ImuMeasurement imuMeas(tsS, gyro, acc, Rgyro, Raccel);
 
         if (state == CalibratorUtils::COLLECTING) {
             std::lock_guard<std::mutex> lock(imuDataMutex);
@@ -553,8 +396,8 @@ public:
         return previews;
     }
 
-    std::pair<cv::Matx33d, std::vector<double>> getCamMatrixDistortion(
-        const boost::shared_ptr<CameraGeometry<CameraGeometryType, DistortionType>>& cam) {
+    std::pair<cv::Matx33d, std::vector<double>>
+        getCamMatrixDistortion(const boost::shared_ptr<CameraGeometry<CameraGeometryType, DistortionType>>& cam) {
         auto cam0Projection = cam->getDv()->projectionDesignVariable()->getParameters();
         auto cam0Dist = cam->getDv()->distortionDesignVariable()->getParameters();
 
@@ -1005,7 +848,7 @@ protected:
                 // Search for pattern and draw it on the image frame
                 if (detector->findTarget(
                         stampedImage.image,
-                        aslam::Time(IccSensors::toSec(stampedImage.timestamp)),
+                        aslam::Time(CalibratorUtils::toSec(stampedImage.timestamp)),
                         observation)) {
                     successes[cameraId] = observation.hasSuccessfulObservation();
                 } else {
@@ -1037,6 +880,51 @@ protected:
                 latestObservations.push_back(
                     boost::make_shared<aslam::cameras::GridCalibrationTargetObservation>(observation));
             }
+        }
+    }
+
+    std::ostream& print(std::ostream& os) {
+        {
+            os << *iccImu;
+            for (const auto& iccCamera : iccCameras) {
+                iccCamera->print(os);
+            }
+            os << "Calibration target:" << std::endl;
+            switch (calibratorOptions.pattern) {
+                case CalibratorUtils::PatternType::CHESSBOARD: {
+                    os << "  Type: CHESSBOARD" << std::endl;
+                    os << "  Rows:" << std::endl;
+                    os << "    Count: " << calibratorOptions.rows << std::endl;
+                    os << "    Distance: " << calibratorOptions.spacingMeters << " [m]" << std::endl;
+                    os << "  Cols:" << std::endl;
+                    os << "    Count: " << calibratorOptions.cols << std::endl;
+                    os << "    Distance: " << calibratorOptions.spacingMeters << " [m]" << std::endl;
+                    break;
+                }
+                case CalibratorUtils::PatternType::ASYMMETRIC_CIRCLES_GRID: {
+                    os << "  Type: ASYMMETRIC_CIRCLES_GRID" << std::endl;
+                    os << "  Rows:" << std::endl;
+                    os << "    Count: " << calibratorOptions.rows << std::endl;
+                    os << "  Cols:" << std::endl;
+                    os << "    Count: " << calibratorOptions.cols << std::endl;
+                    os << "  Spacing: " << calibratorOptions.spacingMeters << " [m]" << std::endl;
+                    break;
+                }
+                case CalibratorUtils::PatternType::APRIL_GRID: {
+                    os << "  Type: APRIL_GRID" << std::endl;
+                    os << "  Tags:" << std::endl;
+                    os << "    Cols: " << calibratorOptions.cols << std::endl;
+                    os << "    Rows: " << calibratorOptions.rows << std::endl;
+                    os << "    Size: " << calibratorOptions.spacingMeters << " [m]" << std::endl;
+                    os << "    PatterSpacing: " << calibratorOptions.patternSpacing << " [m]" << std::endl;
+                    os << "    Spacing : " << calibratorOptions.spacingMeters * calibratorOptions.patternSpacing
+                       << " [m]" << std::endl;
+                    break;
+                }
+                default: os << "Not implemented calibration pattern" << std::endl; break;
+            }
+
+            return os;
         }
     }
 };

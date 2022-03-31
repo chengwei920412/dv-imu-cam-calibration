@@ -1,10 +1,7 @@
-//
-// Created by radam on 2021-06-18.
-//
-
 #pragma once
 
-#include <kalibr_imu_camera_calibration/iccSensors.hpp>
+#include "kalibr_imu_camera_calibration/iccCamera.hpp"
+#include "kalibr_imu_camera_calibration/iccImu.hpp"
 
 #include <aslam/backend/CameraDesignVariable.hpp>
 #include <aslam/backend/HomogeneousPoint.hpp>
