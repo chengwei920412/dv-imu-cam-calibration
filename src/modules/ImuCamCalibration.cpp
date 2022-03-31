@@ -10,6 +10,7 @@
 #include <fmt/chrono.h>
 #include <fstream>
 #include <regex>
+#include <string>
 
 namespace pt = boost::property_tree;
 namespace fs = std::filesystem;
@@ -75,7 +76,6 @@ protected:
                 break;
             }
             lastWrittenTs = ts;
-            std::cout << "writing : " << ts << std::endl;
             const auto& [stream, data] = streamAndData;
             if (const auto* pval = std::get_if<dv::TimedKeyPointPacket>(&data)) {
                 dataLog->writePacket(*pval, stream);
@@ -318,7 +318,7 @@ public:
 
         if (config.getBool("recordData")) {
             dv::io::MonoCameraWriter::Config cfg;
-            cfg.cameraName = getCameraID();
+            cfg.cameraName = getCameraID("frames");
             cfg.frameResolution = frameInput.size();
             cfg.enableImu = inputs.getIMUInput("imu").isConnected();
             cfg.addFrameStream(frameInput.size(), "left_frames", frameInput.getOriginDescription());
@@ -400,7 +400,6 @@ public:
                 dataLogBuffer.emplace(
                     std::make_pair(ts, std::make_pair("left_frames", dv::Frame(ts, detection.first[index].image))));
                 dataLogBuffer.emplace(std::make_pair(ts, std::make_pair("left_markers", markers)));
-                std::cout << "pushing: " << ts << std::endl;
             } else {
                 const auto ts = detection.first[index].timestamp;
                 dataLogBuffer.emplace(
@@ -410,7 +409,7 @@ public:
         }
 
         // Write the log data from the buffer only if it is more than 1 second old
-        writeDataLogBuffer(10000000);
+        writeDataLogBuffer(1000000);
     }
 
     std::optional<size_t> estimateImuFrequency(const dv::IMUPacket& packet) {
@@ -591,8 +590,8 @@ protected:
         }
         return rows;
     }
-    std::string getCameraID() {
-        const auto frameInput = inputs.getFrameInput("frames");
+    std::string getCameraID(const std::string& inputName) {
+        const auto frameInput = inputs.getFrameInput(inputName);
         const auto originDescription = frameInput.getOriginDescription();
         static const std::regex filenameCleanupRegex{"[^a-zA-Z-_\\d]"};
         auto cameraID = std::regex_replace(originDescription, filenameCleanupRegex, "_");
@@ -602,8 +601,8 @@ protected:
         return cameraID;
     }
 
-    cv::Size getInputResolution() {
-        const auto frameInput = inputs.getFrameInput("frames");
+    cv::Size getInputResolution(const std::string& inputName) {
+        const auto frameInput = inputs.getFrameInput(inputName);
         return {frameInput.sizeX(), frameInput.sizeY()};
     }
 
@@ -641,8 +640,11 @@ protected:
             ""};
     }
 
-    dv::camera::calibrations::CameraCalibration
-        getIntrinsicCalibrationData(const CameraCalibrationUtils::CalibrationResult& res) {
+    dv::camera::calibrations::CameraCalibration getIntrinsicCalibrationData(
+        const CameraCalibrationUtils::CalibrationResult& res,
+        const std::string& position,
+        const std::string& inputName,
+        const bool master) {
         const auto floatTransform = res.baseline.cast<float>().eval();
         std::string distortionModel = "radialTangential";
         if (config.getString("calibrationModel") == "Pinhole-Equidistant") {
@@ -652,10 +654,10 @@ protected:
         }
 
         dv::camera::calibrations::CameraCalibration cal(
-            getCameraID(),
-            "left",
-            true,
-            getInputResolution(),
+            getCameraID(inputName),
+            position,
+            master,
+            getInputResolution(inputName),
             cv::Point2f(static_cast<float>(res.projection.at(2)), static_cast<float>(res.projection.at(3))),
             cv::Point2f(static_cast<float>(res.projection.at(0)), static_cast<float>(res.projection.at(1))),
             std::vector<float>(res.distortion.begin(), res.distortion.end()),
@@ -673,7 +675,7 @@ protected:
 
         cv::Point3f omega_offset_avg, acc_offset_avg;
 
-        const auto cameraId = getCameraID();
+        const auto cameraId = getCameraID("frames");
         if (cameraId.substr(0, 9) == "DVXplorer") {
             omega_max = 34.89f;
             acc_max = 156.96f;
@@ -732,7 +734,7 @@ protected:
               << " Mean gyroscope error: " << result.error_info.meanGyroscopeError;
 
         auto cal = dv::camera::calibrations::IMUCalibration(
-            getCameraID(),
+            getCameraID("frames"),
             om,
             am,
             ooavg,
@@ -757,8 +759,9 @@ protected:
 
         dv::camera::CalibrationSet calib;
 
-        for (const auto& intrinsics : intrinsicResult) {
-            calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsics));
+        calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[0], "left", "frames", true));
+        if (intrinsicResult.size() > 1) {
+            calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[1], "right", "right", false));
         }
         // TODO(rokas): save stereo calibration!
 
@@ -776,8 +779,9 @@ protected:
 
         dv::camera::CalibrationSet calib;
 
-        for (const auto& intrinsics : intrinsicResult) {
-            calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsics));
+        calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[0], "left", "frames", true));
+        if (intrinsicResult.size() > 1) {
+            calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[1], "right", "right", false));
         }
         calib.addImuCalibration(getIMUCalibrationData(result));
         // TODO(rokas): save stereo calibration!
@@ -789,13 +793,13 @@ protected:
 
     void calibrate(const bool calibrateImu) {
         fmt::print("getCalibrationSaveDirectory: {0}\n", getCalibrationSaveDirectory());
-//        std::ofstream outLog(getCalibrationSaveDirectory() / "log.txt");
-//        outLog << "Calibrating begins..." << std::endl;
-//
-//        outLog << *calibrator;
+        //        std::ofstream outLog(getCalibrationSaveDirectory() / "log.txt");
+        //        outLog << "Calibrating begins..." << std::endl;
+        //
+        //        outLog << *calibrator;
 
-//        const auto& rdbuf = std::cout.rdbuf();
-//        std::cout.rdbuf(outLog.rdbuf());
+        //        const auto& rdbuf = std::cout.rdbuf();
+        //        std::cout.rdbuf(outLog.rdbuf());
 
         log.info("Calibrating the intrinsics of the camera...");
         auto intrinsicsResult = calibrator->calibrateCameraIntrinsics();
@@ -805,22 +809,22 @@ protected:
         }
 
         if (calibrateImu) {
-//            outLog << "Building the problem..." << std::endl;
+            //            outLog << "Building the problem..." << std::endl;
             calibrator->buildProblem();
 
             // Print the info before optimization
-//            calibrator->getDvInfoBeforeOptimization(outLog);
+            //            calibrator->getDvInfoBeforeOptimization(outLog);
 
             // Run the optimization problem
-//            outLog << "Optimizing..." << std::endl;
+            //            outLog << "Optimizing..." << std::endl;
             try {
                 IccCalibratorUtils::CalibrationResult result = calibrator->calibrate();
                 // Print the info after optimization
-//                calibrator->getDvInfoAfterOptimization(outLog);
+                //                calibrator->getDvInfoAfterOptimization(outLog);
 
                 // Print the result
-//                outLog << "RESULT" << std::endl;
-//                IccCalibratorUtils::printResult(result, outLog);
+                //                outLog << "RESULT" << std::endl;
+                //                IccCalibratorUtils::printResult(result, outLog);
 
                 // Save the calibration to a text file
                 saveCalibration(intrinsicsResult.value(), result);
@@ -832,7 +836,7 @@ protected:
         } else {
             saveIntrinsicCalibration(intrinsicsResult.value());
         }
-//        std::cout.rdbuf(rdbuf);
+        //        std::cout.rdbuf(rdbuf);
     }
 };
 
