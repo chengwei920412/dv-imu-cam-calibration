@@ -519,7 +519,7 @@ public:
         ss << "Reprojection error [px]:      mean: " << mean << " median: " << median << " std: " << std << std::endl;
     }
 
-    std::ostream& print(std::ostream& os, const IccCamera& cam) {
-        return cam.camera.print(os);
+    std::ostream& print(std::ostream& os) {
+        return camera.print(os);
     }
 };
