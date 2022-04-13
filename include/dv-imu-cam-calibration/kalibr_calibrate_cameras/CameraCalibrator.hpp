@@ -10,6 +10,8 @@
 #include <aslam/backend/Optimizer2Options.hpp>
 #include <aslam/backend/ReprojectionError.hpp>
 #include <aslam/calibration/core/IncrementalEstimator.h>
+#include <aslam/cameras.hpp>
+
 #include <ostream>
 
 boost::shared_ptr<aslam::backend::TransformationBasic> addPoseDesignVariable(
@@ -109,6 +111,7 @@ public:
         // Optimize for intrinsics and distortion
         success = calibrateIntrinsics(observationsVector, target);
         if (!success) {
+            std::cout << "Intrinsic calib failed." << std::endl;
             // nothing to print
         }
 
@@ -260,9 +263,8 @@ public:
         baselines;
     std::vector<boost::shared_ptr<aslam::backend::TransformationBasic>> baselinesT;
     std::vector<aslam::backend::HomogeneousExpression> P_t_ex;
-    std::vector<boost::shared_ptr<aslam::backend::HomogeneousPoint>> P_t_dv;std::vector<std::vector<
-        boost::shared_ptr<aslam::backend::ReprojectionError<CameraGeometryType>>>>
-        rerrs;
+    std::vector<boost::shared_ptr<aslam::backend::HomogeneousPoint>> P_t_dv;
+    std::vector<std::vector<boost::shared_ptr<aslam::backend::ReprojectionError<CameraGeometryType>>>> rerrs;
 
     // constructor is merged with factory method from Python "fromTargetViewObservations"
     CalibrationTargetOptimizationProblem(
@@ -325,6 +327,7 @@ public:
         // 4. add camera DVs
         for (const auto& camera : cameras) {
             if (!camera->getIsGeometryInitialized()) {
+                std::cout << "CAMERA GEOMETRY ERROR..." << std::endl;
                 throw std::runtime_error(
                     "The camera geometry is not initialized. Please initialize with initGeometry() or "
                     "initGeometryFromDataset()");
@@ -361,8 +364,7 @@ public:
                 if (rig_observation.imagePoint(i, y)) {
                     ++rerr_cnt;
                     // create an error term.
-                    auto rerr = boost::make_shared<
-                        aslam::backend::ReprojectionError<CameraGeometryType>>(
+                    auto rerr = boost::make_shared<aslam::backend::ReprojectionError<CameraGeometryType>>(
                         y,
                         invR,
                         T_camN_calib * p_target,
@@ -493,6 +495,10 @@ public:
         bool force = false) {
         // Find observation with most points visible and use that target-camera transform estimation
         // as T_tc_guess
+        std::cout << "addTargetView 1" << std::endl;
+        if (observations.empty()) {
+            std::cout << "observations is empty" << std::endl;
+        }
         auto obsWithMostPoints
             = std::max_element(observations.begin(), observations.end(), [](const auto& a, const auto& b) {
                   std::vector<unsigned int> aIdx, bIdx;
@@ -500,7 +506,24 @@ public:
                   b.second.getCornersIdx(bIdx);
                   return aIdx.size() > bIdx.size();
               });
+        std::cout << "addTargetView 2" << std::endl;
         auto T_tc_guess = obsWithMostPoints->second.T_t_c();
+
+        std::cout << "addTargetView 3" << std::endl;
+
+        if (cameras.empty()) {
+            std::cout << "Cameras empty..." << std::endl;
+        }
+        if (target == nullptr) {
+            std::cout << "Target empty..." << std::endl;
+        }
+        if (dv_baselines.empty()) {
+            std::cout << "dv_baselines empty..." << std::endl;
+        }
+        //        if(T_tc_guess)
+        if (observations.empty()) {
+            std::cout << "observations empty..." << std::endl;
+        }
 
         auto batch_problem
             = boost::make_shared<CalibrationTargetOptimizationProblem<CameraGeometryType, DistortionType>>(
@@ -511,12 +534,23 @@ public:
                 observations,
                 estimateLandmarks,
                 useBlakeZissermanMest);
+        std::cout << "addTargetView 4" << std::endl;
+        if (estimator == nullptr) {
+            std::cout << "estimator is null" << std::endl;
+        }
+        if (batch_problem == nullptr) {
+            std::cout << "batch_problem is null" << std::endl;
+        }
+
         auto estimator_return_value = estimator->addBatch(batch_problem, force);
+
+        std::cout << "addTargetView 5" << std::endl;
 
         bool success = estimator_return_value.batchAccepted;
         if (success) {
             views.push_back(batch_problem);
         }
+        std::cout << "addTargetView 6" << std::endl;
 
         return success;
     }
@@ -572,19 +606,32 @@ public:
         return std::make_tuple(all_corners, all_reprojections, all_reprojection_errs);
     }
 
+    size_t nOfViews() {
+        return views.size();
+    }
+
     boost::shared_ptr<CalibrationTargetOptimizationProblem<CameraGeometryType, DistortionType>> removeCornersFromBatch(
         const size_t batch_id,
         const size_t cameraId,
         const std::vector<size_t>& cornerIdList,
         const bool useBlakeZissermanMest) {
+        std::cout << "Corner 1\n";
+        std::cout << "Views size: " << views.size() << ", batch id : " << batch_id << std::endl;
+
         auto& batch = views.at(batch_id);
 
+        std::cout << "Corner 2\n";
         // disable the corners
         bool hasCornerRemoved = false;
-        for (const size_t cornerId : cornerIdList) {
-            batch->rig_observations.at(cameraId).removeImagePoint(cornerId);
-            hasCornerRemoved = true;
+        try {
+            for (const size_t cornerId : cornerIdList) {
+                batch->rig_observations.at(cameraId).removeImagePoint(cornerId);
+                hasCornerRemoved = true;
+            }
+        } catch (std::exception& ex) {
+            std::cout << ex.what() << std::endl;
         }
+        std::cout << "Corner 3\n";
         assert(hasCornerRemoved);
 
         // rebuild problem
@@ -596,6 +643,7 @@ public:
             batch->rig_observations,
             estimateLandmarks,
             useBlakeZissermanMest);
+        std::cout << "Corner 4\n";
         return new_problem;
     }
 
@@ -610,13 +658,39 @@ public:
         projection.push_back(projectionMat(3, 0));
 
         const auto distortionMat = cameras[cameraId]->getDv()->distortionDesignVariable()->getParameters();
-        assert(distortionMat.rows() == 4);
+        if constexpr (
+            std::is_same<CameraGeometryType, aslam::cameras::EquidistantDistortedPinholeCameraGeometry>()
+            && std::is_same<DistortionType, aslam::cameras::EquidistantDistortion>()) {
+            if (distortionMat.rows() != 4) {
+                throw std::runtime_error("Four params are expected for Equidistant model.");
+            }
+        }
+        if constexpr (
+            std::is_same<CameraGeometryType, aslam::cameras::DistortedPinholeCameraGeometry>()
+            && std::is_same<DistortionType, aslam::cameras::RadialTangentialDistortion>()) {
+            if (distortionMat.rows() != 4) {
+                throw std::runtime_error("Four params are expected for RadialTangential model.");
+            }
+        }
+        if constexpr (
+            std::is_same<CameraGeometryType, aslam::cameras::FovDistortedPinholeCameraGeometry>()
+            && std::is_same<DistortionType, aslam::cameras::FovDistortion>()) {
+            if (distortionMat.rows() != 1) {
+                throw std::runtime_error("Four params are expected for Fov model.");
+            }
+        }
         assert(distortionMat.cols() == 1);
         std::vector<double> distortion;
-        distortion.push_back(distortionMat(0, 0));
-        distortion.push_back(distortionMat(1, 0));
-        distortion.push_back(distortionMat(2, 0));
-        distortion.push_back(distortionMat(3, 0));
+        if constexpr (
+            std::is_same<CameraGeometryType, aslam::cameras::FovDistortedPinholeCameraGeometry>()
+            && std::is_same<DistortionType, aslam::cameras::FovDistortion>()) {
+            distortion.push_back(distortionMat(0, 0));
+        } else {
+            distortion.push_back(distortionMat(0, 0));
+            distortion.push_back(distortionMat(1, 0));
+            distortion.push_back(distortionMat(2, 0));
+            distortion.push_back(distortionMat(3, 0));
+        }
 
         // reproj error statistics
         CameraCalibrationUtils::ErrorInfo err_info(Eigen::Vector2d(-1., -1.), Eigen::Vector2d(-1., -1.));

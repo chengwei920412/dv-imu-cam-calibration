@@ -171,10 +171,16 @@ public:
 
             // Guess the distortion coefficients
             if (cameraOptions.distCoeffs.empty()) {
-                cameraOptions.distCoeffs.push_back(0.0);
-                cameraOptions.distCoeffs.push_back(0.0);
-                cameraOptions.distCoeffs.push_back(0.0);
-                cameraOptions.distCoeffs.push_back(0.0);
+                if constexpr (
+                    std::is_same<CameraGeometryType, aslam::cameras::FovDistortedPinholeCameraGeometry>()
+                    && std::is_same<DistortionType, aslam::cameras::FovDistortion>()) {
+                    cameraOptions.distCoeffs.push_back(0.0);
+                } else {
+                    cameraOptions.distCoeffs.push_back(0.0);
+                    cameraOptions.distCoeffs.push_back(0.0);
+                    cameraOptions.distCoeffs.push_back(0.0);
+                    cameraOptions.distCoeffs.push_back(0.0);
+                }
             }
 
             auto targetObservations
@@ -514,7 +520,8 @@ public:
 
                 auto cameraGeometry = boost::make_shared<CameraGeometry<CameraGeometryType, DistortionType>>(iccCamera);
                 if (!cameraGeometry->initGeometryFromObservations(targetObservations, grid)) {
-                    throw std::runtime_error("Could not initialize the intrinsics");
+                    std::cout<<"FAILED!!!!\n";
+                    throw dv::exceptions::RuntimeError("Could not initialize the intrinsics");
                 }
                 geometries.push_back(cameraGeometry);
                 camId++;
@@ -527,7 +534,7 @@ public:
 
         // Initialize the baselines
         if (geometries.size() > 1) {
-            for (auto nextCam = std::next(geometries.begin()); nextCam < geometries.end(); nextCam++) {
+            for (auto nextCam = std::next(geometries.begin()); nextCam != geometries.end(); nextCam++) {
                 auto prevCam = std::prev(nextCam);
                 size_t prevCamId = std::distance(geometries.begin(), prevCam);
                 size_t nextCamId = std::distance(geometries.begin(), nextCam);
@@ -550,27 +557,35 @@ public:
 
                 size_t view_id = 0;
                 for (const auto& [timestamp, observation] : *camTargetObservations.at(0)) {
+                    std::cout << "TEST 5\n";
                     std::map<size_t, aslam::cameras::GridCalibrationTargetObservation> targetViews;
                     targetViews.emplace(0, observation);
+
+                    std::cout << "TEST 6\n";
                     for (const auto& [cameraId, observations] : camTargetObservations) {
                         if (cameraId > 0) {
                             targetViews.emplace(cameraId, observations->at(timestamp));
                         }
                     }
+                    std::cout << "TEST 7\n";
+
                     bool success = calibrator.addTargetView(targetViews);
 
+                    std::cout << "TEST 7.5\n";
                     //                static constexpr bool allowEndFiltering = true;
                     const bool runEndFiltering = (view_id == camTargetObservations.at(0)->size() - 1);
                     const auto numActiveBatches = calibrator.getNumBatches();
                     static size_t numCams = geometries.size();
                     static constexpr size_t minViewOutlier = 20;
                     static constexpr bool removeOutliers = true;
+                    std::cout << "TEST 8\n";
                     if (((success && numActiveBatches > minViewOutlier * numCams)
                          || (runEndFiltering && numActiveBatches > minViewOutlier * numCams))) {
                         // create the list of the batches to check
                         std::vector<size_t> batches_to_check;
                         if (initOutlierRejection) {
                             // check all views after the min. number of batches has been reached
+                            std::cout << "TEST 9\n";
                             for (size_t i = 0; i < calibrator.getNumBatches(); ++i) {
                                 batches_to_check.push_back(i);
                             }
@@ -578,6 +593,7 @@ public:
                             initOutlierRejection = false;
                         } else if (runEndFiltering) {
                             // check all batches again after all views have been processed
+                            std::cout << "TEST 10\n";
                             for (size_t i = 0; i < calibrator.getNumBatches(); ++i) {
                                 batches_to_check.push_back(i);
                             }
@@ -586,8 +602,10 @@ public:
                                       << std::endl;
                         } else {
                             // only check most recent view
+                            std::cout << "TEST 11\n";
                             batches_to_check.push_back(calibrator.getNumBatches() - 1);
                         }
+                        std::cout << "TEST 1\n";
                         std::sort(batches_to_check.rbegin(), batches_to_check.rend());
 
                         for (const auto& batch_id : batches_to_check) {
@@ -597,13 +615,16 @@ public:
 
                             for (size_t camId = 0; camId < numCams; camId++) {
                                 // calculate the reprojection errors statistics
+                                std::cout << "TEST 2\n";
                                 const auto [corners, reprojs, rerrs] = calibrator.getReprojectionErrors(camId);
                                 const auto [me, se] = getReprojectionErrorStatistics(rerrs);
                                 const auto se_threshold = 4.0 * se;
+                                std::cout << "TEST 12\n";
 
                                 // select corners to remove
                                 std::vector<size_t> cornerRemovalList;
                                 for (size_t pidx = 0; pidx < rerrs.at(batch_id).size(); ++pidx) {
+                                    std::cout << "TEST 3\n";
                                     const auto reproj = rerrs.at(batch_id).at(pidx);
                                     if ((reproj.size() != 0)
                                         && (std::abs(reproj(0, 0)) > se_threshold.x()
@@ -611,10 +632,12 @@ public:
                                         cornerRemovalList.push_back(pidx);
                                         ++removedOutlierCornersCount;
                                     }
+                                    std::cout << "TEST 13\n";
                                 }
 
                                 // queue corners on this cam for removal
                                 cornerRemovalList_allCams.push_back(cornerRemovalList);
+                                std::cout << "TEST 14\n";
                             }
                             // we do not plot
 
@@ -626,6 +649,18 @@ public:
 
                             if (removeCount > 0) {
                                 for (size_t camId = 0; camId < numCams; camId++) {
+                                    std::cout << "TEST 4\n";
+
+                                    std::cout << "cornerRemovalList_allCams size: " << cornerRemovalList_allCams.size()
+                                              << std::endl;
+
+                                    std::cout << (fmt::format("cornerRemovalList_allCams.at({0})", camId));
+                                    std::cout << (fmt::format(" size {0}", cornerRemovalList_allCams.at(camId).size()))
+                                              << std::endl;
+                                    if (cornerRemovalList_allCams.at(camId).empty()
+                                        || calibrator.nOfViews() <= batch_id) {
+                                        continue;
+                                    }
                                     auto new_batch = calibrator.removeCornersFromBatch(
                                         batch_id,
                                         camId,
@@ -642,6 +677,7 @@ public:
                     ++view_id;
                 }
 
+                std::cout << "Crazy loop finished.. " << std::endl;
                 // final output
 
                 size_t cameraId = 0;
@@ -676,10 +712,11 @@ public:
 
                 return results;
 
-            } catch (const OptimizationDiverged& exc) {
-                std::cout
-                    << "Optimization diverged possibly due to bad initialization. (Do the models fit the lenses well?)"
-                    << std::endl;
+            } catch (const OptimizationDiverged& ex) {
+                throw dv::exceptions::RuntimeError(fmt::format(
+                    "Optimization diverged possibly due to bad initialization. (Do the models fit the lenses well?) "
+                    "{0}",
+                    ex.what()));
                 // not trying to restart
                 break;
             }
@@ -823,6 +860,50 @@ public:
         iccCalibrator->printErrorStatistics(ss);
     }
 
+    std::ostream& print(std::ostream& os) {
+        {
+            os << *iccImu;
+            for (const auto& iccCamera : iccCameras) {
+                iccCamera->print(os);
+            }
+            os << "Calibration target:" << std::endl;
+            switch (calibratorOptions.pattern) {
+                case CalibratorUtils::PatternType::CHESSBOARD: {
+                    os << "  Type: CHESSBOARD" << std::endl;
+                    os << "  Rows:" << std::endl;
+                    os << "    Count: " << calibratorOptions.rows << std::endl;
+                    os << "    Distance: " << calibratorOptions.spacingMeters << " [m]" << std::endl;
+                    os << "  Cols:" << std::endl;
+                    os << "    Count: " << calibratorOptions.cols << std::endl;
+                    os << "    Distance: " << calibratorOptions.spacingMeters << " [m]" << std::endl;
+                    break;
+                }
+                case CalibratorUtils::PatternType::ASYMMETRIC_CIRCLES_GRID: {
+                    os << "  Type: ASYMMETRIC_CIRCLES_GRID" << std::endl;
+                    os << "  Rows:" << std::endl;
+                    os << "    Count: " << calibratorOptions.rows << std::endl;
+                    os << "  Cols:" << std::endl;
+                    os << "    Count: " << calibratorOptions.cols << std::endl;
+                    os << "  Spacing: " << calibratorOptions.spacingMeters << " [m]" << std::endl;
+                    break;
+                }
+                case CalibratorUtils::PatternType::APRIL_GRID: {
+                    os << "  Type: APRIL_GRID" << std::endl;
+                    os << "  Tags:" << std::endl;
+                    os << "    Cols: " << calibratorOptions.cols << std::endl;
+                    os << "    Rows: " << calibratorOptions.rows << std::endl;
+                    os << "    Size: " << calibratorOptions.spacingMeters << " [m]" << std::endl;
+                    os << "    PatterSpacing: " << calibratorOptions.patternSpacing << " [m]" << std::endl;
+                    os << "    Spacing : " << calibratorOptions.spacingMeters * calibratorOptions.patternSpacing
+                       << " [m]" << std::endl;
+                    break;
+                }
+                default: os << "Not implemented calibration pattern" << std::endl; break;
+            }
+
+            return os;
+        }
+    }
 protected:
     /**
      * Detect the calibration pattern on the given stamped image.
@@ -883,48 +964,5 @@ protected:
         }
     }
 
-    std::ostream& print(std::ostream& os) {
-        {
-            os << *iccImu;
-            for (const auto& iccCamera : iccCameras) {
-                iccCamera->print(os);
-            }
-            os << "Calibration target:" << std::endl;
-            switch (calibratorOptions.pattern) {
-                case CalibratorUtils::PatternType::CHESSBOARD: {
-                    os << "  Type: CHESSBOARD" << std::endl;
-                    os << "  Rows:" << std::endl;
-                    os << "    Count: " << calibratorOptions.rows << std::endl;
-                    os << "    Distance: " << calibratorOptions.spacingMeters << " [m]" << std::endl;
-                    os << "  Cols:" << std::endl;
-                    os << "    Count: " << calibratorOptions.cols << std::endl;
-                    os << "    Distance: " << calibratorOptions.spacingMeters << " [m]" << std::endl;
-                    break;
-                }
-                case CalibratorUtils::PatternType::ASYMMETRIC_CIRCLES_GRID: {
-                    os << "  Type: ASYMMETRIC_CIRCLES_GRID" << std::endl;
-                    os << "  Rows:" << std::endl;
-                    os << "    Count: " << calibratorOptions.rows << std::endl;
-                    os << "  Cols:" << std::endl;
-                    os << "    Count: " << calibratorOptions.cols << std::endl;
-                    os << "  Spacing: " << calibratorOptions.spacingMeters << " [m]" << std::endl;
-                    break;
-                }
-                case CalibratorUtils::PatternType::APRIL_GRID: {
-                    os << "  Type: APRIL_GRID" << std::endl;
-                    os << "  Tags:" << std::endl;
-                    os << "    Cols: " << calibratorOptions.cols << std::endl;
-                    os << "    Rows: " << calibratorOptions.rows << std::endl;
-                    os << "    Size: " << calibratorOptions.spacingMeters << " [m]" << std::endl;
-                    os << "    PatterSpacing: " << calibratorOptions.patternSpacing << " [m]" << std::endl;
-                    os << "    Spacing : " << calibratorOptions.spacingMeters * calibratorOptions.patternSpacing
-                       << " [m]" << std::endl;
-                    break;
-                }
-                default: os << "Not implemented calibration pattern" << std::endl; break;
-            }
 
-            return os;
-        }
-    }
 };

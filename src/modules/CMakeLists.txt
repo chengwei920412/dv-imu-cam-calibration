@@ -27,4 +27,16 @@ TARGET_LINK_LIBRARIES(imu-cam-calibration PRIVATE
         sm_kinematics
         )
 
+ADD_LIBRARY(markers_preview SHARED
+        MarkersDrawing.cpp)
+
+SET_TARGET_PROPERTIES(markers_preview
+        PROPERTIES
+        PREFIX "dv_"
+        )
+
+TARGET_LINK_LIBRARIES(markers_preview PRIVATE
+        ${DV_LIBRARIES}
+        )
+
 INSTALL(TARGETS imu-cam-calibration DESTINATION ${DV_MODULES_DIR}/imu-calibration)

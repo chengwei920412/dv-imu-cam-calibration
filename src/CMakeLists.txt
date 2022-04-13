@@ -1,3 +1,3 @@
-add_subdirectory(kalibr_imu_camera_calibration)
-add_subdirectory(modules)
-add_subdirectory(tests)
+ADD_SUBDIRECTORY(kalibr_imu_camera_calibration)
+ADD_SUBDIRECTORY(modules)
+ADD_SUBDIRECTORY(tests)

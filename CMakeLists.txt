@@ -21,6 +21,7 @@ PROJECT(dv-imu-cam-calibration
 	LANGUAGES C CXX)
 
 ADD_DEFINITIONS(-march=native)
+#ADD_DEFINITIONS(-fsanitize=address)
 
 # Define installation paths
 INCLUDE(GNUInstallDirs)
@@ -49,3 +50,4 @@ SET(CMAKE_INSTALL_RPATH ${USER_LOCAL_PREFIX}/${DV_MODULES_DIR}/imu-calibration)
 
 add_subdirectory(src)
 add_subdirectory(thirdparty)
+

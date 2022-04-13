@@ -95,7 +95,7 @@ StampedImage previewImageWithText(
         cv::Scalar(255, 255, 255),
         2);
 
-    return StampedImage(img, timestamp);
+    return {img, timestamp};
 }
 
 } // namespace CalibratorUtils

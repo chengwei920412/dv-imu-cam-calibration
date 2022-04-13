@@ -26,6 +26,7 @@ class ImuCamCalibration : public dv::ModuleBase {
 protected:
     // Calibrator options
     CalibratorUtils::Options mOptions;
+    std::string mCalibrationModel = "Pinhole-RadialTangential";
 
     std::unique_ptr<CalibratorBase> calibrator = nullptr;
     std::unique_ptr<dv::io::MonoCameraWriter> dataLog = nullptr;
@@ -37,7 +38,7 @@ protected:
     int64_t startTime = -1;
     int64_t warmUpDuration = 100'000;
 
-    boost::circular_buffer<dv::Frame> leftFrames = boost::circular_buffer<dv::Frame>(3);
+    boost::circular_buffer<dv::Frame> leftFrames = boost::circular_buffer<dv::Frame>(10);
     boost::circular_buffer<dv::Frame> rightFrames = boost::circular_buffer<dv::Frame>(10);
 
     enum CollectionState { BEFORE_COLLECTING, DURING_COLLECTING, AFTER_COLLECTING, CALIBRATED };
@@ -64,7 +65,7 @@ protected:
     std::optional<double> imuUpdateRate = std::nullopt;
 
     void writeDataLogBuffer(const int64_t leaveLastMicroseconds = 0) {
-        if (dataLogBuffer.empty()) {
+        if (dataLogBuffer.empty() || dataLog == nullptr) {
             // Nothing to write
             return;
         }
@@ -140,6 +141,8 @@ public:
                 "aprilGrid",
                 {"aprilGrid", "asymmetricCirclesGrid", "chessboard"},
                 false));
+
+        // All the supported models are pinhole projection camera model. What change is the distortion.
         config.add(
             "calibrationModel",
             dv::ConfigOption::listOption(
@@ -147,6 +150,7 @@ public:
                 "Pinhole-RadialTangential",
                 {"Pinhole-RadialTangential", "Pinhole-Equidistant", "Pinhole-Fov"},
                 false));
+
         // Module control buttons
         config.add(
             "startCollecting",
@@ -182,31 +186,51 @@ public:
     }
 
     void handleCollectionState() {
+        if (mCalibrationModel != config.getString("calibrationModel")) {
+            mCalibrationModel = config.getString("calibrationModel");
+            log.info(fmt::format("Calibration model has changed to : {0}", mCalibrationModel));
+            initializeCalibrator();
+            setupCalibrator();
+            collectionState = BEFORE_COLLECTING;
+        }
+
         // Handle user input
         switch (collectionState) {
             case BEFORE_COLLECTING: {
-                // setupCalibrator();
                 if (config.getBool("startCollecting")) {
                     collectionState = DURING_COLLECTING;
                     calibrator->startCollecting();
                     log.info("Started collecting images");
                 }
+                // Enable/Disable buttons based on current state
+                config.setBool("startCollecting", false);
+                config.setBool("stopCollecting", true);
+                config.setBool("discard", true);
+                config.setBool("calibrate", true);
                 break;
             }
             case DURING_COLLECTING: {
                 if (calibrator == nullptr) {
-                    throw std::runtime_error("Calibrator is not initialized.");
+                    collectionState = BEFORE_COLLECTING;
+                    log.error("Calibrator is not initialized.");
                 }
                 if (config.getBool("stopCollecting")) {
                     collectionState = AFTER_COLLECTING;
                     calibrator->stopCollecting();
                     log.info("Stopped collecting images");
                 }
+
+                // Enable/Disable buttons based on current state
+                config.setBool("startCollecting", true);
+                config.setBool("stopCollecting", false);
+                config.setBool("discard", true);
+                config.setBool("calibrate", true);
                 break;
             }
             case AFTER_COLLECTING: {
                 if (calibrator == nullptr) {
-                    throw std::runtime_error("Calibrator is not initialized.");
+                    collectionState = BEFORE_COLLECTING;
+                    log.error("Calibrator is not initialized.");
                 }
                 if (config.getBool("calibrate")) {
                     dataLog = nullptr;
@@ -218,40 +242,10 @@ public:
                     collectionState = BEFORE_COLLECTING;
                     log.info("Discarded all collected data");
                     initializeCalibrator();
+                    setupCalibrator();
                 }
-                break;
-            }
-            case CALIBRATED: {
-                if (calibrator == nullptr) {
-                    throw std::runtime_error("Calibrator is not initialized.");
-                }
-                if (config.getBool("discard")) {
-                    collectionState = BEFORE_COLLECTING;
-                    log.info("Discarded all collected data");
-                    initializeCalibrator();
-                }
-                break;
-            }
-            default: throw std::runtime_error("Invalid collection state");
-        }
 
-        // Enable/Disable buttons based on current state
-        switch (collectionState) {
-            case BEFORE_COLLECTING: {
-                config.setBool("startCollecting", false);
-                config.setBool("stopCollecting", true);
-                config.setBool("discard", true);
-                config.setBool("calibrate", true);
-                break;
-            }
-            case DURING_COLLECTING: {
-                config.setBool("startCollecting", true);
-                config.setBool("stopCollecting", false);
-                config.setBool("discard", true);
-                config.setBool("calibrate", true);
-                break;
-            }
-            case AFTER_COLLECTING: {
+                // Enable/Disable buttons based on current state
                 config.setBool("startCollecting", true);
                 config.setBool("stopCollecting", true);
                 config.setBool("discard", false);
@@ -259,6 +253,18 @@ public:
                 break;
             }
             case CALIBRATED: {
+                if (calibrator == nullptr) {
+                    collectionState = BEFORE_COLLECTING;
+                    log.error("Calibrator is not initialized.");
+                }
+                if (config.getBool("discard")) {
+                    collectionState = BEFORE_COLLECTING;
+                    log.info("Discarded all collected data");
+                    initializeCalibrator();
+                    setupCalibrator();
+                }
+
+                // Enable/Disable buttons based on current state
                 config.setBool("startCollecting", true);
                 config.setBool("stopCollecting", true);
                 config.setBool("discard", false);
@@ -273,6 +279,7 @@ public:
         if (calibrator != nullptr) {
             calibrator->reset();
         }
+        // All the supported models are pinhole projection camera model. What change is the distortion.
         if (config.getString("calibrationModel") == "Pinhole-Equidistant") {
             calibrator = std::make_unique<Calibrator<
                 aslam::cameras::EquidistantDistortedPinholeCameraGeometry,
@@ -280,7 +287,13 @@ public:
         } else if (config.getString("calibrationModel") == "Pinhole-Fov") {
             calibrator = std::make_unique<
                 Calibrator<aslam::cameras::FovDistortedPinholeCameraGeometry, aslam::cameras::FovDistortion>>(mOptions);
-        } else {
+        }
+        //        else if (config.getString("calibrationModel") == "Extended-Unified") {
+        //            calibrator = std::make_unique<
+        //                Calibrator<aslam::cameras::ExtendedUnifiedCameraGeometry,
+        //                aslam::cameras::RadialTangentialDistortion>>( mOptions);
+        //        }
+        else {
             calibrator = std::make_unique<
                 Calibrator<aslam::cameras::DistortedPinholeCameraGeometry, aslam::cameras::RadialTangentialDistortion>>(
                 mOptions);
@@ -294,7 +307,6 @@ public:
     void initializeCalibrator() {
         const auto frameInput = inputs.getFrameInput("frames");
         timestampString = getTimeString();
-
         mOptions.pattern = getPatternType();
         mOptions.cols = static_cast<size_t>(config.getInt("numPatternColumns"));
         mOptions.rows = static_cast<size_t>(config.getInt("numPatternRows"));
@@ -314,8 +326,6 @@ public:
         if (imuUpdateRate.has_value()) {
             mOptions.imuParameters.updateRate = *imuUpdateRate;
         }
-
-        setupCalibrator();
 
         if (config.getBool("recordData")) {
             dv::io::MonoCameraWriter::Config cfg;
@@ -434,6 +444,9 @@ public:
     }
 
     void run() override {
+        if (calibrator == nullptr) {
+            return;
+        }
         // Process IMU input
         if (inputs.isConnected("imu")) {
             auto imuInput = inputs.getIMUInput("imu");
@@ -450,7 +463,6 @@ public:
 
                     if (auto frequency = estimateImuFrequency(*imuData.getBasePointer()); frequency.has_value()) {
                         imuUpdateRate = static_cast<double>(*frequency);
-                        initializeCalibrator();
                     }
                     // wait for frequency estimation
                     return;
@@ -469,10 +481,6 @@ public:
                     }
                 }
             }
-        }
-
-        if (!calibrator) {
-            return;
         }
 
         const auto& rightInput = inputs.getFrameInput("right");
@@ -602,6 +610,16 @@ protected:
         return cameraID;
     }
 
+    bool isInputMaster(const std::string& inputName) const {
+        for (const auto& child :
+             inputs.getFrameInput(inputName).infoNode().getParent().getParent().getParent().getChildren()) {
+            if (child.getName() == "sourceInfo") {
+                return child.getAttribute<dv::Config::AttributeType::BOOL>("deviceIsMaster").value;
+            }
+        }
+        return false;
+    }
+
     cv::Size getInputResolution(const std::string& inputName) {
         const auto frameInput = inputs.getFrameInput(inputName);
         return {frameInput.sizeX(), frameInput.sizeY()};
@@ -638,26 +656,25 @@ protected:
             meanStd,
             timestampString,
             quality,
-            ""};
+            "",
+            std::nullopt};
     }
 
     dv::camera::calibrations::CameraCalibration getIntrinsicCalibrationData(
         const CameraCalibrationUtils::CalibrationResult& res,
         const std::string& position,
-        const std::string& inputName,
-        const bool master) {
-        const auto floatTransform = res.baseline.cast<float>().eval();
+        const std::string& inputName) {
+        const Eigen::Matrix<float, 4, 4, Eigen::RowMajor> floatTransform = res.baseline.cast<float>().eval();
+
         dv::camera::DistortionModel distortionModel = dv::camera::DistortionModel::RadTan;
         if (config.getString("calibrationModel") == "Pinhole-Equidistant") {
             distortionModel = dv::camera::DistortionModel::Equidistant;
-        } else if (config.getString("calibrationModel") == "Pinhole-Fov") {
-            distortionModel = dv::camera::DistortionModel::FOV;
         }
 
         dv::camera::calibrations::CameraCalibration cal(
             getCameraID(inputName),
             position,
-            master,
+            isInputMaster(inputName),
             getInputResolution(inputName),
             cv::Point2f(static_cast<float>(res.projection.at(2)), static_cast<float>(res.projection.at(3))),
             cv::Point2f(static_cast<float>(res.projection.at(0)), static_cast<float>(res.projection.at(1))),
@@ -760,9 +777,9 @@ protected:
 
         dv::camera::CalibrationSet calib;
 
-        calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[0], "left", "frames", true));
+        calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[0], "left", "frames"));
         if (intrinsicResult.size() > 1) {
-            calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[1], "right", "right", false));
+            calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[1], "right", "right"));
         }
         // TODO(rokas): save stereo calibration!
 
@@ -774,15 +791,16 @@ protected:
     void saveCalibration(
         const std::vector<CameraCalibrationUtils::CalibrationResult>& intrinsicResult,
         const IccCalibratorUtils::CalibrationResult& result) {
+        log.info << "Saving calibration..." << dv::logEnd;
         const auto saveDir = getCalibrationSaveDirectory();
 
         const auto filePath = saveDir / "calibration.json";
 
         dv::camera::CalibrationSet calib;
 
-        calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[0], "left", "frames", true));
+        calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[0], "left", "frames"));
         if (intrinsicResult.size() > 1) {
-            calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[1], "right", "right", false));
+            calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[1], "right", "right"));
         }
         calib.addImuCalibration(getIMUCalibrationData(result));
         // TODO(rokas): save stereo calibration!
@@ -793,7 +811,6 @@ protected:
     }
 
     void calibrate(const bool calibrateImu) {
-        fmt::print("getCalibrationSaveDirectory: {0}\n", getCalibrationSaveDirectory());
         std::ofstream outLog(getCalibrationSaveDirectory() / "log.txt");
         outLog << "Calibrating begins..." << std::endl;
 
@@ -805,7 +822,7 @@ protected:
         log.info("Calibrating the intrinsics of the camera...");
         auto intrinsicsResult = calibrator->calibrateCameraIntrinsics();
         if (!intrinsicsResult.has_value()) {
-            throw std::runtime_error(
+            throw dv::exceptions::RuntimeError(
                 "Failed to calibrate intrinsics! Please check that the pattern was well detected on the images");
         }
 
@@ -829,7 +846,8 @@ protected:
 
                 // Save the calibration to a text file
                 saveCalibration(intrinsicsResult.value(), result);
-            } catch (std::exception& e) {
+            } catch (std::exception& ex) {
+                outLog << ex.what() << std::endl;
                 log.error << "Optimization failed. Please make sure that the pattern is detected on all frames in your "
                              "dataset and repeat the calibration"
                           << dv::logEnd;
