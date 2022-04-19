@@ -188,10 +188,10 @@ public:
     void handleCollectionState() {
         if (mCalibrationModel != config.getString("calibrationModel")) {
             mCalibrationModel = config.getString("calibrationModel");
-            log.info(fmt::format("Calibration model has changed to : {0}", mCalibrationModel));
             initializeCalibrator();
             setupCalibrator();
             collectionState = BEFORE_COLLECTING;
+            log.info(fmt::format("Calibration model has changed to : {0}", mCalibrationModel));
         }
 
         // Handle user input
@@ -202,11 +202,6 @@ public:
                     calibrator->startCollecting();
                     log.info("Started collecting images");
                 }
-                // Enable/Disable buttons based on current state
-                config.setBool("startCollecting", false);
-                config.setBool("stopCollecting", true);
-                config.setBool("discard", true);
-                config.setBool("calibrate", true);
                 break;
             }
             case DURING_COLLECTING: {
@@ -219,12 +214,6 @@ public:
                     calibrator->stopCollecting();
                     log.info("Stopped collecting images");
                 }
-
-                // Enable/Disable buttons based on current state
-                config.setBool("startCollecting", true);
-                config.setBool("stopCollecting", false);
-                config.setBool("discard", true);
-                config.setBool("calibrate", true);
                 break;
             }
             case AFTER_COLLECTING: {
@@ -244,12 +233,6 @@ public:
                     initializeCalibrator();
                     setupCalibrator();
                 }
-
-                // Enable/Disable buttons based on current state
-                config.setBool("startCollecting", true);
-                config.setBool("stopCollecting", true);
-                config.setBool("discard", false);
-                config.setBool("calibrate", false);
                 break;
             }
             case CALIBRATED: {
@@ -263,8 +246,35 @@ public:
                     initializeCalibrator();
                     setupCalibrator();
                 }
+                break;
+            }
+            default: throw std::runtime_error("Invalid collection state");
+        }
 
-                // Enable/Disable buttons based on current state
+        // Enable/Disable buttons based on current state
+        switch (collectionState) {
+            case BEFORE_COLLECTING: {
+                config.setBool("startCollecting", false);
+                config.setBool("stopCollecting", true);
+                config.setBool("discard", true);
+                config.setBool("calibrate", true);
+                break;
+            }
+            case DURING_COLLECTING: {
+                config.setBool("startCollecting", true);
+                config.setBool("stopCollecting", false);
+                config.setBool("discard", true);
+                config.setBool("calibrate", true);
+                break;
+            }
+            case AFTER_COLLECTING: {
+                config.setBool("startCollecting", true);
+                config.setBool("stopCollecting", true);
+                config.setBool("discard", false);
+                config.setBool("calibrate", false);
+                break;
+            }
+            case CALIBRATED: {
                 config.setBool("startCollecting", true);
                 config.setBool("stopCollecting", true);
                 config.setBool("discard", false);
@@ -288,11 +298,6 @@ public:
             calibrator = std::make_unique<
                 Calibrator<aslam::cameras::FovDistortedPinholeCameraGeometry, aslam::cameras::FovDistortion>>(mOptions);
         }
-        //        else if (config.getString("calibrationModel") == "Extended-Unified") {
-        //            calibrator = std::make_unique<
-        //                Calibrator<aslam::cameras::ExtendedUnifiedCameraGeometry,
-        //                aslam::cameras::RadialTangentialDistortion>>( mOptions);
-        //        }
         else {
             calibrator = std::make_unique<
                 Calibrator<aslam::cameras::DistortedPinholeCameraGeometry, aslam::cameras::RadialTangentialDistortion>>(
@@ -355,7 +360,7 @@ public:
         if (inputs.isConnected("right")) {
             outputs.getFrameOutput("right").setup(inputs.getFrameInput("right"));
         } else {
-            // Setup using left camera info, but it will not output anthing
+            // Setup using left camera info, but it will not output anything
             outputs.getFrameOutput("right").setup(inputs.getFrameInput("frames"));
         }
 

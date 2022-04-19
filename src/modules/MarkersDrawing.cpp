@@ -52,7 +52,7 @@ public:
             if (iter->timestamp == latestFrame->timestamp) {
                 cv::drawMarker(
                     preview,
-                    cv::Point(std::floor(iter->pt.x), std::floor(iter->pt.y)),
+                    cv::Point(std::floor(iter->pt.x()), std::floor(iter->pt.y())),
                     dv::visualization::colors::someNeonColor(iter->class_id),
                     cv::MARKER_DIAMOND, 7, 3);
             }

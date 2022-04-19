@@ -413,9 +413,18 @@ public:
         cam0Matrix.operator()(0, 2) = cam0Projection(2);
         cam0Matrix.operator()(1, 2) = cam0Projection(3);
 
-        return std::make_pair(
-            cam0Matrix,
-            std::vector<double>({cam0Dist(0), cam0Dist(1), cam0Dist(2), cam0Dist(3), 0.0}));
+        if (std::is_same<DistortionType, aslam::cameras::FovDistortion>()) {
+            return std::make_pair(cam0Matrix, std::vector<double>({cam0Dist(0)}));
+
+        } else if (std::is_same<DistortionType, aslam::cameras::EquidistantDistortion>()) {
+            return std::make_pair(
+                cam0Matrix,
+                std::vector<double>({cam0Dist(0), cam0Dist(1), cam0Dist(2), cam0Dist(3)}));
+        } else {
+            return std::make_pair(
+                cam0Matrix,
+                std::vector<double>({cam0Dist(0), cam0Dist(1), cam0Dist(2), cam0Dist(3), 0.0}));
+        }
     }
 
     /// Calculate average orientation using quaternions
@@ -520,8 +529,9 @@ public:
 
                 auto cameraGeometry = boost::make_shared<CameraGeometry<CameraGeometryType, DistortionType>>(iccCamera);
                 if (!cameraGeometry->initGeometryFromObservations(targetObservations, grid)) {
-                    std::cout<<"FAILED!!!!\n";
-                    throw dv::exceptions::RuntimeError("Could not initialize the intrinsics");
+                    std::cout << "FAILED!!!!\n";
+                    fmt::print("Could not initialize the intrinsics");
+                    return std::nullopt;
                 }
                 geometries.push_back(cameraGeometry);
                 camId++;
@@ -557,35 +567,28 @@ public:
 
                 size_t view_id = 0;
                 for (const auto& [timestamp, observation] : *camTargetObservations.at(0)) {
-                    std::cout << "TEST 5\n";
                     std::map<size_t, aslam::cameras::GridCalibrationTargetObservation> targetViews;
                     targetViews.emplace(0, observation);
-
-                    std::cout << "TEST 6\n";
                     for (const auto& [cameraId, observations] : camTargetObservations) {
                         if (cameraId > 0) {
                             targetViews.emplace(cameraId, observations->at(timestamp));
                         }
                     }
-                    std::cout << "TEST 7\n";
 
                     bool success = calibrator.addTargetView(targetViews);
 
-                    std::cout << "TEST 7.5\n";
                     //                static constexpr bool allowEndFiltering = true;
                     const bool runEndFiltering = (view_id == camTargetObservations.at(0)->size() - 1);
                     const auto numActiveBatches = calibrator.getNumBatches();
                     static size_t numCams = geometries.size();
                     static constexpr size_t minViewOutlier = 20;
                     static constexpr bool removeOutliers = true;
-                    std::cout << "TEST 8\n";
                     if (((success && numActiveBatches > minViewOutlier * numCams)
                          || (runEndFiltering && numActiveBatches > minViewOutlier * numCams))) {
                         // create the list of the batches to check
                         std::vector<size_t> batches_to_check;
                         if (initOutlierRejection) {
                             // check all views after the min. number of batches has been reached
-                            std::cout << "TEST 9\n";
                             for (size_t i = 0; i < calibrator.getNumBatches(); ++i) {
                                 batches_to_check.push_back(i);
                             }
@@ -593,7 +596,6 @@ public:
                             initOutlierRejection = false;
                         } else if (runEndFiltering) {
                             // check all batches again after all views have been processed
-                            std::cout << "TEST 10\n";
                             for (size_t i = 0; i < calibrator.getNumBatches(); ++i) {
                                 batches_to_check.push_back(i);
                             }
@@ -602,10 +604,8 @@ public:
                                       << std::endl;
                         } else {
                             // only check most recent view
-                            std::cout << "TEST 11\n";
                             batches_to_check.push_back(calibrator.getNumBatches() - 1);
                         }
-                        std::cout << "TEST 1\n";
                         std::sort(batches_to_check.rbegin(), batches_to_check.rend());
 
                         for (const auto& batch_id : batches_to_check) {
@@ -615,16 +615,13 @@ public:
 
                             for (size_t camId = 0; camId < numCams; camId++) {
                                 // calculate the reprojection errors statistics
-                                std::cout << "TEST 2\n";
                                 const auto [corners, reprojs, rerrs] = calibrator.getReprojectionErrors(camId);
                                 const auto [me, se] = getReprojectionErrorStatistics(rerrs);
                                 const auto se_threshold = 4.0 * se;
-                                std::cout << "TEST 12\n";
 
                                 // select corners to remove
                                 std::vector<size_t> cornerRemovalList;
                                 for (size_t pidx = 0; pidx < rerrs.at(batch_id).size(); ++pidx) {
-                                    std::cout << "TEST 3\n";
                                     const auto reproj = rerrs.at(batch_id).at(pidx);
                                     if ((reproj.size() != 0)
                                         && (std::abs(reproj(0, 0)) > se_threshold.x()
@@ -632,12 +629,10 @@ public:
                                         cornerRemovalList.push_back(pidx);
                                         ++removedOutlierCornersCount;
                                     }
-                                    std::cout << "TEST 13\n";
                                 }
 
                                 // queue corners on this cam for removal
                                 cornerRemovalList_allCams.push_back(cornerRemovalList);
-                                std::cout << "TEST 14\n";
                             }
                             // we do not plot
 
@@ -649,14 +644,11 @@ public:
 
                             if (removeCount > 0) {
                                 for (size_t camId = 0; camId < numCams; camId++) {
-                                    std::cout << "TEST 4\n";
-
-                                    std::cout << "cornerRemovalList_allCams size: " << cornerRemovalList_allCams.size()
-                                              << std::endl;
-
-                                    std::cout << (fmt::format("cornerRemovalList_allCams.at({0})", camId));
-                                    std::cout << (fmt::format(" size {0}", cornerRemovalList_allCams.at(camId).size()))
-                                              << std::endl;
+//                                    std::cout << "cornerRemovalList_allCams size: " << cornerRemovalList_allCams.size()
+//                                              << std::endl;
+//                                    std::cout << (fmt::format("cornerRemovalList_allCams.at({0})", camId));
+//                                    std::cout << (fmt::format(" size {0}", cornerRemovalList_allCams.at(camId).size()))
+//                                              << std::endl;
                                     if (cornerRemovalList_allCams.at(camId).empty()
                                         || calibrator.nOfViews() <= batch_id) {
                                         continue;
@@ -713,10 +705,10 @@ public:
                 return results;
 
             } catch (const OptimizationDiverged& ex) {
-                throw dv::exceptions::RuntimeError(fmt::format(
+                fmt::print(
                     "Optimization diverged possibly due to bad initialization. (Do the models fit the lenses well?) "
                     "{0}",
-                    ex.what()));
+                    ex.what());
                 // not trying to restart
                 break;
             }
@@ -904,6 +896,7 @@ public:
             return os;
         }
     }
+
 protected:
     /**
      * Detect the calibration pattern on the given stamped image.
@@ -963,6 +956,4 @@ protected:
             }
         }
     }
-
-
 };

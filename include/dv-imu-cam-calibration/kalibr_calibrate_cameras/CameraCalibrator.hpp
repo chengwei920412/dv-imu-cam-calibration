@@ -495,7 +495,6 @@ public:
         bool force = false) {
         // Find observation with most points visible and use that target-camera transform estimation
         // as T_tc_guess
-        std::cout << "addTargetView 1" << std::endl;
         if (observations.empty()) {
             std::cout << "observations is empty" << std::endl;
         }
@@ -506,10 +505,7 @@ public:
                   b.second.getCornersIdx(bIdx);
                   return aIdx.size() > bIdx.size();
               });
-        std::cout << "addTargetView 2" << std::endl;
         auto T_tc_guess = obsWithMostPoints->second.T_t_c();
-
-        std::cout << "addTargetView 3" << std::endl;
 
         if (cameras.empty()) {
             std::cout << "Cameras empty..." << std::endl;
@@ -524,7 +520,6 @@ public:
         if (observations.empty()) {
             std::cout << "observations empty..." << std::endl;
         }
-
         auto batch_problem
             = boost::make_shared<CalibrationTargetOptimizationProblem<CameraGeometryType, DistortionType>>(
                 cameras,
@@ -534,7 +529,7 @@ public:
                 observations,
                 estimateLandmarks,
                 useBlakeZissermanMest);
-        std::cout << "addTargetView 4" << std::endl;
+
         if (estimator == nullptr) {
             std::cout << "estimator is null" << std::endl;
         }
@@ -544,13 +539,10 @@ public:
 
         auto estimator_return_value = estimator->addBatch(batch_problem, force);
 
-        std::cout << "addTargetView 5" << std::endl;
-
         bool success = estimator_return_value.batchAccepted;
         if (success) {
             views.push_back(batch_problem);
         }
-        std::cout << "addTargetView 6" << std::endl;
 
         return success;
     }
@@ -615,12 +607,10 @@ public:
         const size_t cameraId,
         const std::vector<size_t>& cornerIdList,
         const bool useBlakeZissermanMest) {
-        std::cout << "Corner 1\n";
         std::cout << "Views size: " << views.size() << ", batch id : " << batch_id << std::endl;
 
         auto& batch = views.at(batch_id);
 
-        std::cout << "Corner 2\n";
         // disable the corners
         bool hasCornerRemoved = false;
         try {
@@ -631,7 +621,6 @@ public:
         } catch (std::exception& ex) {
             std::cout << ex.what() << std::endl;
         }
-        std::cout << "Corner 3\n";
         assert(hasCornerRemoved);
 
         // rebuild problem
@@ -643,7 +632,6 @@ public:
             batch->rig_observations,
             estimateLandmarks,
             useBlakeZissermanMest);
-        std::cout << "Corner 4\n";
         return new_problem;
     }
 
@@ -676,7 +664,8 @@ public:
             std::is_same<CameraGeometryType, aslam::cameras::FovDistortedPinholeCameraGeometry>()
             && std::is_same<DistortionType, aslam::cameras::FovDistortion>()) {
             if (distortionMat.rows() != 1) {
-                throw std::runtime_error("Four params are expected for Fov model.");
+                std::cout << "One param only is expected for Fov model." << std::endl;
+                throw std::runtime_error("One param only is expected for Fov model.");
             }
         }
         assert(distortionMat.cols() == 1);
