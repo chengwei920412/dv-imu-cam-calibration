@@ -21,9 +21,8 @@ PROJECT(dv-imu-cam-calibration
 	LANGUAGES C CXX)
 
 ADD_DEFINITIONS(-march=native)
-#ADD_DEFINITIONS(-fsanitize=address)
-add_compile_options(-fsanitize=address)
-add_link_options(-fsanitize=address)
+#add_compile_options(-fsanitize=address)
+#add_link_options(-fsanitize=address)
 
 # Define installation paths
 INCLUDE(GNUInstallDirs)

@@ -148,7 +148,7 @@ public:
             dv::ConfigOption::listOption(
                 "Calibration model to use",
                 "Pinhole-RadialTangential",
-                {"Pinhole-RadialTangential", "Pinhole-Equidistant", "Pinhole-Fov"},
+                {"Pinhole-RadialTangential", "Pinhole-Equidistant"},
                 false));
 
         // Module control buttons
@@ -294,11 +294,7 @@ public:
             calibrator = std::make_unique<Calibrator<
                 aslam::cameras::EquidistantDistortedPinholeCameraGeometry,
                 aslam::cameras::EquidistantDistortion>>(mOptions);
-        } else if (config.getString("calibrationModel") == "Pinhole-Fov") {
-            calibrator = std::make_unique<
-                Calibrator<aslam::cameras::FovDistortedPinholeCameraGeometry, aslam::cameras::FovDistortion>>(mOptions);
-        }
-        else {
+        }else {
             calibrator = std::make_unique<
                 Calibrator<aslam::cameras::DistortedPinholeCameraGeometry, aslam::cameras::RadialTangentialDistortion>>(
                 mOptions);
@@ -312,6 +308,8 @@ public:
     void initializeCalibrator() {
         const auto frameInput = inputs.getFrameInput("frames");
         timestampString = getTimeString();
+        mOptions = CalibratorUtils::Options();
+
         mOptions.pattern = getPatternType();
         mOptions.cols = static_cast<size_t>(config.getInt("numPatternColumns"));
         mOptions.rows = static_cast<size_t>(config.getInt("numPatternRows"));

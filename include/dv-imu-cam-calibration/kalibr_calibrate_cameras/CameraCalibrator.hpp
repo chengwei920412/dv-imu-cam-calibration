@@ -520,6 +520,7 @@ public:
         if (observations.empty()) {
             std::cout << "observations empty..." << std::endl;
         }
+
         auto batch_problem
             = boost::make_shared<CalibrationTargetOptimizationProblem<CameraGeometryType, DistortionType>>(
                 cameras,

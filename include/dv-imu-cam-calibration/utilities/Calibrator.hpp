@@ -523,6 +523,8 @@ public:
         {
             size_t camId = 0;
             for (const auto& iccCamera : iccCameras) {
+                std::cout << "camTargetObservations size: " << camTargetObservations.size() << std::endl;
+                std::cout << "camId: " << camId << std::endl;
                 auto& targetObservations = camTargetObservations.at(camId);
                 std::cout << "Calibrating intrinsics using " << targetObservations->size() << " detections."
                           << std::endl;
@@ -566,7 +568,7 @@ public:
                     calibrator(geometries, grid, baselines, false, doBlakeZisserman);
 
                 size_t view_id = 0;
-                for (const auto& [timestamp, observation] : *camTargetObservations.at(0)) {
+                for (const auto& [timestamp, observation] : *(camTargetObservations.at(0))) {
                     std::map<size_t, aslam::cameras::GridCalibrationTargetObservation> targetViews;
                     targetViews.emplace(0, observation);
                     for (const auto& [cameraId, observations] : camTargetObservations) {
@@ -644,11 +646,15 @@ public:
 
                             if (removeCount > 0) {
                                 for (size_t camId = 0; camId < numCams; camId++) {
-//                                    std::cout << "cornerRemovalList_allCams size: " << cornerRemovalList_allCams.size()
-//                                              << std::endl;
-//                                    std::cout << (fmt::format("cornerRemovalList_allCams.at({0})", camId));
-//                                    std::cout << (fmt::format(" size {0}", cornerRemovalList_allCams.at(camId).size()))
-//                                              << std::endl;
+                                    //                                    std::cout << "cornerRemovalList_allCams size:
+                                    //                                    " << cornerRemovalList_allCams.size()
+                                    //                                              << std::endl;
+                                    //                                    std::cout <<
+                                    //                                    (fmt::format("cornerRemovalList_allCams.at({0})",
+                                    //                                    camId)); std::cout << (fmt::format(" size
+                                    //                                    {0}",
+                                    //                                    cornerRemovalList_allCams.at(camId).size()))
+                                    //                                              << std::endl;
                                     if (cornerRemovalList_allCams.at(camId).empty()
                                         || calibrator.nOfViews() <= batch_id) {
                                         continue;
