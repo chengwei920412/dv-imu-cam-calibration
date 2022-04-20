@@ -608,7 +608,7 @@ public:
         const size_t cameraId,
         const std::vector<size_t>& cornerIdList,
         const bool useBlakeZissermanMest) {
-        std::cout << "Views size: " << views.size() << ", batch id : " << batch_id << std::endl;
+        //        std::cout << "Views size: " << views.size() << ", batch id : " << batch_id << std::endl;
 
         auto& batch = views.at(batch_id);
 
