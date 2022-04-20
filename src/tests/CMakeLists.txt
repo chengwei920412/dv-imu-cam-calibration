@@ -1,11 +1,13 @@
 # Unit testing support.
-#OPTION(ENABLE_TESTS "Build unit tests" ON)
+OPTION(ENABLE_TESTS "Build unit tests" ON)
 
-#IF (NOT ENABLE_TESTS)
-#	SET(ENABLE_TESTS 0 CACHE BOOL "Compiles tests using Google's GTest framework.")
-#	RETURN()
-#ENDIF()
+IF (NOT ENABLE_TESTS)
+	SET(ENABLE_TESTS 0 CACHE BOOL "Compiles tests using Google's GTest framework.")
+	RETURN()
+ENDIF()
+
 find_package(GTest REQUIRED)
+find_package(OpenCV REQUIRED)
 
 add_executable(test_calibrator
 		testCalibrator.cpp)

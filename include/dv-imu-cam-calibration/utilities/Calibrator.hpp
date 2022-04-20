@@ -646,15 +646,7 @@ public:
 
                             if (removeCount > 0) {
                                 for (size_t camId = 0; camId < numCams; camId++) {
-                                    //                                    std::cout << "cornerRemovalList_allCams size:
-                                    //                                    " << cornerRemovalList_allCams.size()
-                                    //                                              << std::endl;
-                                    //                                    std::cout <<
-                                    //                                    (fmt::format("cornerRemovalList_allCams.at({0})",
-                                    //                                    camId)); std::cout << (fmt::format(" size
-                                    //                                    {0}",
-                                    //                                    cornerRemovalList_allCams.at(camId).size()))
-                                    //                                              << std::endl;
+
                                     if (cornerRemovalList_allCams.at(camId).empty()
                                         || calibrator.nOfViews() <= batch_id) {
                                         continue;
@@ -742,7 +734,6 @@ public:
             6,
             100,
             50,
-            false,
             1e6,
             1e5,
             true,
@@ -774,7 +765,7 @@ public:
         ss << std::endl << "Optimizing..." << std::endl;
         std::cout << ss.str();
         ss.str("");
-        iccCalibrator->optimize(nullptr, calibratorOptions.maxIter, false);
+        iccCalibrator->optimize(nullptr, calibratorOptions.maxIter);
 
         ss << std::endl << "After Optimization" << std::endl << "###################" << std::endl;
         iccCalibrator->printErrorStatistics(ss);

@@ -784,7 +784,6 @@ protected:
         if (intrinsicResult.size() > 1) {
             calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[1], "right", "right"));
         }
-        // TODO(rokas): save stereo calibration!
 
         calib.writeToFile(filePath.string());
 
@@ -806,7 +805,6 @@ protected:
             calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[1], "right", "right"));
         }
         calib.addImuCalibration(getIMUCalibrationData(result));
-        // TODO(rokas): save stereo calibration!
 
         calib.writeToFile(filePath.string());
 

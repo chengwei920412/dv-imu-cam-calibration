@@ -125,30 +125,10 @@ public:
         iccCamera->addDesignVariables(problem, noChainExtrinsics, noTimeCalibration);
     }
 
-    void addPoseMotionTerms(
-        boost::shared_ptr<aslam::calibration::OptimizationProblem> problem,
-        const double tv,
-        const double rv) {
-        const auto wt = 1.0 / tv;
-        const auto wr = 1.0 / rv;
-        Eigen::Matrix<double, 6, 6> W;
-        W.setZero();
-        W(0, 0) = wt;
-        W(1, 1) = wt;
-        W(2, 2) = wt;
-        W(3, 3) = wr;
-        W(4, 4) = wr;
-        W(5, 5) = wr;
-        const unsigned int errorOrder = 1;
-        throw std::runtime_error("Not implemented addPoseMotionTerms");
-        // aslam::backend::addMotionErrorTerms(problem, *poseDv, W, errorOrder);
-    }
-
     void buildProblem(
         size_t splineOrder = 6,
         size_t poseKnotsPerSecond = 70,
         size_t biasKnotsPerSecond = 70,
-        bool doPoseMotionError = false,
         double mrTranslationVariance = 1e6,
         double mrRotationVariance = 1e5,
         bool doBiasMotionError = true,
@@ -174,7 +154,6 @@ public:
 
         std::cout << "\tSpline order: " << splineOrder << std::endl;
         std::cout << "\tPose knots per second: " << poseKnotsPerSecond << std::endl;
-        std::cout << "\tDo pose motion regularization: " << bool2string(doPoseMotionError) << std::endl;
         std::cout << "\t\txddot translation variance: " << mrTranslationVariance << std::endl;
         std::cout << "\t\txddot rotation variance: " << mrRotationVariance << std::endl;
         std::cout << "\tBias knots per second: " << biasKnotsPerSecond << std::endl;
@@ -236,17 +215,11 @@ public:
         if (doBiasMotionError) {
             iccImu->addBiasMotionTerms(problem);
         }
-
-        // # Add the pose motion terms.
-        if (doPoseMotionError) {
-            addPoseMotionTerms(problem, mrTranslationVariance, mrRotationVariance);
-        }
     }
 
     void optimize(
         boost::shared_ptr<aslam::backend::Optimizer2Options> options = nullptr,
-        const size_t maxIterations = 30,
-        const bool recoverCov = false) {
+        const size_t maxIterations = 30) {
         if (options == nullptr) {
             options = boost::make_shared<aslam::backend::Optimizer2Options>();
             options->verbose = true;
@@ -278,23 +251,6 @@ public:
             throw std::runtime_error("Optimization failed");
         }
 
-        if (recoverCov) {
-            recoverCovariance();
-        }
-    }
-
-    void recoverCovariance() {
-        std::cout << "Recovering covariance..." << std::endl;
-
-        aslam::calibration::IncrementalEstimator estimator(calibrationGroupId);
-        auto rval = estimator.addBatch(problem, true);
-        auto est_stds = estimator.getSigma2Theta().diagonal().cwiseSqrt();
-
-        throw std::runtime_error("Not implemented recoverCovariance");
-
-        // # split and store the variance
-        // self.std_trafo_ic = np.array(est_stds[0:6])
-        // self.std_times = np.array(est_stds[6:])
     }
 
     IccCalibratorUtils::CalibrationResult getResult() {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "kalibr_calibrate_cameras/CameraCalibrator.hpp"
 #include "kalibr_imu_camera_calibration/iccCalibrator.hpp"
 #include "kalibr_imu_camera_calibration/iccCamera.hpp"
 #include "kalibr_imu_camera_calibration/iccImu.hpp"
@@ -9,7 +10,6 @@
 #include <aslam/cameras/GridCalibrationTargetCheckerboard.hpp>
 #include <aslam/cameras/GridCalibrationTargetCirclegrid.hpp>
 #include <aslam/cameras/GridDetector.hpp>
-#include <kalibr_calibrate_cameras/CameraCalibrator.hpp>
 #include <sm/boost/JobQueue.hpp>
 
 #include <opencv2/opencv.hpp>
@@ -118,10 +118,16 @@ public:
      */
     virtual void addImages(const std::vector<CalibratorUtils::StampedImage>& stampedImages) = 0;
 
+    /**
+     * Return the last images and grid observations
+     * @return a pair containing a vector of CalibratorUtils::StampedImage and a vector of pointers to
+     * aslam::cameras::GridCalibrationTargetObservation
+     */
     virtual std::pair<
         std::vector<CalibratorUtils::StampedImage>,
         std::vector<boost::shared_ptr<aslam::cameras::GridCalibrationTargetObservation>>>
         getLatestObservations() = 0;
+    
     /**
      * @return preview image visualizing the current status of the calibration
      */
@@ -173,8 +179,7 @@ public:
      */
     virtual void getDvInfoAfterOptimization(std::ostream& ss) = 0;
 
-
-    virtual std::ostream& print(std::ostream& os)=0;
+    virtual std::ostream& print(std::ostream& os) = 0;
 
 protected:
     /**
@@ -183,5 +188,4 @@ protected:
      * @param stampedImage
      */
     virtual void detectPattern(const std::vector<CalibratorUtils::StampedImage>& frames) = 0;
-
 };
