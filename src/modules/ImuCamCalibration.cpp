@@ -22,11 +22,18 @@ std::string getTimeString() {
         fmt::localtime(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())));
 }
 
+namespace ImuCamModelTypes {
+const std::string RADTAN = "Pinhole-RadialTangential";
+const std::string EQUIDISTANT = "Pinhole-Equidistant";
+const std::string FOV = "Pinhole-FOV";
+
+} // namespace ImuCamModelTypes
+
 class ImuCamCalibration : public dv::ModuleBase {
 protected:
     // Calibrator options
     CalibratorUtils::Options mOptions;
-    std::string mCalibrationModel = "Pinhole-RadialTangential";
+    std::string mCalibrationModel = ImuCamModelTypes::RADTAN;
 
     std::unique_ptr<CalibratorBase> calibrator = nullptr;
     std::unique_ptr<dv::io::MonoCameraWriter> dataLog = nullptr;
@@ -99,13 +106,13 @@ protected:
 
 public:
     static void initInputs(dv::InputDefinitionList& in) {
-        in.addFrameInput("frames");
+        in.addFrameInput("left");
         in.addIMUInput("imu", true);
         in.addFrameInput("right", true);
     }
 
     static void initOutputs(dv::OutputDefinitionList& out) {
-        out.addFrameOutput("preview");
+        out.addFrameOutput("left");
         out.addFrameOutput("right");
     }
 
@@ -147,8 +154,8 @@ public:
             "calibrationModel",
             dv::ConfigOption::listOption(
                 "Calibration model to use",
-                "Pinhole-RadialTangential",
-                {"Pinhole-RadialTangential", "Pinhole-Equidistant"},
+                ImuCamModelTypes::RADTAN,
+                {ImuCamModelTypes::RADTAN, ImuCamModelTypes::EQUIDISTANT},
                 false));
 
         // Module control buttons
@@ -189,7 +196,6 @@ public:
         if (mCalibrationModel != config.getString("calibrationModel")) {
             mCalibrationModel = config.getString("calibrationModel");
             initializeCalibrator();
-            setupCalibrator();
             collectionState = BEFORE_COLLECTING;
             log.info(fmt::format("Calibration model has changed to : {0}", mCalibrationModel));
         }
@@ -290,11 +296,11 @@ public:
             calibrator->reset();
         }
         // All the supported models are pinhole projection camera model. What change is the distortion.
-        if (config.getString("calibrationModel") == "Pinhole-Equidistant") {
+        if (config.getString("calibrationModel") == ImuCamModelTypes::RADTAN) {
             calibrator = std::make_unique<Calibrator<
                 aslam::cameras::EquidistantDistortedPinholeCameraGeometry,
                 aslam::cameras::EquidistantDistortion>>(mOptions);
-        }else {
+        } else {
             calibrator = std::make_unique<
                 Calibrator<aslam::cameras::DistortedPinholeCameraGeometry, aslam::cameras::RadialTangentialDistortion>>(
                 mOptions);
@@ -306,7 +312,7 @@ public:
     }
 
     void initializeCalibrator() {
-        const auto frameInput = inputs.getFrameInput("frames");
+        const auto frameInput = inputs.getFrameInput("left");
         timestampString = getTimeString();
         mOptions = CalibratorUtils::Options();
 
@@ -330,9 +336,12 @@ public:
             mOptions.imuParameters.updateRate = *imuUpdateRate;
         }
 
+        setupCalibrator();
+
+        // TODO: wrap a class around the MonoCameraWriter and the StereoCameraWriter
         if (config.getBool("recordData")) {
             dv::io::MonoCameraWriter::Config cfg;
-            cfg.cameraName = getCameraID("frames");
+            cfg.cameraName = getCameraID("left");
             cfg.frameResolution = frameInput.size();
             cfg.enableImu = inputs.getIMUInput("imu").isConnected();
             cfg.addFrameStream(frameInput.size(), "left_frames", frameInput.getOriginDescription());
@@ -350,16 +359,16 @@ public:
 
     ImuCamCalibration() {
         // Input output
-        const auto frameInput = inputs.getFrameInput("frames");
+        const auto frameInput = inputs.getFrameInput("left");
         const auto inputSize = frameInput.size();
         const auto description = frameInput.getOriginDescription();
-        outputs.getFrameOutput("preview").setup(inputSize.width, inputSize.height, description);
+        outputs.getFrameOutput("left").setup(inputSize.width, inputSize.height, description);
 
         if (inputs.isConnected("right")) {
             outputs.getFrameOutput("right").setup(inputs.getFrameInput("right"));
         } else {
             // Setup using left camera info, but it will not output anything
-            outputs.getFrameOutput("right").setup(inputs.getFrameInput("frames"));
+            outputs.getFrameOutput("right").setup(inputs.getFrameInput("left"));
         }
 
         // If imu input is connected, do not initialize and wait until imu frequency is estimated
@@ -496,7 +505,7 @@ public:
         }
 
         // Process frame input
-        auto frameInput = inputs.getFrameInput("frames");
+        auto frameInput = inputs.getFrameInput("left");
         if (auto frame = frameInput.data()) {
             leftFrames.push_back(*frame.getBasePointer());
         }
@@ -532,7 +541,7 @@ public:
             // Output preview image
             auto previews = calibrator->getPreviewImages();
             if (!previews.empty()) {
-                outputs.getFrameOutput("preview") << previews[0].timestamp << previews[0].image << dv::commit;
+                outputs.getFrameOutput("left") << previews[0].timestamp << previews[0].image << dv::commit;
                 if (previews.size() == 2) {
                     outputs.getFrameOutput("right") << previews[1].timestamp << previews[1].image << dv::commit;
                 }
@@ -546,7 +555,7 @@ public:
 
 protected:
     fs::path getCalibrationSaveDirectory() {
-        const auto frameInput = inputs.getFrameInput("frames");
+        const auto frameInput = inputs.getFrameInput("left");
         const auto cameraID = frameInput.getOriginDescription();
         fs::path outputDir{config.getString("outputCalibrationDirectory")};
 
@@ -670,7 +679,7 @@ protected:
         const Eigen::Matrix<float, 4, 4, Eigen::RowMajor> floatTransform = res.baseline.cast<float>().eval();
 
         dv::camera::DistortionModel distortionModel = dv::camera::DistortionModel::RadTan;
-        if (config.getString("calibrationModel") == "Pinhole-Equidistant") {
+        if (config.getString("calibrationModel") == ImuCamModelTypes::EQUIDISTANT) {
             distortionModel = dv::camera::DistortionModel::Equidistant;
         }
 
@@ -696,7 +705,7 @@ protected:
 
         cv::Point3f omega_offset_avg, acc_offset_avg;
 
-        const auto cameraId = getCameraID("frames");
+        const auto cameraId = getCameraID("left");
         if (cameraId.substr(0, 9) == "DVXplorer") {
             omega_max = 34.89f;
             acc_max = 156.96f;
@@ -755,7 +764,7 @@ protected:
               << " Mean gyroscope error: " << result.error_info.meanGyroscopeError;
 
         auto cal = dv::camera::calibrations::IMUCalibration(
-            getCameraID("frames"),
+            getCameraID("left"),
             om,
             am,
             ooavg,
@@ -780,9 +789,13 @@ protected:
 
         dv::camera::CalibrationSet calib;
 
-        calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[0], "left", "frames"));
+        calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[0], "left", "left"));
+        log.info << "Calibration quality left camera: " << calib.getCameraCalibration("left")->metadata->quality
+                 << dv::logEnd;
         if (intrinsicResult.size() > 1) {
             calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[1], "right", "right"));
+            log.info << "Calibration quality right camera: " << calib.getCameraCalibration("right")->metadata->quality
+                     << dv::logEnd;
         }
 
         calib.writeToFile(filePath.string());
@@ -800,7 +813,7 @@ protected:
 
         dv::camera::CalibrationSet calib;
 
-        calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[0], "left", "frames"));
+        calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[0], "left", "left"));
         if (intrinsicResult.size() > 1) {
             calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[1], "right", "right"));
         }
