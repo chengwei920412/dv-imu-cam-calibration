@@ -237,6 +237,9 @@ public:
 
                 if (config.getBool("discard")) {
                     collectionState = BEFORE_COLLECTING;
+                    if (threadCalibrate.joinable()) {
+                        threadCalibrate.join();
+                    }
                     log.info("Discarded all collected data");
                     calibrator->reset();
                     initializeCalibrator();
@@ -246,7 +249,11 @@ public:
             case CALIBRATED: {
                 if (config.getBool("discard")) {
                     collectionState = BEFORE_COLLECTING;
+                    if (threadCalibrate.joinable()) {
+                        threadCalibrate.join();
+                    }
                     log.info("Discarded all collected data");
+
                     initializeCalibrator();
                 }
                 break;
