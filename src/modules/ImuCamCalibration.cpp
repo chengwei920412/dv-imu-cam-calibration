@@ -12,6 +12,7 @@
 #include <fstream>
 #include <regex>
 #include <string>
+#include <thread>
 
 namespace pt = boost::property_tree;
 namespace fs = std::filesystem;
@@ -35,6 +36,7 @@ protected:
     CalibratorUtils::Options mOptions;
     std::string mCalibrationModel = ImuCamModelTypes::RADTAN;
 
+    std::thread threadCalibrate;
     std::unique_ptr<CalibratorBase> calibrator = nullptr;
     std::unique_ptr<dv::io::MonoCameraWriter> dataLog = nullptr;
     using DVMessage = std::variant<dv::TimedKeyPointPacket, dv::Frame, dv::IMU>;
@@ -45,8 +47,8 @@ protected:
     int64_t startTime = -1;
     int64_t warmUpDuration = 100'000;
 
-    boost::circular_buffer<dv::Frame> leftFrames = boost::circular_buffer<dv::Frame>(10);
-    boost::circular_buffer<dv::Frame> rightFrames = boost::circular_buffer<dv::Frame>(10);
+    boost::circular_buffer<dv::Frame> leftFrames = boost::circular_buffer<dv::Frame>(5);
+    boost::circular_buffer<dv::Frame> rightFrames = boost::circular_buffer<dv::Frame>(5);
 
     enum CollectionState { BEFORE_COLLECTING, DURING_COLLECTING, AFTER_COLLECTING, CALIBRATED };
 
@@ -199,6 +201,10 @@ public:
             collectionState = BEFORE_COLLECTING;
             log.info(fmt::format("Calibration model has changed to : {0}", mCalibrationModel));
         }
+        if (calibrator == nullptr) {
+            initializeCalibrator();
+            collectionState = BEFORE_COLLECTING;
+        }
 
         // Handle user input
         switch (collectionState) {
@@ -211,10 +217,6 @@ public:
                 break;
             }
             case DURING_COLLECTING: {
-                if (calibrator == nullptr) {
-                    collectionState = BEFORE_COLLECTING;
-                    log.error("Calibrator is not initialized.");
-                }
                 if (config.getBool("stopCollecting")) {
                     collectionState = AFTER_COLLECTING;
                     calibrator->stopCollecting();
@@ -223,13 +225,13 @@ public:
                 break;
             }
             case AFTER_COLLECTING: {
-                if (calibrator == nullptr) {
-                    collectionState = BEFORE_COLLECTING;
-                    log.error("Calibrator is not initialized.");
-                }
                 if (config.getBool("calibrate")) {
                     dataLog = nullptr;
-                    calibrate(inputs.isConnected("imu"));
+
+                    threadCalibrate = std::thread([&]() {
+                        calibrate(inputs.isConnected("imu"));
+                        collectionState = CALIBRATED;
+                    });
                     collectionState = CALIBRATED;
                 }
 
@@ -237,15 +239,10 @@ public:
                     collectionState = BEFORE_COLLECTING;
                     log.info("Discarded all collected data");
                     initializeCalibrator();
-                    setupCalibrator();
                 }
                 break;
             }
             case CALIBRATED: {
-                if (calibrator == nullptr) {
-                    collectionState = BEFORE_COLLECTING;
-                    log.error("Calibrator is not initialized.");
-                }
                 if (config.getBool("discard")) {
                     collectionState = BEFORE_COLLECTING;
                     log.info("Discarded all collected data");
@@ -384,7 +381,11 @@ public:
         handleCollectionState();
     }
 
-    ~ImuCamCalibration() {
+    ~ImuCamCalibration() override {
+        if (threadCalibrate.joinable()) {
+            threadCalibrate.join();
+        }
+        calibrator->reset();
         writeDataLogBuffer();
     }
 
@@ -457,7 +458,7 @@ public:
 
     void run() override {
         if (calibrator == nullptr) {
-            return;
+            handleCollectionState();
         }
         // Process IMU input
         if (inputs.isConnected("imu")) {
@@ -541,6 +542,16 @@ public:
             // Output preview image
             auto previews = calibrator->getPreviewImages();
             if (!previews.empty()) {
+                if (!inputs.isConnected("imu")) {
+                    cv::putText(
+                        previews[0].image,
+                        "No imu data",
+                        cv::Point(20, previews[0].image.rows - 20),
+                        cv::FONT_HERSHEY_DUPLEX,
+                        1.0,
+                        cv::Scalar(0, 165, 255),
+                        2);
+                }
                 outputs.getFrameOutput("left") << previews[0].timestamp << previews[0].image << dv::commit;
                 if (previews.size() == 2) {
                     outputs.getFrameOutput("right") << previews[1].timestamp << previews[1].image << dv::commit;
@@ -814,8 +825,12 @@ protected:
         dv::camera::CalibrationSet calib;
 
         calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[0], "left", "left"));
+        log.info << "Calibration quality left camera: " << calib.getCameraCalibration("left")->metadata->quality
+                 << dv::logEnd;
         if (intrinsicResult.size() > 1) {
             calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[1], "right", "right"));
+            log.info << "Calibration quality right camera: " << calib.getCameraCalibration("right")->metadata->quality
+                     << dv::logEnd;
         }
         calib.addImuCalibration(getIMUCalibrationData(result));
 

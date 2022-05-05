@@ -646,7 +646,6 @@ public:
 
                             if (removeCount > 0) {
                                 for (size_t camId = 0; camId < numCams; camId++) {
-
                                     if (cornerRemovalList_allCams.at(camId).empty()
                                         || calibrator.nOfViews() <= batch_id) {
                                         continue;
@@ -698,6 +697,8 @@ public:
                     results.push_back(result);
                     cameraId++;
                 }
+
+                state = CalibratorUtils::CALIBRATED;
                 std::cout << "Finished calibration of intrinsics." << std::endl;
 
                 return results;
@@ -707,6 +708,7 @@ public:
                     "Optimization diverged possibly due to bad initialization. (Do the models fit the lenses well?) "
                     "{0}",
                     ex.what());
+                state = CalibratorUtils::INITIALIZED;
                 // not trying to restart
                 break;
             }
