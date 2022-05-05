@@ -238,6 +238,7 @@ public:
                 if (config.getBool("discard")) {
                     collectionState = BEFORE_COLLECTING;
                     log.info("Discarded all collected data");
+                    calibrator->reset();
                     initializeCalibrator();
                 }
                 break;
@@ -247,7 +248,6 @@ public:
                     collectionState = BEFORE_COLLECTING;
                     log.info("Discarded all collected data");
                     initializeCalibrator();
-                    setupCalibrator();
                 }
                 break;
             }
@@ -880,6 +880,8 @@ protected:
                 log.error << "Optimization failed. Please make sure that the pattern is detected on all frames in your "
                              "dataset and repeat the calibration"
                           << dv::logEnd;
+                initializeCalibrator();
+                collectionState = BEFORE_COLLECTING;
             }
         } else {
             saveIntrinsicCalibration(intrinsicsResult.value());
