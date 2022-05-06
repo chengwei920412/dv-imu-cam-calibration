@@ -174,7 +174,7 @@ public:
                 if constexpr (
                     std::is_same<CameraGeometryType, aslam::cameras::FovDistortedPinholeCameraGeometry>()
                     && std::is_same<DistortionType, aslam::cameras::FovDistortion>()) {
-                    cameraOptions.distCoeffs.push_back(0.0);
+                    cameraOptions.distCoeffs.push_back(1.0);
                 } else {
                     cameraOptions.distCoeffs.push_back(0.0);
                     cameraOptions.distCoeffs.push_back(0.0);

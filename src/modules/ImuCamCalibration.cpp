@@ -26,7 +26,6 @@ std::string getTimeString() {
 namespace ImuCamModelTypes {
 const std::string RADTAN = "Pinhole-RadialTangential";
 const std::string EQUIDISTANT = "Pinhole-Equidistant";
-const std::string FOV = "Pinhole-FOV";
 
 } // namespace ImuCamModelTypes
 
@@ -308,7 +307,7 @@ public:
             mCalibrator->reset();
         }
         // All the supported models are pinhole projection camera model. What change is the distortion.
-        if (config.getString("calibrationModel") == ImuCamModelTypes::RADTAN) {
+        if (config.getString("calibrationModel") == ImuCamModelTypes::EQUIDISTANT) {
             mCalibrator = std::make_unique<Calibrator<
                 aslam::cameras::EquidistantDistortedPinholeCameraGeometry,
                 aslam::cameras::EquidistantDistortion>>(mOptions);
@@ -465,9 +464,10 @@ public:
     }
 
     const dv::Frame& closestRightFrame(const int64_t timestamp) {
-        auto iter = std::min_element(mRightFrames.begin(), mRightFrames.end(), [timestamp](const auto& a, const auto& b) {
-            return std::abs(a.timestamp - timestamp) < std::abs(b.timestamp - timestamp);
-        });
+        auto iter
+            = std::min_element(mRightFrames.begin(), mRightFrames.end(), [timestamp](const auto& a, const auto& b) {
+                  return std::abs(a.timestamp - timestamp) < std::abs(b.timestamp - timestamp);
+              });
         return *iter;
     }
 
