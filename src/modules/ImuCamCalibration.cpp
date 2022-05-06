@@ -30,25 +30,33 @@ const std::string FOV = "Pinhole-FOV";
 
 } // namespace ImuCamModelTypes
 
+namespace QualityStrings {
+const std::string EXCELLENT = "excellent";
+const std::string GOOD = "good";
+const std::string POOR = "poor";
+const std::string BAD = "bad";
+} // namespace QualityStrings
+
 class ImuCamCalibration : public dv::ModuleBase {
 protected:
     // Calibrator options
     CalibratorUtils::Options mOptions;
     std::string mCalibrationModel = ImuCamModelTypes::RADTAN;
 
-    std::thread threadCalibrate;
-    std::unique_ptr<CalibratorBase> calibrator = nullptr;
-    std::unique_ptr<dv::io::MonoCameraWriter> dataLog = nullptr;
+    std::thread mThreadCalibrate;
+    std::string mQuality;
+    std::unique_ptr<CalibratorBase> mCalibrator = nullptr;
+    std::unique_ptr<dv::io::MonoCameraWriter> mDataLog = nullptr;
     using DVMessage = std::variant<dv::TimedKeyPointPacket, dv::Frame, dv::IMU>;
     using DVStreamAndMessage = std::pair<std::string, DVMessage>;
-    std::multimap<int64_t, DVStreamAndMessage> dataLogBuffer;
-    std::string timestampString;
-    std::vector<int64_t> times;
-    int64_t startTime = -1;
-    int64_t warmUpDuration = 100'000;
+    std::multimap<int64_t, DVStreamAndMessage> mDataLogBuffer;
+    std::string mTimestampString;
+    std::vector<int64_t> mTimes;
+    int64_t mStartTime = -1;
+    int64_t mWarmUpDuration = 100'000;
 
-    boost::circular_buffer<dv::Frame> leftFrames = boost::circular_buffer<dv::Frame>(5);
-    boost::circular_buffer<dv::Frame> rightFrames = boost::circular_buffer<dv::Frame>(5);
+    boost::circular_buffer<dv::Frame> mLeftFrames = boost::circular_buffer<dv::Frame>(5);
+    boost::circular_buffer<dv::Frame> mRightFrames = boost::circular_buffer<dv::Frame>(5);
 
     enum CollectionState { BEFORE_COLLECTING, DURING_COLLECTING, AFTER_COLLECTING, CALIBRATED };
 
@@ -74,26 +82,26 @@ protected:
     std::optional<double> imuUpdateRate = std::nullopt;
 
     void writeDataLogBuffer(const int64_t leaveLastMicroseconds = 0) {
-        if (dataLogBuffer.empty() || dataLog == nullptr) {
+        if (mDataLogBuffer.empty() || mDataLog == nullptr) {
             // Nothing to write
             return;
         }
 
         // Write the data up to last - minus a bit microseconds
-        const auto lastTs = dataLogBuffer.rbegin()->first;
+        const auto lastTs = mDataLogBuffer.rbegin()->first;
         int64_t lastWrittenTs = -1;
-        for (const auto& [ts, streamAndData] : dataLogBuffer) {
+        for (const auto& [ts, streamAndData] : mDataLogBuffer) {
             if (ts > lastTs - leaveLastMicroseconds) {
                 break;
             }
             lastWrittenTs = ts;
             const auto& [stream, data] = streamAndData;
             if (const auto* pval = std::get_if<dv::TimedKeyPointPacket>(&data)) {
-                dataLog->writePacket(*pval, stream);
+                mDataLog->writePacket(*pval, stream);
             } else if (const auto* pval = std::get_if<dv::Frame>(&data)) {
-                dataLog->writePacket(*pval, stream);
+                mDataLog->writePacket(*pval, stream);
             } else if (const auto* pval = std::get_if<dv::IMU>(&data)) {
-                dataLog->writeImu(*pval, stream);
+                mDataLog->writeImu(*pval, stream);
             } else {
                 throw std::runtime_error("Unknown packet type");
             }
@@ -101,8 +109,8 @@ protected:
 
         // Erase the data that has been written
         if (lastWrittenTs != -1) {
-            const auto it = dataLogBuffer.find(lastWrittenTs);
-            dataLogBuffer.erase(dataLogBuffer.begin(), it);
+            const auto it = mDataLogBuffer.find(lastWrittenTs);
+            mDataLogBuffer.erase(mDataLogBuffer.begin(), it);
         }
     }
 
@@ -201,7 +209,7 @@ public:
             collectionState = BEFORE_COLLECTING;
             log.info(fmt::format("Calibration model has changed to : {0}", mCalibrationModel));
         }
-        if (calibrator == nullptr) {
+        if (mCalibrator == nullptr) {
             initializeCalibrator();
             collectionState = BEFORE_COLLECTING;
         }
@@ -211,7 +219,7 @@ public:
             case BEFORE_COLLECTING: {
                 if (config.getBool("startCollecting")) {
                     collectionState = DURING_COLLECTING;
-                    calibrator->startCollecting();
+                    mCalibrator->startCollecting();
                     log.info("Started collecting images");
                 }
                 break;
@@ -219,16 +227,16 @@ public:
             case DURING_COLLECTING: {
                 if (config.getBool("stopCollecting")) {
                     collectionState = AFTER_COLLECTING;
-                    calibrator->stopCollecting();
+                    mCalibrator->stopCollecting();
                     log.info("Stopped collecting images");
                 }
                 break;
             }
             case AFTER_COLLECTING: {
                 if (config.getBool("calibrate")) {
-                    dataLog = nullptr;
+                    mDataLog = nullptr;
 
-                    threadCalibrate = std::thread([&]() {
+                    mThreadCalibrate = std::thread([&]() {
                         calibrate(inputs.isConnected("imu"));
                         collectionState = CALIBRATED;
                     });
@@ -237,11 +245,11 @@ public:
 
                 if (config.getBool("discard")) {
                     collectionState = BEFORE_COLLECTING;
-                    if (threadCalibrate.joinable()) {
-                        threadCalibrate.join();
+                    if (mThreadCalibrate.joinable()) {
+                        mThreadCalibrate.join();
                     }
                     log.info("Discarded all collected data");
-                    calibrator->reset();
+                    mCalibrator->reset();
                     initializeCalibrator();
                 }
                 break;
@@ -249,8 +257,8 @@ public:
             case CALIBRATED: {
                 if (config.getBool("discard")) {
                     collectionState = BEFORE_COLLECTING;
-                    if (threadCalibrate.joinable()) {
-                        threadCalibrate.join();
+                    if (mThreadCalibrate.joinable()) {
+                        mThreadCalibrate.join();
                     }
                     log.info("Discarded all collected data");
 
@@ -296,16 +304,16 @@ public:
     }
 
     void setupCalibrator() {
-        if (calibrator != nullptr) {
-            calibrator->reset();
+        if (mCalibrator != nullptr) {
+            mCalibrator->reset();
         }
         // All the supported models are pinhole projection camera model. What change is the distortion.
         if (config.getString("calibrationModel") == ImuCamModelTypes::RADTAN) {
-            calibrator = std::make_unique<Calibrator<
+            mCalibrator = std::make_unique<Calibrator<
                 aslam::cameras::EquidistantDistortedPinholeCameraGeometry,
                 aslam::cameras::EquidistantDistortion>>(mOptions);
         } else {
-            calibrator = std::make_unique<
+            mCalibrator = std::make_unique<
                 Calibrator<aslam::cameras::DistortedPinholeCameraGeometry, aslam::cameras::RadialTangentialDistortion>>(
                 mOptions);
         }
@@ -317,7 +325,7 @@ public:
 
     void initializeCalibrator() {
         const auto frameInput = inputs.getFrameInput("left");
-        timestampString = getTimeString();
+        mTimestampString = getTimeString();
         mOptions = CalibratorUtils::Options();
 
         mOptions.pattern = getPatternType();
@@ -355,7 +363,7 @@ public:
                 cfg.addStream<dv::TimedKeyPointPacket>("right_markers");
             }
 
-            dataLog = std::make_unique<dv::io::MonoCameraWriter>(
+            mDataLog = std::make_unique<dv::io::MonoCameraWriter>(
                 fs::path(getCalibrationSaveDirectory()) / "data.aedat4",
                 cfg);
         }
@@ -389,15 +397,15 @@ public:
     }
 
     ~ImuCamCalibration() override {
-        if (threadCalibrate.joinable()) {
-            threadCalibrate.join();
+        if (mThreadCalibrate.joinable()) {
+            mThreadCalibrate.join();
         }
-        calibrator->reset();
+        mCalibrator->reset();
         writeDataLogBuffer();
     }
 
     void logObservationData() {
-        auto detection = calibrator->getLatestObservations();
+        auto detection = mCalibrator->getLatestObservations();
         if (!detection.first.empty() && !detection.second.empty()) {
             dv::runtime_assert(
                 detection.first.size() == detection.second.size(),
@@ -428,14 +436,14 @@ public:
             }
             if (index == 0) {
                 const auto ts = detection.first[index].timestamp;
-                dataLogBuffer.emplace(
+                mDataLogBuffer.emplace(
                     std::make_pair(ts, std::make_pair("left_frames", dv::Frame(ts, detection.first[index].image))));
-                dataLogBuffer.emplace(std::make_pair(ts, std::make_pair("left_markers", markers)));
+                mDataLogBuffer.emplace(std::make_pair(ts, std::make_pair("left_markers", markers)));
             } else {
                 const auto ts = detection.first[index].timestamp;
-                dataLogBuffer.emplace(
+                mDataLogBuffer.emplace(
                     std::make_pair(ts, std::make_pair("right_frames", dv::Frame(ts, detection.first[index].image))));
-                dataLogBuffer.emplace(std::make_pair(ts, std::make_pair("right_markers", markers)));
+                mDataLogBuffer.emplace(std::make_pair(ts, std::make_pair("right_markers", markers)));
             }
         }
 
@@ -445,11 +453,11 @@ public:
 
     std::optional<size_t> estimateImuFrequency(const dv::IMUPacket& packet) {
         for (const auto& measurement : packet.elements) {
-            times.push_back(measurement.timestamp);
+            mTimes.push_back(measurement.timestamp);
         }
-        if (times.size() > 10) {
-            auto result = estimateFrequency(times);
-            times.clear();
+        if (mTimes.size() > 10) {
+            auto result = estimateFrequency(mTimes);
+            mTimes.clear();
             return result;
         } else {
             return std::nullopt;
@@ -457,27 +465,27 @@ public:
     }
 
     const dv::Frame& closestRightFrame(const int64_t timestamp) {
-        auto iter = std::min_element(rightFrames.begin(), rightFrames.end(), [timestamp](const auto& a, const auto& b) {
+        auto iter = std::min_element(mRightFrames.begin(), mRightFrames.end(), [timestamp](const auto& a, const auto& b) {
             return std::abs(a.timestamp - timestamp) < std::abs(b.timestamp - timestamp);
         });
         return *iter;
     }
 
     void run() override {
-        if (calibrator == nullptr) {
+        if (mCalibrator == nullptr) {
             handleCollectionState();
         }
         // Process IMU input
         if (inputs.isConnected("imu")) {
             auto imuInput = inputs.getIMUInput("imu");
             if (auto imuData = imuInput.data()) {
-                if (!calibrator) {
-                    if (startTime < 0) {
-                        startTime = imuData.front().timestamp;
+                if (!mCalibrator) {
+                    if (mStartTime < 0) {
+                        mStartTime = imuData.front().timestamp;
                     }
 
                     // Skip some data during warm up, the timestamps are not well aligned during startup
-                    if (imuData.front().timestamp - startTime < warmUpDuration) {
+                    if (imuData.front().timestamp - mStartTime < mWarmUpDuration) {
                         return;
                     }
 
@@ -489,7 +497,7 @@ public:
                 }
 
                 for (const auto& singleImu : imuData) {
-                    calibrator->addImu(
+                    mCalibrator->addImu(
                         singleImu.timestamp,
                         singleImu.getAngularVelocities().cast<double>(),
                         singleImu.getAccelerations().cast<double>());
@@ -497,7 +505,7 @@ public:
                 if (collectionState == DURING_COLLECTING) {
                     for (const auto& singleImu : imuData) {
                         const auto ts = singleImu.timestamp;
-                        dataLogBuffer.emplace(std::make_pair(ts, std::make_pair("imu", singleImu)));
+                        mDataLogBuffer.emplace(std::make_pair(ts, std::make_pair("imu", singleImu)));
                     }
                 }
             }
@@ -508,23 +516,23 @@ public:
 
         if (stereo) {
             if (auto frame = rightInput.data()) {
-                rightFrames.push_back(*frame.getBasePointer());
+                mRightFrames.push_back(*frame.getBasePointer());
             }
         }
 
         // Process frame input
         auto frameInput = inputs.getFrameInput("left");
         if (auto frame = frameInput.data()) {
-            leftFrames.push_back(*frame.getBasePointer());
+            mLeftFrames.push_back(*frame.getBasePointer());
         }
 
-        if (stereo && !rightFrames.full()) {
+        if (stereo && !mRightFrames.full()) {
             return;
         }
 
-        if (leftFrames.full()) {
+        if (mLeftFrames.full()) {
             std::vector<CalibratorUtils::StampedImage> images;
-            dv::Frame& left = leftFrames.front();
+            dv::Frame& left = mLeftFrames.front();
             if (left.image.channels() == 3) {
                 cv::Mat gray;
                 cv::cvtColor(left.image, gray, cv::COLOR_BGR2GRAY);
@@ -544,30 +552,42 @@ public:
                     images.emplace_back(right.image, left.timestamp);
                 }
             }
-            calibrator->addImages(images);
+            mCalibrator->addImages(images);
 
             // Output preview image
-            auto previews = calibrator->getPreviewImages();
+            auto previews = mCalibrator->getPreviewImages();
             if (!previews.empty()) {
-                if (!inputs.isConnected("imu")) {
+                if (collectionState == BEFORE_COLLECTING) {
+                    if (!inputs.isConnected("imu")) {
+                        cv::putText(
+                            previews[0].image,
+                            "No IMU data",
+                            cv::Point(20, previews[0].image.rows - 20),
+                            cv::FONT_HERSHEY_DUPLEX,
+                            1.0,
+                            cv::Scalar(0, 165, 255),
+                            2);
+                    }
                     cv::putText(
                         previews[0].image,
-                        "No imu data",
-                        cv::Point(20, previews[0].image.rows - 20),
+                        config.getString("calibrationModel"),
+                        cv::Point(20, 80),
                         cv::FONT_HERSHEY_DUPLEX,
-                        1.0,
-                        cv::Scalar(0, 165, 255),
+                        .5,
+                        cv::Scalar(255, 0, 0),
                         2);
+                } else if (collectionState == CALIBRATED) {
+                    drawQuality(previews[0].image);
                 }
                 outputs.getFrameOutput("left") << previews[0].timestamp << previews[0].image << dv::commit;
                 if (previews.size() == 2) {
                     outputs.getFrameOutput("right") << previews[1].timestamp << previews[1].image << dv::commit;
                 }
             }
-            if (dataLog) {
+            if (mDataLog) {
                 logObservationData();
             }
-            leftFrames.pop_front();
+            mLeftFrames.pop_front();
         }
     }
 
@@ -581,7 +601,7 @@ protected:
             outputDir = dv::portable_get_user_home_directory();
         }
 
-        const std::string dirName = "dv_calibration_" + timestampString;
+        const std::string dirName = "dv_calibration_" + mTimestampString;
         auto outputDirWithTs = outputDir / dirName;
 
         if (!fs::is_directory(outputDirWithTs)) {
@@ -666,15 +686,14 @@ protected:
                 << " Standard deviation: " << intrinsicResult.err_info.std.transpose();
 
         auto meanStd = (intrinsicResult.err_info.std.x() + intrinsicResult.err_info.std.y()) / 2.0;
-        std::string quality;
         if (meanStd < 0.1) {
-            quality = "excellent";
+            mQuality = QualityStrings::EXCELLENT;
         } else if (meanStd < 0.2) {
-            quality = "good";
+            mQuality = QualityStrings::GOOD;
         } else if (meanStd < 0.5) {
-            quality = "poor";
+            mQuality = QualityStrings::POOR;
         } else {
-            quality = "bad";
+            mQuality = QualityStrings::BAD;
         }
 
         return {
@@ -684,8 +703,8 @@ protected:
             config.getFloat("markerSize"),
             config.getFloat("markerSpacing"),
             meanStd,
-            timestampString,
-            quality,
+            mTimestampString,
+            mQuality,
             "",
             std::nullopt};
     }
@@ -795,9 +814,23 @@ protected:
             anrw,
             static_cast<int64_t>(result.t_cam_imu * 1e+6),
             transData,
-            dv::camera::calibrations::IMUCalibration::Metadata{timestampString, ssCom.str()});
+            dv::camera::calibrations::IMUCalibration::Metadata{mTimestampString, ssCom.str()});
 
         return cal;
+    }
+
+    void drawQuality(cv::Mat& image) {
+        cv::Scalar color;
+        if (mQuality == QualityStrings::EXCELLENT) {
+            color = cv::Scalar(0, 255, 0);
+        } else if (mQuality == QualityStrings::GOOD) {
+            color = cv::Scalar(145, 255, 0);
+        } else if (mQuality == QualityStrings::POOR) {
+            color = cv::Scalar(145, 0, 255);
+        } else {
+            color = cv::Scalar(0, 0, 255);
+        }
+        cv::putText(image, mQuality, cv::Point(20, image.rows - 20), cv::FONT_HERSHEY_DUPLEX, 1.0, color, 2);
     }
 
     void saveIntrinsicCalibration(const std::vector<CameraCalibrationUtils::CalibrationResult>& intrinsicResult) {
@@ -808,11 +841,11 @@ protected:
         dv::camera::CalibrationSet calib;
 
         calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[0], "left", "left"));
-        log.info << "Calibration quality left camera: " << calib.getCameraCalibration("left")->metadata->quality
+        log.info << "Calibration mQuality left camera: " << calib.getCameraCalibration("left")->metadata->quality
                  << dv::logEnd;
         if (intrinsicResult.size() > 1) {
             calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[1], "right", "right"));
-            log.info << "Calibration quality right camera: " << calib.getCameraCalibration("right")->metadata->quality
+            log.info << "Calibration mQuality right camera: " << calib.getCameraCalibration("right")->metadata->quality
                      << dv::logEnd;
         }
 
@@ -850,13 +883,13 @@ protected:
         std::ofstream outLog(getCalibrationSaveDirectory() / "log.txt");
         outLog << "Calibrating begins..." << std::endl;
 
-        calibrator->print(outLog);
+        mCalibrator->print(outLog);
 
         const auto& rdbuf = std::cout.rdbuf();
         std::cout.rdbuf(outLog.rdbuf());
 
         log.info("Calibrating the intrinsics of the camera...");
-        auto intrinsicsResult = calibrator->calibrateCameraIntrinsics();
+        auto intrinsicsResult = mCalibrator->calibrateCameraIntrinsics();
         if (!intrinsicsResult.has_value()) {
             throw dv::exceptions::RuntimeError(
                 "Failed to calibrate intrinsics! Please check that the pattern was well detected on the images");
@@ -864,17 +897,17 @@ protected:
 
         if (calibrateImu) {
             outLog << "Building the problem..." << std::endl;
-            calibrator->buildProblem();
+            mCalibrator->buildProblem();
 
             // Print the info before optimization
-            calibrator->getDvInfoBeforeOptimization(outLog);
+            mCalibrator->getDvInfoBeforeOptimization(outLog);
 
             // Run the optimization problem
             outLog << "Optimizing..." << std::endl;
             try {
-                IccCalibratorUtils::CalibrationResult result = calibrator->calibrate();
+                IccCalibratorUtils::CalibrationResult result = mCalibrator->calibrate();
                 // Print the info after optimization
-                calibrator->getDvInfoAfterOptimization(outLog);
+                mCalibrator->getDvInfoAfterOptimization(outLog);
 
                 // Print the result
                 outLog << "RESULT" << std::endl;
