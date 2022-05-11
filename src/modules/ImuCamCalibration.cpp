@@ -56,8 +56,9 @@ protected:
 
     boost::circular_buffer<dv::Frame> mLeftFrames = boost::circular_buffer<dv::Frame>(5);
     boost::circular_buffer<dv::Frame> mRightFrames = boost::circular_buffer<dv::Frame>(5);
+    dv::io::MonoCameraWriter::Config mWriterConfig;
 
-    enum CollectionState { BEFORE_COLLECTING, DURING_COLLECTING, AFTER_COLLECTING, CALIBRATED };
+    enum CollectionState { BEFORE_COLLECTING, DURING_COLLECTING, AFTER_COLLECTING, CALIBRATING, CALIBRATED };
 
     CollectionState collectionState = BEFORE_COLLECTING;
 
@@ -235,11 +236,10 @@ public:
                 if (config.getBool("calibrate")) {
                     mDataLog = nullptr;
 
+                    collectionState = CALIBRATING;
                     mThreadCalibrate = std::thread([&]() {
                         calibrate(inputs.isConnected("imu"));
-                        collectionState = CALIBRATED;
                     });
-                    collectionState = CALIBRATED;
                 }
 
                 if (config.getBool("discard")) {
@@ -251,6 +251,9 @@ public:
                     mCalibrator->reset();
                     initializeCalibrator();
                 }
+                break;
+            }
+            case CALIBRATING: {
                 break;
             }
             case CALIBRATED: {
@@ -289,6 +292,13 @@ public:
                 config.setBool("stopCollecting", true);
                 config.setBool("discard", false);
                 config.setBool("calibrate", false);
+                break;
+            }
+            case CALIBRATING: {
+                config.setBool("startCollecting", true);
+                config.setBool("stopCollecting", true);
+                config.setBool("discard", true);
+                config.setBool("calibrate", true);
                 break;
             }
             case CALIBRATED: {
@@ -351,20 +361,15 @@ public:
 
         // TODO: wrap a class around the MonoCameraWriter and the StereoCameraWriter
         if (config.getBool("recordData")) {
-            dv::io::MonoCameraWriter::Config cfg;
-            cfg.cameraName = getCameraID("left");
-            cfg.frameResolution = frameInput.size();
-            cfg.enableImu = inputs.getIMUInput("imu").isConnected();
-            cfg.addFrameStream(frameInput.size(), "left_frames", frameInput.getOriginDescription());
-            cfg.addStream<dv::TimedKeyPointPacket>("left_markers");
+            mWriterConfig.cameraName = getCameraID("left");
+            mWriterConfig.frameResolution = frameInput.size();
+            mWriterConfig.enableImu = inputs.getIMUInput("imu").isConnected();
+            mWriterConfig.addFrameStream(frameInput.size(), "left_frames", frameInput.getOriginDescription());
+            mWriterConfig.addStream<dv::TimedKeyPointPacket>("left_markers");
             if (rightInput.isConnected()) {
-                cfg.addFrameStream(rightInput.size(), "right_frames", rightInput.getOriginDescription());
-                cfg.addStream<dv::TimedKeyPointPacket>("right_markers");
+                mWriterConfig.addFrameStream(rightInput.size(), "right_frames", rightInput.getOriginDescription());
+                mWriterConfig.addStream<dv::TimedKeyPointPacket>("right_markers");
             }
-
-            mDataLog = std::make_unique<dv::io::MonoCameraWriter>(
-                fs::path(getCalibrationSaveDirectory()) / "data.aedat4",
-                cfg);
         }
     }
 
@@ -830,7 +835,14 @@ protected:
         } else {
             color = cv::Scalar(0, 0, 255);
         }
-        cv::putText(image, mQuality, cv::Point(20, image.rows - 20), cv::FONT_HERSHEY_DUPLEX, 1.0, color, 2);
+        cv::putText(
+            image,
+            fmt::format("Quality: {0}", mQuality),
+            cv::Point(20, image.rows - 20),
+            cv::FONT_HERSHEY_DUPLEX,
+            1.0,
+            color,
+            2);
     }
 
     void saveIntrinsicCalibration(const std::vector<CameraCalibrationUtils::CalibrationResult>& intrinsicResult) {
@@ -841,11 +853,11 @@ protected:
         dv::camera::CalibrationSet calib;
 
         calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[0], "left", "left"));
-        log.info << "Calibration mQuality left camera: " << calib.getCameraCalibration("left")->metadata->quality
+        log.info << "Calibration quality left camera: " << calib.getCameraCalibration("left")->metadata->quality
                  << dv::logEnd;
         if (intrinsicResult.size() > 1) {
             calib.addCameraCalibration(getIntrinsicCalibrationData(intrinsicResult[1], "right", "right"));
-            log.info << "Calibration mQuality right camera: " << calib.getCameraCalibration("right")->metadata->quality
+            log.info << "Calibration quality right camera: " << calib.getCameraCalibration("right")->metadata->quality
                      << dv::logEnd;
         }
 
@@ -880,6 +892,12 @@ protected:
     }
 
     void calibrate(const bool calibrateImu) {
+        if (config.getBool("recordData")) {
+            mDataLog = std::make_unique<dv::io::MonoCameraWriter>(
+                fs::path(getCalibrationSaveDirectory()) / "data.aedat4",
+                mWriterConfig);
+        }
+
         std::ofstream outLog(getCalibrationSaveDirectory() / "log.txt");
         outLog << "Calibrating begins..." << std::endl;
 
@@ -915,6 +933,7 @@ protected:
 
                 // Save the calibration to a text file
                 saveCalibration(intrinsicsResult.value(), result);
+                collectionState = CALIBRATED;
             } catch (std::exception& ex) {
                 outLog << ex.what() << std::endl;
                 log.error << "Optimization failed. Please make sure that the pattern is detected on all frames in your "
@@ -925,6 +944,7 @@ protected:
             }
         } else {
             saveIntrinsicCalibration(intrinsicsResult.value());
+            collectionState = CALIBRATED;
         }
         std::cout.rdbuf(rdbuf);
     }

@@ -61,6 +61,7 @@ protected:
     std::vector<CalibratorUtils::StampedImage> latestImages;
     std::vector<boost::shared_ptr<aslam::cameras::GridCalibrationTargetObservation>> latestObservations;
     std::mutex latestImageMutex;
+    std::string calibrationLoading;
 
     std::vector<boost::shared_ptr<aslam::cameras::GridDetector>> detectors;
 
@@ -352,9 +353,14 @@ public:
                     break;
                 }
                 case CalibratorUtils::CALIBRATING: {
+                    if (calibrationLoading.size() > 5) {
+                        calibrationLoading = "";
+                    } else {
+                        calibrationLoading += ".";
+                    }
                     cv::putText(
                         latestImage.image,
-                        "Calibrating...",
+                        fmt::format("Calibrating{0}", calibrationLoading),
                         cv::Point(20, 40),
                         cv::FONT_HERSHEY_DUPLEX,
                         1.0,
