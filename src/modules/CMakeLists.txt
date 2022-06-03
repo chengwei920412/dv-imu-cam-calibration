@@ -20,14 +20,23 @@ TARGET_LINK_LIBRARIES(imu-cam-calibration PRIVATE
         aslam_cameras_april
         aslam_splines
         bsplines
-        calibrator
-        camera_calibrator
-        config_reader
         incremental_calibration
         kalibr_errorterms
         kalibr_imu_camera_calibration
         sm_boost
         sm_kinematics
+        )
+
+ADD_LIBRARY(markers_preview SHARED
+        MarkersDrawing.cpp)
+
+SET_TARGET_PROPERTIES(markers_preview
+        PROPERTIES
+        PREFIX "dv_"
+        )
+
+TARGET_LINK_LIBRARIES(markers_preview PRIVATE
+        ${DV_LIBRARIES}
         )
 
 INSTALL(TARGETS imu-cam-calibration DESTINATION ${DV_MODULES_DIR}/imu-calibration)

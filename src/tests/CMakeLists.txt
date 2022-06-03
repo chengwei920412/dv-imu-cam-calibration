@@ -1,34 +1,33 @@
+# Unit testing support.
+OPTION(ENABLE_TESTS "Build unit tests" ON)
+
 IF (NOT ENABLE_TESTS)
 	SET(ENABLE_TESTS 0 CACHE BOOL "Compiles tests using Google's GTest framework.")
 	RETURN()
 ENDIF()
 
-find_package(OpenCV REQUIRED)
-include_directories(SYSTEM ${OpenCV_INCLUDE_DIRS})
-
-find_package(Eigen3 REQUIRED)
-include_directories(SYSTEM ${EIGEN3_INCLUDE_DIR})
-
 find_package(GTest REQUIRED)
+find_package(OpenCV REQUIRED)
 
 add_executable(test_calibrator
-        testCalibrator.cpp)
-target_link_libraries(test_calibrator
-        ${OpenCV_LIBS}
-        ${Boost_LIBRARIES}
-        aslam_backend
-        aslam_cameras
-        aslam_cv_backend
-        aslam_splines
-        bsplines
-        calibrator
-        incremental_calibration
-        sm_boost
-        sm_kinematics
-        kalibr_errorterms
-        kalibr_imu_camera_calibration
-        gtest
-        pthread
-        )
+		testCalibrator.cpp)
 
-#INSTALL(TARGETS test_calibrator DESTINATION ${DV_MODULES_DIR}/imu-calibration)
+target_link_libraries(test_calibrator
+		${DV_LIBRARIES}
+		${OpenCV_LIBS}
+		${Boost_LIBRARIES}
+		aslam_backend
+		aslam_cameras
+		aslam_cameras_april
+		aslam_splines
+		bsplines
+		incremental_calibration
+		kalibr_errorterms
+		kalibr_imu_camera_calibration
+		sm_boost
+		sm_kinematics
+		gtest
+		pthread
+		)
+
+INSTALL(TARGETS test_calibrator DESTINATION ${DV_MODULES_DIR}/imu-calibration)

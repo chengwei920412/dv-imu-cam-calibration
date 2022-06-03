@@ -20,6 +20,8 @@ PROJECT(dv-imu-cam-calibration
 	VERSION 1.0.0
 	LANGUAGES C CXX)
 
+ADD_DEFINITIONS(-march=native)
+
 # Define installation paths
 INCLUDE(GNUInstallDirs)
 
@@ -36,8 +38,8 @@ IF (APPLE)
 ENDIF()
 
 # Basic setup
-INCLUDE(dv-modules)
-DV_MODULE_SETUP()
+FIND_PACKAGE(dv 1.5.0 REQUIRED)
+SET(DV_LIBRARIES dv::sdk)
 
 SET(CMAKE_C_VISIBILITY_PRESET default)
 SET(CMAKE_CXX_VISIBILITY_PRESET default)
@@ -47,3 +49,4 @@ SET(CMAKE_INSTALL_RPATH ${USER_LOCAL_PREFIX}/${DV_MODULES_DIR}/imu-calibration)
 
 add_subdirectory(src)
 add_subdirectory(thirdparty)
+
