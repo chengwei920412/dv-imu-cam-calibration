@@ -362,8 +362,10 @@ public:
         // TODO: wrap a class around the MonoCameraWriter and the StereoCameraWriter
         if (config.getBool("recordData")) {
             mWriterConfig.cameraName = getCameraID("left");
-            mWriterConfig.frameResolution = frameInput.size();
-            mWriterConfig.enableImu = inputs.getIMUInput("imu").isConnected();
+            mWriterConfig.addFrameStream(frameInput.size(), "frames");
+            if (inputs.getIMUInput("imu").isConnected()) {
+                mWriterConfig.addImuStream("imu");
+            }
             mWriterConfig.addFrameStream(frameInput.size(), "left_frames", frameInput.getOriginDescription());
             mWriterConfig.addStream<dv::TimedKeyPointPacket>("left_markers");
             if (rightInput.isConnected()) {
@@ -373,7 +375,7 @@ public:
         }
     }
 
-    ImuCamCalibration() {
+    ImuCamCalibration(): mWriterConfig(dv::io::MonoCameraWriter::Config(getCameraID("left"))) {
         // Input output
         const auto frameInput = inputs.getFrameInput("left");
         const auto inputSize = frameInput.size();
