@@ -7,6 +7,9 @@ This code is based on [kalibr](https://github.com/ethz-asl/kalibr).
 * boost
 * eigen
 * libsuitesparse-de
+* libgtest-dev
+* dv-runtime-dev
+* gcc >= 10.0
 
 ## Build instructions
 ```
