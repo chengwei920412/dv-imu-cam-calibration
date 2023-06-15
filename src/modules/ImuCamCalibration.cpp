@@ -362,8 +362,8 @@ public:
         // TODO: wrap a class around the MonoCameraWriter and the StereoCameraWriter
         if (config.getBool("recordData")) {
             mWriterConfig.cameraName = getCameraID("left");
-            mWriterConfig.frameResolution = frameInput.size();
-            mWriterConfig.enableImu = inputs.getIMUInput("imu").isConnected();
+            //            mWriterConfig.frameResolution = frameInput.size();
+            //            mWriterConfig.enableImu = inputs.getIMUInput("imu").isConnected();
             mWriterConfig.addFrameStream(frameInput.size(), "left_frames", frameInput.getOriginDescription());
             mWriterConfig.addStream<dv::TimedKeyPointPacket>("left_markers");
             if (rightInput.isConnected()) {
@@ -373,7 +373,7 @@ public:
         }
     }
 
-    ImuCamCalibration() {
+    ImuCamCalibration() : mWriterConfig(getCameraID("left")) {
         // Input output
         const auto frameInput = inputs.getFrameInput("left");
         const auto inputSize = frameInput.size();
@@ -924,16 +924,6 @@ protected:
             outLog << "Optimizing..." << std::endl;
             try {
                 IccCalibratorUtils::CalibrationResult result = mCalibrator->calibrate();
-                // Print the info after optimization
-                mCalibrator->getDvInfoAfterOptimization(outLog);
-
-                // Print the result
-                outLog << "RESULT" << std::endl;
-                IccCalibratorUtils::printResult(result, outLog);
-
-                // Save the calibration to a text file
-                saveCalibration(intrinsicsResult.value(), result);
-                collectionState = CALIBRATED;
             } catch (std::exception& ex) {
                 outLog << ex.what() << std::endl;
                 log.error << "Optimization failed. Please make sure that the pattern is detected on all frames in your "
@@ -942,6 +932,17 @@ protected:
                 initializeCalibrator();
                 collectionState = BEFORE_COLLECTING;
             }
+
+            // Print the info after optimization
+            mCalibrator->getDvInfoAfterOptimization(outLog);
+            
+            // Print the result
+            outLog << "RESULT" << std::endl;
+            IccCalibratorUtils::printResult(result, outLog);
+
+            // Save the calibration to a text file
+            saveCalibration(intrinsicsResult.value(), result);
+            collectionState = CALIBRATED;
         } else {
             saveIntrinsicCalibration(intrinsicsResult.value());
             collectionState = CALIBRATED;
