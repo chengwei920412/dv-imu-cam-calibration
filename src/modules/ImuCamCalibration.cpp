@@ -177,6 +177,7 @@ public:
             dv::ConfigOption::buttonOption("Stop collecting calibration images", "StopCollecting"));
         config.add("discard", dv::ConfigOption::buttonOption("Discard the collected images", "Discard"));
         config.add("calibrate", dv::ConfigOption::buttonOption("Start calibration algorithm", "Calibrate"));
+        config.add("calibrationFinished", dv::ConfigOption::boolOption("Calibration finished", false, true));
 
         // Optimization options
         config.add(
@@ -306,6 +307,7 @@ public:
                 config.setBool("stopCollecting", true);
                 config.setBool("discard", false);
                 config.setBool("calibrate", true);
+                config.setBool("calibrationFinished", true);
                 break;
             }
             default: throw std::runtime_error("Invalid collection state");
@@ -924,6 +926,16 @@ protected:
             outLog << "Optimizing..." << std::endl;
             try {
                 IccCalibratorUtils::CalibrationResult result = mCalibrator->calibrate();
+                // Print the info after optimization
+                mCalibrator->getDvInfoAfterOptimization(outLog);
+
+                // Print the result
+                outLog << "RESULT" << std::endl;
+                IccCalibratorUtils::printResult(result, outLog);
+
+                // Save the calibration to a text file
+                saveCalibration(intrinsicsResult.value(), result);
+                collectionState = CALIBRATED;
             } catch (std::exception& ex) {
                 outLog << ex.what() << std::endl;
                 log.error << "Optimization failed. Please make sure that the pattern is detected on all frames in your "
@@ -932,17 +944,6 @@ protected:
                 initializeCalibrator();
                 collectionState = BEFORE_COLLECTING;
             }
-
-            // Print the info after optimization
-            mCalibrator->getDvInfoAfterOptimization(outLog);
-            
-            // Print the result
-            outLog << "RESULT" << std::endl;
-            IccCalibratorUtils::printResult(result, outLog);
-
-            // Save the calibration to a text file
-            saveCalibration(intrinsicsResult.value(), result);
-            collectionState = CALIBRATED;
         } else {
             saveIntrinsicCalibration(intrinsicsResult.value());
             collectionState = CALIBRATED;
