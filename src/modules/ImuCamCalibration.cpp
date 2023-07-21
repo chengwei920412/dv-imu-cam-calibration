@@ -307,7 +307,6 @@ public:
                 config.setBool("stopCollecting", true);
                 config.setBool("discard", false);
                 config.setBool("calibrate", true);
-                config.setBool("calibrationFinished", true);
                 break;
             }
             default: throw std::runtime_error("Invalid collection state");
@@ -946,6 +945,7 @@ protected:
             }
         } else {
             saveIntrinsicCalibration(intrinsicsResult.value());
+            config.setBool("calibrationFinished", true);
             collectionState = CALIBRATED;
         }
         std::cout.rdbuf(rdbuf);
