@@ -737,7 +737,6 @@ public:
 
         std::cout << "Calibrating using " << camTargetObservations.at(0)->size() << " detections." << std::endl;
 
-        std::cout << std::endl << "Building the problem" << std::endl;
         iccCalibrator->buildProblem(
             6,
             100,

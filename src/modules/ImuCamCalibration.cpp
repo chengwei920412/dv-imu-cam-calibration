@@ -177,6 +177,7 @@ public:
             dv::ConfigOption::buttonOption("Stop collecting calibration images", "StopCollecting"));
         config.add("discard", dv::ConfigOption::buttonOption("Discard the collected images", "Discard"));
         config.add("calibrate", dv::ConfigOption::buttonOption("Start calibration algorithm", "Calibrate"));
+        config.add("calibrationFinished", dv::ConfigOption::boolOption("Calibration finished", false, true));
 
         // Optimization options
         config.add(
@@ -375,7 +376,7 @@ public:
         }
     }
 
-    ImuCamCalibration(): mWriterConfig(dv::io::MonoCameraWriter::Config(getCameraID("left"))) {
+    ImuCamCalibration() : mWriterConfig(getCameraID("left")) {
         // Input output
         const auto frameInput = inputs.getFrameInput("left");
         const auto inputSize = frameInput.size();
@@ -946,6 +947,7 @@ protected:
             }
         } else {
             saveIntrinsicCalibration(intrinsicsResult.value());
+            config.setBool("calibrationFinished", true);
             collectionState = CALIBRATED;
         }
         std::cout.rdbuf(rdbuf);
